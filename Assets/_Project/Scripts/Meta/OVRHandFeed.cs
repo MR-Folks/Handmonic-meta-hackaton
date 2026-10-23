@@ -40,8 +40,10 @@ namespace MusicInYourHands.Meta
             var rig = HandRig.Instance;
             if (rig == null || hand == null || skeleton == null) return;
 
-            // The system gesture (palm up, pinch) opens the Meta menu, so treat the hand as busy.
-            bool tracked = hand.IsTracked && skeleton.IsDataValid && !hand.IsSystemGestureInProgress && (palm != null || FindBones());
+            bool tracked = hand.IsTracked && skeleton.IsDataValid && (palm != null || FindBones());
+            // Facing the palm to the headset shows Meta's menu button. The hand stays tracked and visible, but worlds
+            // should ignore pinches from it so they do not fire while the player opens the menu.
+            rig.Get(isLeft).InSystemGesture = tracked && hand.IsSystemGestureInProgress;
             if (!tracked)
             {
                 rig.Push(isLeft, false, default, default, null);

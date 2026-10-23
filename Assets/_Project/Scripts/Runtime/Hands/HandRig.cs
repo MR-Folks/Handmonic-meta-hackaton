@@ -24,6 +24,8 @@ namespace MusicInYourHands
             public float Fist;
             public bool PalmUp;
             public Vector3 Velocity;
+            /// <summary>True while the palm faces the headset and Meta's menu button shows. Ignore pinches then.</summary>
+            public bool InSystemGesture;
 
             /// <summary>
             /// The joint transforms that move the visible hand, when the feed has them. Attach visuals to these to

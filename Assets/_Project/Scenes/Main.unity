@@ -282,7 +282,7 @@ PrefabInstance:
     - target: {fileID: 8661073797813907648, guid: deccf1bd75222ab419fef0130b2a4d9e, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: d641a50c4fe4ee3489a64cf52b76ae79, type: 2}
+      objectReference: {fileID: 2100000, guid: 963a4a574989243d1abf4416304468f9, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -290,6 +290,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 5240948049834782713, guid: deccf1bd75222ab419fef0130b2a4d9e, type: 3}
       insertIndex: -1
       addedObject: {fileID: 438014124}
+    - targetCorrespondingSourceObject: {fileID: 5240948049834782713, guid: deccf1bd75222ab419fef0130b2a4d9e, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 438014125}
   m_SourcePrefab: {fileID: 100100000, guid: deccf1bd75222ab419fef0130b2a4d9e, type: 3}
 --- !u!4 &438014120 stripped
 Transform:
@@ -338,6 +341,37 @@ MonoBehaviour:
   hand: {fileID: 438014123}
   skeleton: {fileID: 438014122}
   isLeft: 1
+--- !u!114 &438014125
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 438014121}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c7831fcc50f64419189dbc86eabf7dc2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.HandSkin
+  target: {fileID: 1157063446}
+  wrist: {fileID: 1157063448}
+  knuckle: {fileID: 1157063447}
+  response: 12
+--- !u!137 &719480442 stripped
+SkinnedMeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 8897015553105444279, guid: f4f1f0ff232ea644c8a980e61825dd44, type: 3}
+  m_PrefabInstance: {fileID: 1414445809}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &719480443 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 9074307649457216382, guid: f4f1f0ff232ea644c8a980e61825dd44, type: 3}
+  m_PrefabInstance: {fileID: 1414445809}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &719480444 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 7715439802841928401, guid: f4f1f0ff232ea644c8a980e61825dd44, type: 3}
+  m_PrefabInstance: {fileID: 1414445809}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1132760866
 GameObject:
   m_ObjectHideFlags: 0
@@ -388,6 +422,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!137 &1157063446 stripped
+SkinnedMeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 8661073797813907648, guid: deccf1bd75222ab419fef0130b2a4d9e, type: 3}
+  m_PrefabInstance: {fileID: 438014119}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &1157063447 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 702649242308947508, guid: deccf1bd75222ab419fef0130b2a4d9e, type: 3}
+  m_PrefabInstance: {fileID: 438014119}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &1157063448 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 8105417998198620699, guid: deccf1bd75222ab419fef0130b2a4d9e, type: 3}
+  m_PrefabInstance: {fileID: 438014119}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1164771368
 GameObject:
   m_ObjectHideFlags: 0
@@ -624,7 +673,7 @@ PrefabInstance:
     - target: {fileID: 8897015553105444279, guid: f4f1f0ff232ea644c8a980e61825dd44, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: d641a50c4fe4ee3489a64cf52b76ae79, type: 2}
+      objectReference: {fileID: 2100000, guid: 963a4a574989243d1abf4416304468f9, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -632,6 +681,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 6349819858803557333, guid: f4f1f0ff232ea644c8a980e61825dd44, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1414445814}
+    - targetCorrespondingSourceObject: {fileID: 6349819858803557333, guid: f4f1f0ff232ea644c8a980e61825dd44, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1414445815}
   m_SourcePrefab: {fileID: 100100000, guid: f4f1f0ff232ea644c8a980e61825dd44, type: 3}
 --- !u!4 &1414445810 stripped
 Transform:
@@ -680,6 +732,22 @@ MonoBehaviour:
   hand: {fileID: 1414445813}
   skeleton: {fileID: 1414445812}
   isLeft: 0
+--- !u!114 &1414445815
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1414445811}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c7831fcc50f64419189dbc86eabf7dc2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.HandSkin
+  target: {fileID: 719480442}
+  wrist: {fileID: 719480444}
+  knuckle: {fileID: 719480443}
+  response: 12
 --- !u!1 &1492539440
 GameObject:
   m_ObjectHideFlags: 0

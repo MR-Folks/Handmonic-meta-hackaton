@@ -230,12 +230,14 @@ namespace MusicInYourHands.EditorTools
                 debugView.transform.position = new Vector3(0f, 1.2f, 1f);
             }
 
-            if (Object.FindAnyObjectByType<HandDebugView>() == null) new GameObject("HandDebugView", typeof(HandDebugView));
+            // The joint dots are a debugging aid, so they start switched off. Turn the HandDebugView object on to see them.
+            if (Object.FindAnyObjectByType<HandDebugView>(FindObjectsInactive.Include) == null)
+                new GameObject("HandDebugView", typeof(HandDebugView)).SetActive(false);
             if (Object.FindAnyObjectByType<RuntimeDiagnostics>() == null) new GameObject("RuntimeDiagnostics", typeof(RuntimeDiagnostics));
 
             var debugMaterial = EnsureDebugMaterial();
             foreach (var view in Object.FindObjectsByType<MusicDebugView>(FindObjectsSortMode.None)) SetMaterial(view, debugMaterial);
-            foreach (var view in Object.FindObjectsByType<HandDebugView>(FindObjectsSortMode.None)) SetMaterial(view, debugMaterial);
+            foreach (var view in Object.FindObjectsByType<HandDebugView>(FindObjectsInactive.Include, FindObjectsSortMode.None)) SetMaterial(view, debugMaterial);
 
             if (Object.FindAnyObjectByType<Light>() == null)
             {
@@ -248,6 +250,7 @@ namespace MusicInYourHands.EditorTools
 
 #if META_XR_CORE
             if (Object.FindAnyObjectByType<OVRManager>() == null) CreateMetaRig();
+            foreach (var feed in Object.FindObjectsByType<OVRHandFeed>(FindObjectsSortMode.None)) ApplyHandLook(feed.gameObject);
 #endif
 
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -278,7 +281,6 @@ namespace MusicInYourHands.EditorTools
         const string MetaPrefabs = "Packages/com.meta.xr.sdk.core/Prefabs/";
         const string MetaHandPrefabLeft = MetaPrefabs + "OpenXRCustomHandPrefab_L.prefab";
         const string MetaHandPrefabRight = MetaPrefabs + "OpenXRCustomHandPrefab_R.prefab";
-        const string MetaHandMaterial = "Packages/com.meta.xr.sdk.interaction/Runtime/Materials/OculusHand.mat";
 
         static void CreateMetaRig()
         {
@@ -316,16 +318,47 @@ namespace MusicInYourHands.EditorTools
             if (handGo.TryGetComponent<OVRMesh>(out var mesh))
                 SetSerialized(mesh, "_meshType", (int)(left ? OVRMesh.MeshType.XRHandLeft : OVRMesh.MeshType.XRHandRight));
 
-            var material = AssetDatabase.LoadAssetAtPath<Material>(MetaHandMaterial);
-            if (material == null) Debug.LogError($"[Setup] Hand material not found: {MetaHandMaterial}");
-            foreach (var skin in handGo.GetComponentsInChildren<SkinnedMeshRenderer>(true))
-            {
-                skin.sharedMaterial = material;
-                PrefabUtility.RecordPrefabInstancePropertyModifications(skin);
-            }
-
             handGo.AddComponent<OVRHandFeed>().Configure(hand, skeleton, left);
+            ApplyHandLook(handGo);
         }
+
+        /// <summary>Gives a Meta hand the project's hand material and a HandSkin to drive it. Safe to repeat.</summary>
+        public static void ApplyHandLook(GameObject handGo)
+        {
+            var material = EnsureHandMaterial();
+            var skin = handGo.GetComponentInChildren<SkinnedMeshRenderer>(true);
+            if (skin == null)
+            {
+                Debug.LogError($"[Setup] {handGo.name} has no hand mesh.");
+                return;
+            }
+            skin.sharedMaterial = material;
+            if (PrefabUtility.IsPartOfPrefabInstance(skin)) PrefabUtility.RecordPrefabInstancePropertyModifications(skin);
+
+            var bones = handGo.GetComponentsInChildren<Transform>(true);
+            var wrist = bones.FirstOrDefault(t => t.name == "XRHand_Wrist");
+            var knuckle = bones.FirstOrDefault(t => t.name == "XRHand_MiddleProximal");
+            // Not "??": Unity's fake-null objects slip past it.
+            var handSkin = handGo.GetComponent<HandSkin>();
+            if (handSkin == null) handSkin = handGo.AddComponent<HandSkin>();
+            handSkin.Configure(skin, wrist, knuckle);
+            EditorUtility.SetDirty(handSkin);
+        }
+#endif
+
+        public const string HandMaterialPath = Root + "/Materials/Hand.mat";
+
+        public static Material EnsureHandMaterial()
+        {
+            EnsureFolder(Root + "/Materials");
+            var material = AssetDatabase.LoadAssetAtPath<Material>(HandMaterialPath);
+            if (material != null) return material;
+            material = new Material(Shader.Find("MusicInYourHands/Hand")) { name = "Hand" };
+            AssetDatabase.CreateAsset(material, HandMaterialPath);
+            return material;
+        }
+
+#if META_XR_CORE
 
         static void SetSerialized(Object target, string property, int value)
         {
