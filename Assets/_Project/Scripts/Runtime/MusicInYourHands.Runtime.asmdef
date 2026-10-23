@@ -1,0 +1,6 @@
+{
+    "name": "MusicInYourHands.Runtime",
+    "rootNamespace": "MusicInYourHands",
+    "references": [],
+    "autoReferenced": true
+}

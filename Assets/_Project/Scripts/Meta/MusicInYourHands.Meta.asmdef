@@ -1,0 +1,19 @@
+{
+    "name": "MusicInYourHands.Meta",
+    "rootNamespace": "MusicInYourHands.Meta",
+    "references": [
+        "MusicInYourHands.Runtime",
+        "Oculus.VR"
+    ],
+    "defineConstraints": [
+        "META_XR_CORE"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.meta.xr.sdk.core",
+            "expression": "1.0.0",
+            "define": "META_XR_CORE"
+        }
+    ],
+    "autoReferenced": true
+}

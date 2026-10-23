@@ -16,17 +16,30 @@ Assets/_Project/
   Scripts/
     Runtime/Music/   MusicBus (bands, beats, song time), SongAsset
     Runtime/Lyrics/  LyricsTrack (LRC parser and current line/word lookup)
-    Runtime/Debug/   MusicDebugView (in-headset check of bands, beats and lyric sync)
-    Editor/          LRC importer, one-click project setup
+    Runtime/Hands/   HandRig (palm, fingertips, pinch, fist, palm-up for every world)
+    Runtime/Debug/   MusicDebugView and HandDebugView (in-headset checks)
+    Meta/            OVRHandFeed (Meta hand tracking into HandRig)
+    Editor/          Quest setup, scene builder, APK build, LRC importer
+Docs/
+  concept-book.html      the interactive concept page with all worlds and lyric styles
 Tools/
   render_glass_room.py   renders the demo song and its LRC
 ```
 
 ## Setup
-1. Open the project in Unity 6000.3.16f1.
-2. Run **Music In Your Hands > Run Project Setup** (safe to run again).
-3. Run **Meta > Tools > Project Setup Tool** and apply the fixes for Android.
-4. Open `Assets/_Project/Scenes/Main.unity` and add the Building Blocks listed in the next section.
+The project is already set up for Quest, using the same setup as autism-keyboard: Android, IL2CPP/ARM64, Vulkan, OpenXR with the Meta features, hand tracking and passthrough.
+
+1. Install [Git LFS](https://git-lfs.com) once (`git lfs install`), then clone.
+2. Open the folder in Unity Hub with Unity 6000.3.16f1. The first import downloads Meta's SDK and takes several minutes.
+3. Open `Assets/_Project/Scenes/Main.unity`. It has an `OVRCameraRig` with passthrough and Meta's hand prefabs, `MusicBus` playing the demo song, `HandRig`, and two debug views.
+4. **Music In Your Hands > Build APK for Quest** writes `Builds/MusicInYourHands.apk`. Install it with Meta Quest Developer Hub or `adb install -r Builds/MusicInYourHands.apk`, then launch it from **Library > Unknown sources**.
+
+If settings drift, run **Music In Your Hands > Configure Project for Quest**. It reapplies everything and runs Meta's Project Setup Tool "Fix All". **Rebuild Main Scene** recreates the scene from scratch.
+
+## In the headset
+- Bars about a metre ahead bounce with the music, and a sphere above them pulses on each beat.
+- Below them, the current lyric line shows with the sung word in pink.
+- Spheres follow your fingertips: they turn pink when you pinch, and the palm sphere turns yellow when your palm faces up.
 
 ## Adding songs
 1. Put the audio file and its `.lrc` lyrics in `Assets/_Project/Audio`.

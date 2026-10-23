@@ -34,3 +34,6 @@ crashlytics-build.properties
 
 # Python
 __pycache__/
+
+# Test runner leftovers from builds
+Assets/Resources/PerformanceTestRun*
