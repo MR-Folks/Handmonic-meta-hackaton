@@ -25,6 +25,15 @@ namespace MusicInYourHands
             public bool PalmUp;
             public Vector3 Velocity;
 
+            /// <summary>
+            /// The joint transforms that move the visible hand, when the feed has them. Attach visuals to these to
+            /// stay exactly on the hand: positions above are sampled earlier in the frame than the late pose update.
+            /// </summary>
+            public Transform PalmJoint;
+            public readonly Transform[] TipJoints = new Transform[5];
+
+            internal int LastFrame = -1;
+
             public Vector3 Tip(Finger f) => Tips[(int)f];
         }
 
@@ -44,7 +53,18 @@ namespace MusicInYourHands
             if (Instance == this) Instance = null;
         }
 
-        /// <summary>Called by a hand feed once per frame. Pass tracked = false when the hand is lost.</summary>
+        /// <summary>Called by a hand feed once it has found the joints of the visible hand.</summary>
+        public void SetJoints(bool left, Transform palm, Transform[] tips)
+        {
+            var hand = Get(left);
+            hand.PalmJoint = palm;
+            for (int i = 0; i < hand.TipJoints.Length; i++) hand.TipJoints[i] = tips[i];
+        }
+
+        /// <summary>
+        /// Called by a hand feed, once per frame and optionally again right before rendering with the late pose.
+        /// Pass tracked = false when the hand is lost.
+        /// </summary>
         public void Push(bool left, bool tracked, Pose palm, Vector3 palmNormal, Vector3[] tips)
         {
             var hand = Get(left);
@@ -52,8 +72,13 @@ namespace MusicInYourHands
             hand.IsTracked = tracked;
             if (!tracked) return;
 
-            float dt = Mathf.Max(Time.deltaTime, 1e-4f);
-            hand.Velocity = wasTracked ? (palm.position - hand.Palm.position) / dt : Vector3.zero;
+            // Velocity only from the first sample each frame; the late sample would divide a tiny move by a whole frame.
+            if (hand.LastFrame != Time.frameCount)
+            {
+                float dt = Mathf.Max(Time.deltaTime, 1e-4f);
+                hand.Velocity = wasTracked ? (palm.position - hand.Palm.position) / dt : Vector3.zero;
+                hand.LastFrame = Time.frameCount;
+            }
             hand.Palm = palm;
             hand.PalmNormal = palmNormal;
             hand.PalmUp = Vector3.Dot(palmNormal, Vector3.up) > palmUpThreshold;

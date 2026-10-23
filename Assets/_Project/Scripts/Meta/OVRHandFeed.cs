@@ -2,15 +2,16 @@ using UnityEngine;
 
 namespace MusicInYourHands.Meta
 {
-    /// <summary>Feeds one Meta tracked hand (OVRHand + OVRSkeleton, OpenXR bones) into HandRig.</summary>
-    [DefaultExecutionOrder(-50)]
+    /// <summary>
+    /// Feeds one Meta tracked hand into HandRig. Joints are looked up by name in Meta's OpenXR hand prefab
+    /// (XRHand_IndexTip and so on): those are the transforms that bend the visible hand mesh, so the data
+    /// always matches the hand the player sees. Looking them up by OVRSkeleton bone id did not, because the
+    /// prefab's custom skeleton maps ids to its own bone list.
+    /// </summary>
+    [DefaultExecutionOrder(100)]
     public class OVRHandFeed : MonoBehaviour
     {
-        static readonly OVRSkeleton.BoneId[] TipIds =
-        {
-            OVRSkeleton.BoneId.XRHand_ThumbTip, OVRSkeleton.BoneId.XRHand_IndexTip, OVRSkeleton.BoneId.XRHand_MiddleTip,
-            OVRSkeleton.BoneId.XRHand_RingTip, OVRSkeleton.BoneId.XRHand_LittleTip
-        };
+        static readonly string[] TipNames = { "XRHand_ThumbTip", "XRHand_IndexTip", "XRHand_MiddleTip", "XRHand_RingTip", "XRHand_LittleTip" };
 
         [SerializeField] OVRHand hand;
         [SerializeField] OVRSkeleton skeleton;
@@ -27,7 +28,14 @@ namespace MusicInYourHands.Meta
             isLeft = left;
         }
 
-        void Update()
+        void OnEnable() => Application.onBeforeRender += Sample;
+        void OnDisable() => Application.onBeforeRender -= Sample;
+
+        // Runs after OVRCameraRig and OVRSkeleton update (execution order 100), and again right before rendering,
+        // after OVRCameraRig's late pose update, so HandRig matches the hand that is actually drawn.
+        void Update() => Sample();
+
+        void Sample()
         {
             var rig = HandRig.Instance;
             if (rig == null || hand == null || skeleton == null) return;
@@ -52,24 +60,33 @@ namespace MusicInYourHands.Meta
 
         bool FindBones()
         {
-            if (!skeleton.IsInitialized || skeleton.Bones == null) return false;
-            foreach (var bone in skeleton.Bones)
-            {
-                switch (bone.Id)
-                {
-                    case OVRSkeleton.BoneId.XRHand_Palm: palm = bone.Transform; break;
-                    case OVRSkeleton.BoneId.XRHand_Wrist: wrist = bone.Transform; break;
-                    case OVRSkeleton.BoneId.XRHand_IndexProximal: indexBase = bone.Transform; break;
-                    case OVRSkeleton.BoneId.XRHand_LittleProximal: littleBase = bone.Transform; break;
-                }
-                int tip = System.Array.IndexOf(TipIds, bone.Id);
-                if (tip >= 0) tips[tip] = bone.Transform;
-            }
+            var root = skeleton.transform;
+            palm = Find(root, "XRHand_Palm");
+            wrist = Find(root, "XRHand_Wrist");
+            indexBase = Find(root, "XRHand_IndexProximal");
+            littleBase = Find(root, "XRHand_LittleProximal");
+            for (int i = 0; i < TipNames.Length; i++) tips[i] = Find(root, TipNames[i]);
 
             bool found = palm != null && wrist != null && indexBase != null && littleBase != null;
             foreach (var t in tips) found &= t != null;
-            if (!found) palm = null;
-            return found;
+            if (!found)
+            {
+                palm = null;
+                return false;
+            }
+            if (HandRig.Instance != null) HandRig.Instance.SetJoints(isLeft, palm, tips);
+            return true;
+        }
+
+        static Transform Find(Transform parent, string boneName)
+        {
+            foreach (Transform child in parent)
+            {
+                if (child.name == boneName) return child;
+                var match = Find(child, boneName);
+                if (match != null) return match;
+            }
+            return null;
         }
     }
 }

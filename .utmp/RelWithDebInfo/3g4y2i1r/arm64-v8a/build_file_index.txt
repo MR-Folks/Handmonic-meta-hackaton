@@ -1,0 +1,3 @@
+/Users/alireza/Documents/GitHub/music-in-your-hands/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/src/main/cpp/CMakeLists.txt
+/Users/alireza/Documents/GitHub/music-in-your-hands/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/src/main/cpp/FramePacing/CMakeLists.txt
+/Users/alireza/Documents/GitHub/music-in-your-hands/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/src/main/cpp/GameActivity/CMakeLists.txt

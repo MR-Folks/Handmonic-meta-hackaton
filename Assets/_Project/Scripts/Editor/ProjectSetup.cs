@@ -231,6 +231,11 @@ namespace MusicInYourHands.EditorTools
             }
 
             if (Object.FindAnyObjectByType<HandDebugView>() == null) new GameObject("HandDebugView", typeof(HandDebugView));
+            if (Object.FindAnyObjectByType<RuntimeDiagnostics>() == null) new GameObject("RuntimeDiagnostics", typeof(RuntimeDiagnostics));
+
+            var debugMaterial = EnsureDebugMaterial();
+            foreach (var view in Object.FindObjectsByType<MusicDebugView>(FindObjectsSortMode.None)) SetMaterial(view, debugMaterial);
+            foreach (var view in Object.FindObjectsByType<HandDebugView>(FindObjectsSortMode.None)) SetMaterial(view, debugMaterial);
 
             if (Object.FindAnyObjectByType<Light>() == null)
             {
@@ -247,6 +252,26 @@ namespace MusicInYourHands.EditorTools
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
+        }
+
+        public const string DebugMaterialPath = Root + "/Materials/DebugUnlit.mat";
+
+        /// <summary>URP Unlit material for debug shapes; primitives' built-in default material renders magenta in URP.</summary>
+        public static Material EnsureDebugMaterial()
+        {
+            EnsureFolder(Root + "/Materials");
+            var material = AssetDatabase.LoadAssetAtPath<Material>(DebugMaterialPath);
+            if (material != null) return material;
+            material = new Material(Shader.Find("Universal Render Pipeline/Unlit")) { name = "DebugUnlit" };
+            AssetDatabase.CreateAsset(material, DebugMaterialPath);
+            return material;
+        }
+
+        static void SetMaterial(Object view, Material material)
+        {
+            var so = new SerializedObject(view);
+            so.FindProperty("material").objectReferenceValue = material;
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
 #if META_XR_CORE

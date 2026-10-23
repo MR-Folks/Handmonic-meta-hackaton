@@ -13,6 +13,8 @@ namespace MusicInYourHands
         [SerializeField] float maxBarHeight = 0.25f;
         [SerializeField] Color barColor = new Color(0.37f, 0.83f, 1f);
         [SerializeField] Color wordColor = new Color(1f, 0.37f, 0.68f);
+        [Tooltip("A URP Unlit material. Primitives keep Unity's built-in material otherwise, which URP draws magenta.")]
+        [SerializeField] Material material;
 
         static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
 
@@ -22,7 +24,10 @@ namespace MusicInYourHands
         MaterialPropertyBlock block;
         readonly StringBuilder sb = new StringBuilder();
 
-        void Start()
+        void Start() => Build();
+
+        /// <summary>Creates the bars, beat light and lyric text. Also called by the editor preview check.</summary>
+        public void Build()
         {
             block = new MaterialPropertyBlock();
             bars = new Transform[MusicBus.BandCount];
@@ -52,11 +57,13 @@ namespace MusicInYourHands
         {
             var go = GameObject.CreatePrimitive(type);
             go.name = objectName;
-            Destroy(go.GetComponent<Collider>());
+            DebugShapes.RemoveCollider(go);
             go.transform.SetParent(transform, false);
             go.transform.localScale = Vector3.one * barWidth;
+            var r = go.GetComponent<Renderer>();
+            if (material != null) r.sharedMaterial = material;
             block.SetColor(BaseColor, color);
-            go.GetComponent<Renderer>().SetPropertyBlock(block);
+            r.SetPropertyBlock(block);
             return go;
         }
 
