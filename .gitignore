@@ -37,3 +37,6 @@ __pycache__/
 
 # Test runner leftovers from builds
 Assets/Resources/PerformanceTestRun*
+
+# Unity Android build temp files
+/.utmp/
