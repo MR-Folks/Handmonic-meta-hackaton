@@ -201,6 +201,7 @@ namespace MusicInYourHands.EditorTools
             song.artist = "Music In Your Hands demo";
             song.clip = AssetDatabase.LoadAssetAtPath<AudioClip>(Root + "/Audio/GlassRoom.wav");
             song.lyrics = AssetDatabase.LoadAssetAtPath<TextAsset>(Root + "/Audio/GlassRoom.lrc");
+            song.notes = AssetDatabase.LoadAssetAtPath<TextAsset>(Root + "/Audio/GlassRoom.notes");
             EditorUtility.SetDirty(song);
             if (song.clip == null) Debug.LogWarning("[Setup] GlassRoom.wav was not found, so the demo song has no audio.");
             if (song.lyrics == null) Debug.LogWarning("[Setup] GlassRoom.lrc was not found, so the demo song has no lyrics.");
@@ -347,14 +348,15 @@ namespace MusicInYourHands.EditorTools
             // Not "??": Unity's fake-null objects slip past it.
             var handSkin = handGo.GetComponent<HandSkin>();
             if (handSkin == null) handSkin = handGo.AddComponent<HandSkin>();
-            handSkin.Configure(skin, wrist, knuckle);
+            bool left = handGo.name.Contains("Left") || handGo.name.EndsWith("_L");
+            handSkin.Configure(skin, wrist, knuckle, left);
             EditorUtility.SetDirty(handSkin);
         }
 #endif
 
         /// <summary>
-        /// The worlds and the wheel: a "Worlds" object with WorldManager, one child per world in wheel order, and the
-        /// WorldWheel. Existing objects are kept and only their references and names are refreshed.
+        /// The worlds and the menu: a "Worlds" object with WorldManager, one child per world in menu order, the bubble
+        /// WorldMenu and the menu button feed. Existing objects are kept and only their references and names are refreshed.
         /// </summary>
         static void EnsureWorlds()
         {
@@ -368,7 +370,8 @@ namespace MusicInYourHands.EditorTools
 
             var orb = EnsureWorld<HeartbeatOrb>(manager.transform, "HeartbeatOrb", "Heartbeat orb", new Color(1f, 0.83f, 0.42f));
             SetReferences(orb, ("glowMaterial", glow), ("orbMaterial", EnsureMaterial(OrbMaterialPath, "MusicInYourHands/Orb")),
-                ("ringMaterial", EnsureMaterial(RingMaterialPath, "MusicInYourHands/Ring")));
+                ("ringMaterial", EnsureMaterial(RingMaterialPath, "MusicInYourHands/Ring")),
+                ("lineMaterial", EnsureMaterial(LineMaterialPath, "MusicInYourHands/Line")));
 
             var line = EnsureMaterial(LineMaterialPath, "MusicInYourHands/Line");
             var ring = EnsureMaterial(RingMaterialPath, "MusicInYourHands/Ring");
@@ -377,13 +380,13 @@ namespace MusicInYourHands.EditorTools
             SetReferences(ribbon, ("lineMaterial", line), ("glowMaterial", glow));
 
             var strings = EnsureWorld<AirStrings>(manager.transform, "AirStrings", "Air strings", new Color(0.49f, 0.95f, 0.79f));
-            SetReferences(strings, ("lineMaterial", line), ("glowMaterial", glow));
+            SetReferences(strings, ("lineMaterial", line), ("glowMaterial", glow), ("ringMaterial", ring));
 
             var rain = EnsureWorld<NoteRain>(manager.transform, "NoteRain", "Note rain", new Color(0.5f, 0.72f, 1f));
-            SetReferences(rain, ("glowMaterial", glow), ("lineMaterial", line), ("ringMaterial", ring));
+            SetReferences(rain, ("glowMaterial", glow), ("streakMaterial", EnsureMaterial(StreakMaterialPath, "MusicInYourHands/Streak")), ("ringMaterial", ring));
 
             var fireflies = EnsureWorld<FireflyChoir>(manager.transform, "FireflyChoir", "Firefly choir", new Color(0.79f, 0.61f, 1f));
-            SetReferences(fireflies, ("glowMaterial", glow));
+            SetReferences(fireflies, ("glowMaterial", glow), ("lineMaterial", line));
 
             var so = new SerializedObject(manager);
             var list = so.FindProperty("worlds");
@@ -392,9 +395,17 @@ namespace MusicInYourHands.EditorTools
             for (int i = 0; i < order.Length; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = order[i];
             so.ApplyModifiedPropertiesWithoutUndo();
 
-            var wheel = Object.FindAnyObjectByType<WorldWheel>(FindObjectsInactive.Include);
-            if (wheel == null) wheel = new GameObject("WorldWheel", typeof(WorldWheel)).GetComponent<WorldWheel>();
-            SetReferences(wheel, ("glowMaterial", glow));
+            // The palm-up wheel was replaced by the bubble menu.
+            var oldWheel = GameObject.Find("WorldWheel");
+            if (oldWheel != null) Object.DestroyImmediate(oldWheel);
+
+            var menu = Object.FindAnyObjectByType<WorldMenu>(FindObjectsInactive.Include);
+            if (menu == null) menu = new GameObject("WorldMenu", typeof(WorldMenu)).GetComponent<WorldMenu>();
+            SetReferences(menu, ("bubbleMaterial", EnsureMaterial(BubbleMaterialPath, "MusicInYourHands/Bubble")));
+#if META_XR_CORE
+            if (Object.FindAnyObjectByType<MenuButtonFeed>(FindObjectsInactive.Include) == null)
+                new GameObject("MenuButton", typeof(MenuButtonFeed));
+#endif
         }
 
         static T EnsureWorld<T>(Transform parent, string objectName, string displayName, Color color) where T : World
@@ -420,6 +431,8 @@ namespace MusicInYourHands.EditorTools
         public const string HandMaterialPath = Root + "/Materials/Hand.mat";
         public const string OrbMaterialPath = Root + "/Materials/Orb.mat";
         public const string LineMaterialPath = Root + "/Materials/Line.mat";
+        public const string BubbleMaterialPath = Root + "/Materials/Bubble.mat";
+        public const string StreakMaterialPath = Root + "/Materials/Streak.mat";
         public const string GlowMaterialPath = Root + "/Materials/Glow.mat";
         public const string RingMaterialPath = Root + "/Materials/Ring.mat";
 

@@ -20,6 +20,11 @@ Shader "MusicInYourHands/Hand"
         _PulseSpeed ("Pulse speed (m/s)", Float) = 0.55
         _PulseWidth ("Pulse width (m)", Float) = 0.022
         _PulseLength ("Wrist to fingertips (m)", Float) = 0.2
+        _Pattern ("Effect (set by the world: 0 veins, 1 heat, 2 scanlines, 3 electric, 4 ripples, 5 specks)", Float) = 0
+        _PatternColor ("Effect colour (set by the world)", Color) = (1, 0.83, 0.42, 1)
+        _FocusPos ("Focus point (set by the world)", Vector) = (0, 0, 0, 0)
+        _FocusStrength ("Focus strength (set by the world)", Float) = 0
+        _Charge ("Charge 0-1 (set by the world)", Float) = 0
     }
 
     SubShader
@@ -45,7 +50,71 @@ Shader "MusicInYourHands/Hand"
             float _PulseSpeed;
             float _PulseWidth;
             float _PulseLength;
+            float _Pattern;
+            float4 _PatternColor;
+            float4 _FocusPos;
+            float _FocusStrength;
+            float _Charge;
         CBUFFER_END
+
+        float Hash(float3 p)
+        {
+            p = frac(p * 0.3183099 + 0.1);
+            p *= 17.0;
+            return frac(p.x * p.y * p.z * (p.x + p.y + p.z));
+        }
+
+        // Each world dresses the hand differently. Returns light to add (rgb) and extra opacity (a).
+        float4 HandEffect(float3 positionWS, float3 n, float3 v)
+        {
+            float t = _Time.y;
+            float along = dot(positionWS - _WristPos.xyz, _HandForward.xyz);
+            float3 palm = _WristPos.xyz + _HandForward.xyz * 0.07;
+            float3 c = _PatternColor.rgb;
+            if (_Pattern < 0.5) return 0;
+            if (_Pattern < 1.5)
+            {
+                // Heat: the side of the hand facing the orb glows, with energy flowing towards it.
+                float3 toFocus = _FocusPos.xyz - positionWS;
+                float d = length(toFocus);
+                float facing = saturate(dot(n, toFocus / max(d, 1e-4)));
+                float near = saturate(1 - d / 0.35);
+                float flow = pow(saturate(sin(d * 90 + t * 10) * 0.5 + 0.5), 4);
+                float k = facing * near * _FocusStrength * (0.5 + flow * 0.8 + _Kick * 0.7);
+                return float4(c * k, k * 0.6);
+            }
+            if (_Pattern < 2.5)
+            {
+                // Oscilloscope: bright scanlines sweep from the wrist to the fingertips.
+                float scan = pow(saturate(sin(along * 140 - t * 12) * 0.5 + 0.5), 10);
+                float sweep = pow(saturate(sin(along * 18 - t * 4) * 0.5 + 0.5), 3);
+                float k = scan * (0.35 + sweep * 0.8 + _Kick * 0.6);
+                return float4(c * k, k * 0.5);
+            }
+            if (_Pattern < 3.5)
+            {
+                // Electric: tiny sparks crackle over the skin, more on the beat.
+                float3 cell = floor(positionWS * 260 + floor(t * 14) * 3.1);
+                float spark = step(0.965 - _Kick * 0.04 - _Energy * 0.02, Hash(cell));
+                float rim = pow(1 - saturate(abs(dot(n, v))), 3) * (0.5 + 0.5 * sin(t * 37 + along * 80));
+                float k = spark * 1.3 + rim * 0.5;
+                return float4(c * k, saturate(spark + rim * 0.3));
+            }
+            if (_Pattern < 4.5)
+            {
+                // Water: ripples spread across the palm, stronger as it fills with caught light.
+                float r = length(positionWS - palm);
+                float ripple = pow(saturate(sin(r * 120 - t * 8) * 0.5 + 0.5), 6) * saturate(1 - r / 0.13);
+                float k = ripple * (0.35 + _Charge * 1.2 + _Kick * 0.3) + _Charge * 0.25 * saturate(1 - r / 0.1);
+                return float4(c * k, k * 0.5);
+            }
+            // Specks: warm points of light twinkle in the skin, like fireflies resting on it.
+            float3 cell2 = floor(positionWS * 95);
+            float h = Hash(cell2);
+            float twinkle = step(0.9, h) * pow(saturate(sin(t * (2 + h * 4) + h * 40) * 0.5 + 0.5), 3);
+            float k = twinkle * (0.9 + _Kick * 0.8 + _Energy * 0.4);
+            return float4(c * k, k * 0.6);
+        }
 
         struct Attributes
         {
@@ -119,10 +188,13 @@ Shader "MusicInYourHands/Hand"
                 float3 v = normalize(GetWorldSpaceViewDir(input.positionWS));
                 float rim = pow(1 - saturate(abs(dot(n, v))), _RimPower) * (_RimStrength + _Kick * 0.6);
                 float3 edge = lerp(_EdgeColor.rgb, _GlowColor.rgb, _Kick * 0.8);
-                float pulse = BeatPulse(input.positionWS);
+                float pulse = BeatPulse(input.positionWS) * step(_Pattern, 0.5);
                 float3 color = lerp(_FillColor.rgb, edge, saturate(rim)) + _GlowColor.rgb * (_Energy * 0.08);
                 color += lerp(_GlowColor.rgb, 1, 0.25) * pulse * 0.9;
-                float alpha = max(lerp(_FillColor.a, 1, saturate(rim)), pulse * 0.85) * WristFade(input.positionWS);
+                float4 effect = HandEffect(input.positionWS, n, v);
+                color += effect.rgb;
+                float alpha = max(lerp(_FillColor.a, 1, saturate(rim)), pulse * 0.85);
+                alpha = saturate(alpha + effect.a) * WristFade(input.positionWS);
                 return half4(color, alpha);
             }
             ENDHLSL
@@ -147,7 +219,7 @@ Shader "MusicInYourHands/Hand"
             half4 frag(Varyings input) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
-                float pulse = BeatPulse(input.positionWS);
+                float pulse = BeatPulse(input.positionWS) * step(_Pattern, 0.5);
                 float3 color = lerp(_EdgeColor.rgb, _GlowColor.rgb, saturate(_Kick * 0.8 + pulse));
                 color = lerp(color, 1, pulse * 0.4);
                 return half4(color, _EdgeColor.a * WristFade(input.positionWS));

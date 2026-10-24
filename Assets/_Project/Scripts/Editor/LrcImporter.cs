@@ -4,8 +4,8 @@ using UnityEngine;
 
 namespace MusicInYourHands.EditorTools
 {
-    /// <summary>Imports .lrc lyric files as TextAssets so a SongAsset can reference them.</summary>
-    [ScriptedImporter(1, "lrc")]
+    /// <summary>Imports .lrc lyric files and .notes melody files as TextAssets so a SongAsset can reference them.</summary>
+    [ScriptedImporter(2, new[] { "lrc", "notes" })]
     public class LrcImporter : ScriptedImporter
     {
         public override void OnImportAsset(AssetImportContext ctx)

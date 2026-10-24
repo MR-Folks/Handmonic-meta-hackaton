@@ -15,9 +15,16 @@ namespace MusicInYourHands
         [SerializeField] Color color = Color.white;
 
         bool beatPending;
+        readonly System.Collections.Generic.List<NoteTrack.Note> upcoming = new System.Collections.Generic.List<NoteTrack.Note>();
 
         public string DisplayName => displayName;
         public Color Color => color;
+
+        /// <summary>Which emblem the world's menu bubble shows (see the Bubble shader).</summary>
+        public virtual int MenuIcon => 0;
+
+        /// <summary>How the hands look in this world. Applied when the world becomes active.</summary>
+        public virtual HandTheme Theme => HandTheme.Veins;
 
         /// <summary>Creates the world's objects once. Safe to call again.</summary>
         public abstract void Build();
@@ -27,6 +34,9 @@ namespace MusicInYourHands
 
         protected virtual void OnEnable()
         {
+            HandSkin.Theme = Theme;
+            HandSkin.FocusStrength = 0f;
+            HandSkin.Charge[0] = HandSkin.Charge[1] = 0f;
             Build();
             if (MusicBus.Instance != null) MusicBus.Instance.Beat += OnBeat;
         }
@@ -44,13 +54,17 @@ namespace MusicInYourHands
             var rig = HandRig.Instance;
             if (rig == null) return;
             var bus = MusicBus.Instance;
+            if (bus != null) bus.UpcomingNotes(3f, upcoming);
+            else upcoming.Clear();
             var music = new MusicFrame
             {
                 Bands = bus != null ? bus.Bands : null,
                 Kick = bus != null ? bus.Kick : 0f,
                 Beat = beatPending,
                 Waveform = bus != null ? bus.Waveform : null,
-                Bus = bus
+                Bus = bus,
+                SongTime = bus != null ? bus.SongTime : 0f,
+                Upcoming = upcoming
             };
             beatPending = false;
             Step(rig, music, Camera.main, Time.deltaTime);

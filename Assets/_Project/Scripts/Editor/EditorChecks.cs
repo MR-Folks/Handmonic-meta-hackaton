@@ -38,7 +38,7 @@ namespace MusicInYourHands.EditorTools
             ok &= CheckHandPreview();
             ok &= CheckLivingSkinPreview();
             ok &= CheckOrbPreview();
-            ok &= CheckWheelPreview();
+            ok &= CheckMenuPreview();
             ok &= CheckRibbonPreview();
             ok &= CheckStringsPreview();
             ok &= CheckRainPreview();
@@ -202,10 +202,12 @@ namespace MusicInYourHands.EditorTools
             var rig = new GameObject("HandRig").AddComponent<HandRig>();
             foreach (var hand in hands) PushHand(rig, hand);
 
+            HandSkin.Theme = HandTheme.Veins;
             var skin = new GameObject("LivingSkin").AddComponent<LivingSkin>();
             var so = new SerializedObject(skin);
             so.FindProperty("glowMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow");
             so.FindProperty("ringMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.RingMaterialPath, "MusicInYourHands/Ring");
+            so.FindProperty("lineMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.LineMaterialPath, "MusicInYourHands/Line");
             so.ApplyModifiedPropertiesWithoutUndo();
             skin.Build();
 
@@ -259,6 +261,7 @@ namespace MusicInYourHands.EditorTools
             foreach (var hand in hands) PushHand(rig, hand);
 
             var orb = new GameObject("HeartbeatOrb").AddComponent<HeartbeatOrb>();
+            HandSkin.Theme = orb.Theme;
             var so = new SerializedObject(orb);
             so.FindProperty("glowMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow");
             so.FindProperty("orbMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.OrbMaterialPath, "MusicInYourHands/Orb");
@@ -268,12 +271,13 @@ namespace MusicInYourHands.EditorTools
 
             float[] bands = { 0.8f, 0.6f, 0.5f, 0.5f, 0.4f, 0.5f };
             for (int i = 0; i < 8; i++) orb.Step(rig, Music(bands, 0f, false), camera, 0.1f);
+            foreach (var hand in hands) hand.Root.GetComponent<HandSkin>().Apply();
             const int w = 640, h = 360;
             var sheet = new Texture2D(w * 2, h, TextureFormat.RGB24, false);
             sheet.SetPixels(0, 0, w, h, Render(camera, w, h).GetPixels());
             orb.Step(rig, Music(bands, 1f, true), camera, 0.016f);
             orb.SimulateParticles(0.18f);
-            foreach (var hand in hands) SetBeat(hand.Skin, 0.08f, 1f);
+            foreach (var hand in hands) { hand.Root.GetComponent<HandSkin>().Apply(); SetBeat(hand.Skin, 0.08f, 1f); }
             sheet.SetPixels(w, 0, w, h, Render(camera, w, h).GetPixels());
             sheet.Apply();
             return CheckImage(sheet, camera.backgroundColor, "Logs/preview-heartbeat-orb.png", "Heartbeat orb preview");
@@ -282,8 +286,8 @@ namespace MusicInYourHands.EditorTools
 #endif
         }
 
-        /// <summary>Renders the world wheel open above the left hand: Logs/preview-wheel.png.</summary>
-        static bool CheckWheelPreview()
+        /// <summary>Renders the bubble menu open in front of the viewer: Logs/preview-menu.png.</summary>
+        static bool CheckMenuPreview()
         {
 #if META_XR_CORE
             var hands = StageHands(out var camera);
@@ -309,13 +313,17 @@ namespace MusicInYourHands.EditorTools
             mso.ApplyModifiedPropertiesWithoutUndo();
             manager.Switch(0);
 
-            var wheel = new GameObject("WorldWheel").AddComponent<WorldWheel>();
-            var wso = new SerializedObject(wheel);
-            wso.FindProperty("glowMaterial").objectReferenceValue = glow;
+            var menu = new GameObject("WorldMenu").AddComponent<WorldMenu>();
+            var wso = new SerializedObject(menu);
+            wso.FindProperty("bubbleMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.BubbleMaterialPath, "MusicInYourHands/Bubble");
             wso.ApplyModifiedPropertiesWithoutUndo();
-            for (int i = 0; i < 10; i++) wheel.Step(rig, manager, camera, 0.05f, forceOpenLeft: true);
+            // Lower the hands out of the way, as if the player had just opened the menu.
+            foreach (var hand in hands) { hand.Root.transform.position += Vector3.down * 0.3f; PushHand(rig, hand); }
+            menu.Step(rig, manager, null, camera, 0f);
+            menu.Open(camera);
+            for (int i = 0; i < 20; i++) menu.Step(rig, manager, null, camera, 0.05f);
 
-            return CheckImage(Render(camera, 960, 540), camera.backgroundColor, "Logs/preview-wheel.png", "Wheel preview");
+            return CheckImage(Render(camera, 960, 540), camera.backgroundColor, "Logs/preview-menu.png", "Menu preview");
 #else
             return true;
 #endif
@@ -343,7 +351,7 @@ namespace MusicInYourHands.EditorTools
         /// then renders two moments side by side: before a beat and just after one.
         /// </summary>
         static bool CheckWorldPreview<T>(string label, string path, (string property, string materialPath, string shader)[] materials,
-            System.Action<List<PreviewHand>, HandRig, T> pose, float warmup) where T : World
+            System.Action<List<PreviewHand>, HandRig, T, Camera> pose, float warmup, bool withSong = false) where T : World
         {
 #if META_XR_CORE
             var hands = StageHands(out var camera);
@@ -356,23 +364,40 @@ namespace MusicInYourHands.EditorTools
                 so.FindProperty(property).objectReferenceValue = ProjectSetup.EnsureMaterial(materialPath, shader);
             so.ApplyModifiedPropertiesWithoutUndo();
             world.Build();
-            pose?.Invoke(hands, rig, world);
+            HandSkin.Theme = world.Theme;
+            HandSkin.FocusStrength = 0f;
+            HandSkin.Charge[0] = HandSkin.Charge[1] = 0f;
+            pose?.Invoke(hands, rig, world, camera);
 
-            for (float t = 0f; t < warmup; t += 0.05f)
+            // With the demo song's note track, the preview plays from the first chorus like the real song would.
+            var notes = withSong ? NoteTrack.Parse(AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/_Project/Audio/GlassRoom.notes")?.text) : null;
+            var upcoming = new List<NoteTrack.Note>();
+            float clock = 24.2f;
+            MusicFrame Frame(float kick, bool beat)
             {
-                world.Step(rig, Music(PreviewBands, 0.2f, false), camera, 0.05f);
-                world.SimulateParticles(0.05f);
+                var frame = Music(PreviewBands, kick, beat);
+                if (notes == null) return frame;
+                upcoming.Clear();
+                notes.Between(clock, clock + 3f, upcoming);
+                frame.SongTime = clock;
+                frame.Upcoming = upcoming;
+                return frame;
             }
+            void Advance(float kick, bool beat, float dt)
+            {
+                world.Step(rig, Frame(kick, beat), camera, dt);
+                world.SimulateParticles(dt);
+                clock += dt;
+            }
+
+            for (float t = 0f; t < warmup; t += 0.05f) Advance(0.2f, false, 0.05f);
             const int w = 640, h = 360;
             var sheet = new Texture2D(w * 2, h, TextureFormat.RGB24, false);
+            foreach (var hand in hands) { hand.Root.GetComponent<HandSkin>().Apply(); SetBeat(hand.Skin, 10f, 0.1f); }
             sheet.SetPixels(0, 0, w, h, Render(camera, w, h).GetPixels());
-            world.Step(rig, Music(PreviewBands, 1f, true), camera, 0.016f);
-            for (int i = 0; i < 3; i++)
-            {
-                world.Step(rig, Music(PreviewBands, 0.8f, false), camera, 0.04f);
-                world.SimulateParticles(0.04f);
-            }
-            foreach (var hand in hands) SetBeat(hand.Skin, 0.12f, 0.8f);
+            Advance(1f, true, 0.016f);
+            for (int i = 0; i < 3; i++) Advance(0.8f, false, 0.04f);
+            foreach (var hand in hands) { hand.Root.GetComponent<HandSkin>().Apply(); SetBeat(hand.Skin, 0.12f, 0.8f); }
             sheet.SetPixels(w, 0, w, h, Render(camera, w, h).GetPixels());
             sheet.Apply();
             return CheckImage(sheet, camera.backgroundColor, path, label);
@@ -383,25 +408,33 @@ namespace MusicInYourHands.EditorTools
 
         static bool CheckRibbonPreview() => CheckWorldPreview<WaveformRibbon>("Waveform ribbon preview", "Logs/preview-ribbon.png",
             new[] { ("lineMaterial", ProjectSetup.LineMaterialPath, "MusicInYourHands/Line"), ("glowMaterial", ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow") },
-            (hands, rig, world) => { rig.Left.Pinch = 1f; rig.Right.Pinch = 1f; }, 0.6f);
+            (hands, rig, world, camera) => { rig.Left.Pinch = 1f; rig.Right.Pinch = 1f; }, 0.6f);
 
         static bool CheckStringsPreview() => CheckWorldPreview<AirStrings>("Air strings preview", "Logs/preview-strings.png",
-            new[] { ("lineMaterial", ProjectSetup.LineMaterialPath, "MusicInYourHands/Line"), ("glowMaterial", ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow") },
-            (hands, rig, world) => { world.PreviewPluck(2, 0.02f); world.PreviewPluck(4, 0.012f); }, 0.3f);
+            new[] { ("lineMaterial", ProjectSetup.LineMaterialPath, "MusicInYourHands/Line"), ("glowMaterial", ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow"),
+                    ("ringMaterial", ProjectSetup.RingMaterialPath, "MusicInYourHands/Ring") },
+            (hands, rig, world, camera) =>
+            {
+                // Look a little lower and further back to see all six strings.
+                camera.transform.position += new Vector3(0f, -0.12f, -0.25f);
+                camera.transform.rotation = Quaternion.Euler(12f, 0f, 0f);
+                world.PreviewPluck(2, 0.02f);
+            }, 0.6f, withSong: true);
 
         static bool CheckRainPreview() => CheckWorldPreview<NoteRain>("Note rain preview", "Logs/preview-rain.png",
-            new[] { ("glowMaterial", ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow"), ("lineMaterial", ProjectSetup.LineMaterialPath, "MusicInYourHands/Line"),
+            new[] { ("glowMaterial", ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow"), ("streakMaterial", ProjectSetup.StreakMaterialPath, "MusicInYourHands/Streak"),
                     ("ringMaterial", ProjectSetup.RingMaterialPath, "MusicInYourHands/Ring") },
-            (hands, rig, world) =>
+            (hands, rig, world, camera) =>
             {
-                var random = new System.Random(3);
-                for (int i = 0; i < 18; i++)
-                    world.PreviewDrop((float)random.NextDouble() * 2 - 1, (float)random.NextDouble() * 2 - 1, (float)random.NextDouble() * 0.9f, 2 + i % 4, i % 6 == 0);
-            }, 1.2f);
+                // Step back and look down at the floor, where the notes land.
+                camera.transform.position += new Vector3(0f, 0.1f, -0.6f);
+                camera.transform.rotation = Quaternion.Euler(42f, 0f, 0f);
+                camera.fieldOfView = 70f;
+            }, 2.6f, withSong: true);
 
         static bool CheckFirefliesPreview() => CheckWorldPreview<FireflyChoir>("Firefly choir preview", "Logs/preview-fireflies.png",
-            new[] { ("glowMaterial", ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow") },
-            (hands, rig, world) => { }, 3f);
+            new[] { ("glowMaterial", ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow"), ("lineMaterial", ProjectSetup.LineMaterialPath, "MusicInYourHands/Line") },
+            (hands, rig, world, camera) => { }, 3f);
 
 #if META_XR_CORE
         sealed class PreviewHand

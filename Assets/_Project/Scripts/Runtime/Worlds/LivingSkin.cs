@@ -11,6 +11,8 @@ namespace MusicInYourHands
     [DefaultExecutionOrder(150)]
     public class LivingSkin : World
     {
+        public override int MenuIcon => 0;
+
         [Header("Materials")]
         [SerializeField] Material glowMaterial;
         [SerializeField] Material ringMaterial;

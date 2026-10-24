@@ -3,12 +3,24 @@ using UnityEngine;
 namespace MusicInYourHands
 {
     /// <summary>
-    /// The Waveform ribbon world: pinch with both hands and the song's live waveform stretches between your fingers
-    /// as three glowing strands. Pull apart and it tightens; bring your hands together and it billows. Each beat
+    /// The Waveform ribbon world: pinch with both hands and the music stretches between your fingers as three
+    /// glowing strands: smooth waves layered from the frequency bands (bass as long slow waves, highs as short quick
+    /// ones), as on the concept page. Pull apart and it tightens; bring your hands together and it billows. Each beat
     /// tugs your visible hands a little towards each other, as if the ribbon pulled back. Let go and it fades away.
     /// </summary>
     public class WaveformRibbon : World
     {
+        public override int MenuIcon => 2;
+
+        public override HandTheme Theme => new HandTheme
+        {
+            Fill = new Color(0.08f, 0.12f, 0.22f, 0.55f),
+            Edge = new Color(0.55f, 0.85f, 1f),
+            Glow = new Color(1f, 0.83f, 0.42f),
+            Pattern = HandTheme.Effect.Scanlines,
+            PatternColor = new Color(0.55f, 0.9f, 1f)
+        };
+
         [Header("Materials")]
         [SerializeField] Material lineMaterial;
         [SerializeField] Material glowMaterial;
@@ -33,7 +45,6 @@ namespace MusicInYourHands
         LineStrip[] strands;
         Renderer[] grips;
         Vector3[] path;
-        float[] wave;
         MaterialPropertyBlock block;
         Vector3 lastA, lastB;
         float hold;
@@ -45,7 +56,6 @@ namespace MusicInYourHands
             built = true;
             block = new MaterialPropertyBlock();
             path = new Vector3[points];
-            wave = new float[points];
             strands = new LineStrip[StrandColors.Length];
             for (int i = 0; i < strands.Length; i++) strands[i] = new LineStrip($"Strand {i}", transform, lineMaterial, points);
             grips = new Renderer[2];
@@ -101,7 +111,6 @@ namespace MusicInYourHands
             }
 
             UpdateGrips(rig, music, view);
-            UpdateWave(music);
 
             bool show = hold > 0.001f && view != null;
             foreach (var s in strands) s.SetVisible(show);
@@ -112,21 +121,6 @@ namespace MusicInYourHands
             float amount = held ? tug * music.Kick : 0f;
             Effects.OffsetHand(left, pull * amount);
             Effects.OffsetHand(right, -pull * amount);
-        }
-
-        void UpdateWave(MusicFrame music)
-        {
-            var source = music.Waveform;
-            float t = Now;
-            for (int i = 0; i < points; i++)
-            {
-                float target;
-                if (source != null && source.Length > 0)
-                    target = source[i * source.Length / points] * 2.2f;
-                else
-                    target = Mathf.Sin(i * 0.31f + t * 7f) * 0.5f + Mathf.Sin(i * 0.11f - t * 3f) * 0.4f;
-                wave[i] = Mathf.Lerp(wave[i], Mathf.Clamp(target, -1.2f, 1.2f), 0.45f);
-            }
         }
 
         void DrawRibbon(MusicFrame music, Camera view)
@@ -147,13 +141,17 @@ namespace MusicInYourHands
             float t = Now;
             for (int s = 0; s < strands.Length; s++)
             {
-                float phase = t * (1.5f + s * 0.4f) + s * 2.1f;
                 for (int i = 0; i < points; i++)
                 {
                     float u = i / (float)(points - 1);
                     float envelope = Mathf.Sin(Mathf.PI * u);
-                    float w = wave[(i + s * 7) % points] * (1f + 0.25f * s);
-                    var offset = side * (w * amp * envelope) + depth * (Mathf.Sin(u * Mathf.PI * 3f + phase) * amp * 0.3f * envelope);
+                    // Each band adds a smooth wave: low bands long and slow, high bands short and quick. Pulling the
+                    // ribbon tighter packs the waves closer together.
+                    float w = 0f;
+                    for (int q = 0; q < 4; q++)
+                        w += music.Band(q + 1) * Mathf.Sin(u * Mathf.PI * (q + 2) * (1f + tension * 1.5f) - t * (4f + q * 2f) + s * 0.7f);
+                    float twist = Mathf.Sin(u * Mathf.PI * 2f + t * (1.3f + s * 0.4f) + s * 2.1f);
+                    var offset = side * (w * amp * envelope * 0.55f) + depth * (twist * amp * 0.25f * envelope);
                     path[i] = a + along * u + offset;
                 }
                 var color = StrandColors[s];

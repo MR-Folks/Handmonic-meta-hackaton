@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace MusicInYourHands
@@ -52,6 +53,23 @@ namespace MusicInYourHands
 
         public SongAsset CurrentSong { get; private set; }
         public LyricsTrack Lyrics { get; private set; } = LyricsTrack.Empty;
+        public NoteTrack Notes { get; private set; } = NoteTrack.Empty;
+
+        /// <summary>Length of the current song in seconds, 0 without one.</summary>
+        public float SongLength => source != null && source.clip != null ? source.clip.length : 0f;
+
+        /// <summary>
+        /// Adds the melody notes that start between now and <paramref name="ahead"/> seconds from now, with their
+        /// times as song time. Looks across the loop point when the song repeats.
+        /// </summary>
+        public void UpcomingNotes(float ahead, List<NoteTrack.Note> into)
+        {
+            into.Clear();
+            if (Notes.IsEmpty) return;
+            float now = SongTime, end = now + ahead, length = SongLength;
+            Notes.Between(now, end, into);
+            if (loop && length > 0f && end > length) Notes.Between(0f, end - length, into, length);
+        }
         public LyricsTrack.State Lyric { get; private set; } = new LyricsTrack.State(-1, -1);
 
         public bool IsPlaying => source != null && source.isPlaying;
@@ -96,6 +114,7 @@ namespace MusicInYourHands
         {
             CurrentSong = song;
             Lyrics = song.lyrics != null ? LyricsTrack.Parse(song.lyrics.text) : LyricsTrack.Empty;
+            Notes = song.notes != null ? NoteTrack.Parse(song.notes.text) : NoteTrack.Empty;
             Lyric = new LyricsTrack.State(-1, -1);
             source.clip = song.clip;
             source.loop = loop;

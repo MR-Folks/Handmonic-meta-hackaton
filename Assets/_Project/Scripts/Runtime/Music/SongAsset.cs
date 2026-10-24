@@ -13,6 +13,9 @@ namespace MusicInYourHands
         [Tooltip("Timed lyrics in LRC format. Word times (<mm:ss.xx>) are used when present.")]
         public TextAsset lyrics;
 
+        [Tooltip("Optional melody notes (.notes: time, MIDI pitch, length per line). Lets worlds play in time with the tune.")]
+        public TextAsset notes;
+
         [Tooltip("Seconds added to the song time before looking up lyrics. Use it to nudge an LRC that is slightly early or late.")]
         public float lyricsOffset;
     }

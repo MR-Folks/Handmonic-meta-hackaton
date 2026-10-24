@@ -59,19 +59,33 @@ Shader "MusicInYourHands/Orb"
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
-            // The blob surface in object space for a direction from the centre (sphere radius 0.5).
+            // Gielis' superformula: one closed "supershape" curve. m sets the symmetry (petals), n1 how pinched the
+            // petals are (small n1 = spiky star, large = soft and round), n2 and n3 the petal outline.
+            float Superformula(float angle, float m, float n1, float n2, float n3)
+            {
+                float a = pow(abs(cos(m * angle * 0.25)), n2);
+                float b = pow(abs(sin(m * angle * 0.25)), n3);
+                return pow(max(a + b, 1e-4), -1.0 / n1);
+            }
+
+            // The layer's surface in object space for a direction from the centre: a 3D supershape (two supershape
+            // curves, around and up-down) that morphs with the music, blended with a sphere so it stays organic.
             float3 Blob(float3 dir)
             {
                 dir = normalize(dir);
                 float t = _Time.y;
-                float phi = atan2(dir.z, dir.x);
+                float lon = atan2(dir.z, dir.x) + t * _Spin * 0.35;
                 float lat = asin(clamp(dir.y, -1, 1));
-                float lobes = sin(phi * _Lobes + t * _Spin);
-                float bands = 0.55 + 0.45 * cos(lat * 3 + t * 0.7 * _Spin);
-                float swell = _Amp * (0.6 + _Band * 0.9 + _Kick * 0.3);
-                float r = 0.5 * (1 + lobes * bands * swell);
-                // Slightly flattened, like a soft pebble rather than a ball.
-                return dir * r * float3(1, 0.88, 1);
+                float energy = saturate(_Band * 0.9 + _Kick * 0.5);
+                float n1 = lerp(4.5, 1.1, energy) + 0.6 * sin(t * 0.7 + _Lobes);
+                float n2 = 1.7 + 0.7 * sin(t * 0.45 + _Lobes * 1.3);
+                float r1 = Superformula(lon, _Lobes, n1, n2, n2);
+                float r2 = Superformula(lat, _Lobes - 1, n1 + 1, 1.6, 1.6);
+                float3 shape = float3(r1 * cos(lon) * r2 * cos(lat), r2 * sin(lat) * 0.9, r1 * sin(lon) * r2 * cos(lat));
+                float len = length(shape);
+                shape *= min(1.0, 1.35 / max(len, 1e-3)) / 1.15;
+                float3 sphere = dir;
+                return lerp(sphere, shape, saturate(_Amp * 4)) * 0.5;
             }
 
             Varyings vert(Attributes input)

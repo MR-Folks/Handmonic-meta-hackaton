@@ -227,13 +227,13 @@ MonoBehaviour:
   displayName: Note rain
   color: {r: 0.5, g: 0.72, b: 1, a: 1}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
-  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
+  streakMaterial: {fileID: 2100000, guid: 141076a49ca5548e9a16f7ac49f7d207, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
   areaWidth: 0.8
   areaDepth: 0.45
   distance: 0.45
   spawnHeight: 0.45
-  fallSpeed: 0.5
+  fallTime: 1.8
   catchRadius: 0.075
   maxDrops: 40
   onsetRise: 0.16
@@ -285,11 +285,13 @@ MonoBehaviour:
   displayName: Firefly choir
   color: {r: 0.79, g: 0.61, b: 1, a: 1}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   count: 44
   cloudDistance: 0.6
   cloudRadius: 0.45
   flySize: 0.016
   startle: 0.4
+  waveSpeed: 1.1
 --- !u!4 &128519274
 Transform:
   m_ObjectHideFlags: 0
@@ -338,6 +340,7 @@ MonoBehaviour:
   color: {r: 0.49, g: 0.95, b: 0.79, a: 1}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
   span: 1.1
   distance: 0.42
   lowest: -0.36
@@ -346,6 +349,8 @@ MonoBehaviour:
   grabRadius: 0.018
   releaseDistance: 0.05
   resistance: 0.35
+  lead: 1.6
+  window: 0.2
 --- !u!4 &179923060
 Transform:
   m_ObjectHideFlags: 0
@@ -523,6 +528,7 @@ MonoBehaviour:
   wrist: {fileID: 1157063448}
   knuckle: {fileID: 1157063447}
   response: 12
+  isLeft: 1
 --- !u!1 &689960894
 GameObject:
   m_ObjectHideFlags: 0
@@ -653,6 +659,99 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1462377328}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1022504057
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1022504059}
+  - component: {fileID: 1022504058}
+  m_Layer: 0
+  m_Name: MenuButton
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1022504058
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1022504057}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ced897abee78b48ee912f0d079289d4b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Meta::MusicInYourHands.Meta.MenuButtonFeed
+--- !u!4 &1022504059
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1022504057}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1126936835
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1126936837}
+  - component: {fileID: 1126936836}
+  m_Layer: 0
+  m_Name: WorldMenu
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1126936836
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1126936835}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5cbbdfde690464349a6739e27da1c358, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.WorldMenu
+  bubbleMaterial: {fileID: 2100000, guid: fa89d5024587b4c8e83405b9bccf5a04, type: 2}
+  distance: 0.42
+  drop: 0.06
+  spacing: 0.11
+  bubbleSize: 0.095
+--- !u!4 &1126936837
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1126936835}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1132760866
 GameObject:
@@ -1030,6 +1129,7 @@ MonoBehaviour:
   wrist: {fileID: 719480444}
   knuckle: {fileID: 719480443}
   response: 12
+  isLeft: 0
 --- !u!1 &1462377326
 GameObject:
   m_ObjectHideFlags: 0
@@ -1518,6 +1618,7 @@ MonoBehaviour:
   orbMaterial: {fileID: 2100000, guid: 670281a42a551438a91dfccad4c42bad, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   minRadius: 0.04
   maxRadius: 0.15
   radiusPerSpread: 0.3
@@ -1542,58 +1643,6 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1462377328}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1811622234
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1811622236}
-  - component: {fileID: 1811622235}
-  m_Layer: 0
-  m_Name: WorldWheel
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1811622235
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1811622234}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3bc7585374ee64f9aad41b3b30d21801, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.WorldWheel
-  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
-  openHold: 0.35
-  closeGrace: 0.25
-  height: 0.09
-  radius: 0.1
-  orbSize: 0.05
-  hoverDistance: 0.05
-  pokeDistance: 0.022
---- !u!4 &1811622236
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1811622234}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1821913003
 GameObject:
@@ -1688,4 +1737,5 @@ SceneRoots:
   - {fileID: 1512639467}
   - {fileID: 112429296}
   - {fileID: 1462377328}
-  - {fileID: 1811622236}
+  - {fileID: 1126936837}
+  - {fileID: 1022504059}

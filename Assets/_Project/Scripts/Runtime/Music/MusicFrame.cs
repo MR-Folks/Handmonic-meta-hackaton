@@ -13,6 +13,10 @@ namespace MusicInYourHands
         public float[] Waveform;
         /// <summary>The bus, when there is one: worlds may change its volume.</summary>
         public MusicBus Bus;
+        /// <summary>Song position in seconds.</summary>
+        public float SongTime;
+        /// <summary>Melody notes starting in the next few seconds, in song time. May be null or empty.</summary>
+        public System.Collections.Generic.List<NoteTrack.Note> Upcoming;
 
         public float Band(int index) => Bands != null && index >= 0 && index < Bands.Length ? Bands[index] : 0.3f;
     }

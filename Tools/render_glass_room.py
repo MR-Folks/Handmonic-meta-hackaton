@@ -169,6 +169,16 @@ def write_lrc(path):
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def write_notes(path):
+    """One sung note per line: start time (s), MIDI pitch, length (s). Worlds use it to play in time with the melody."""
+    lines = ["# time midi length"]
+    for bar, words in MELODY:
+        start = bar * 4 * BEAT
+        for _, beat, length, midi in words:
+            lines.append(f"{start + beat * BEAT:.3f} {midi} {length * BEAT:.3f}")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def write_wav(path):
     out = np.tanh(mix * 1.2)
     out /= max(1e-6, np.abs(out).max()) / 0.9
@@ -186,4 +196,5 @@ if __name__ == "__main__":
     render()
     write_wav(out_dir / "GlassRoom.wav")
     write_lrc(out_dir / "GlassRoom.lrc")
-    print("Wrote", out_dir / "GlassRoom.wav", "and GlassRoom.lrc")
+    write_notes(out_dir / "GlassRoom.notes")
+    print("Wrote", out_dir / "GlassRoom.wav", "GlassRoom.lrc and GlassRoom.notes")
