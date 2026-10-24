@@ -8,6 +8,7 @@ Shader "MusicInYourHands/Glow"
         _Intensity ("Intensity", Float) = 1
         _Softness ("Softness", Float) = 2.2
         _Core ("White-hot core", Range(0, 1)) = 0.5
+        [Enum(UnityEngine.Rendering.CompareFunction)] _ZTest ("Depth test", Float) = 4
     }
 
     SubShader
@@ -19,7 +20,7 @@ Shader "MusicInYourHands/Glow"
             Tags { "LightMode" = "UniversalForward" }
             Cull Off
             ZWrite Off
-            ZTest LEqual
+            ZTest [_ZTest]
             Blend SrcAlpha One, One OneMinusSrcAlpha
 
             HLSLPROGRAM
@@ -33,6 +34,7 @@ Shader "MusicInYourHands/Glow"
                 float _Intensity;
                 float _Softness;
                 float _Core;
+                float _ZTest;
             CBUFFER_END
 
             struct Attributes

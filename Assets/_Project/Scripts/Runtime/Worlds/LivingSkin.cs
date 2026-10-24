@@ -88,9 +88,19 @@ namespace MusicInYourHands
             built = true;
             block = new MaterialPropertyBlock();
 
+            // Fingertip lights are drawn on top of the hand: the finger's own surface is closer to the viewer than
+            // the light and would otherwise cut it off. They are light, so showing through the hand looks right.
+            Material tipMaterial = glowMaterial;
+            if (glowMaterial != null)
+            {
+                tipMaterial = new Material(glowMaterial) { name = "Fingertip Glow" };
+                tipMaterial.SetFloat("_ZTest", (float)UnityEngine.Rendering.CompareFunction.Always);
+                tipMaterial.renderQueue = glowMaterial.renderQueue + 20;
+            }
+
             for (int i = 0; i < tipLights.Length; i++)
             {
-                var quad = MakeQuad($"Tip Light {i}", glowMaterial);
+                var quad = MakeQuad($"Tip Light {i}", tipMaterial);
                 tipLights[i] = quad.transform;
                 tipRenderers[i] = quad.GetComponent<Renderer>();
                 quad.SetActive(false);
