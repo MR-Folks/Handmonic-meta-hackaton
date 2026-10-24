@@ -235,7 +235,9 @@ MonoBehaviour:
   spawnHeight: 0.45
   fallTime: 1.8
   catchRadius: 0.075
-  maxDrops: 40
+  maxDrops: 72
+  drizzleRate: 9
+  dropsPerBeat: 3
   onsetRise: 0.16
   onsetLevel: 0.45
 --- !u!4 &122405008
@@ -343,8 +345,8 @@ MonoBehaviour:
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
   span: 1.1
   distance: 0.42
-  lowest: -0.36
-  spacing: 0.075
+  lowest: -0.42
+  spacing: 0.062
   points: 72
   grabRadius: 0.018
   releaseDistance: 0.05
@@ -615,7 +617,7 @@ MonoBehaviour:
   - {r: 0.5, g: 0.72, b: 1, a: 1}
   - {r: 0.79, g: 0.61, b: 1, a: 1}
   - {r: 1, g: 0.56, b: 0.78, a: 1}
-  waveRadius: 0.3
+  waveRadius: 0.14
   waveLife: 1.1
   waveColor: {r: 0.62, g: 0.56, b: 1, a: 1}
   waveBeatColor: {r: 1, g: 0.37, b: 0.68, a: 1}
@@ -780,10 +782,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.WorldMenu
   bubbleMaterial: {fileID: 2100000, guid: fa89d5024587b4c8e83405b9bccf5a04, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   distance: 0.42
   drop: 0.06
   spacing: 0.11
   bubbleSize: 0.095
+  pinchThresholds: {x: 0.85, y: 0.5}
 --- !u!4 &1126936837
 Transform:
   m_ObjectHideFlags: 0
@@ -928,11 +933,13 @@ MonoBehaviour:
   startSong: {fileID: 11400000, guid: 72a957a8bb3d84047bdb07ff426b8355, type: 2}
   playOnStart: 1
   loop: 1
+  startSource: 0
   bandResponse: 18
   levelMemoryPerSecond: 0.85
   beatThreshold: 0.15
   minBeatInterval: 0.28
   kickDecay: 7
+  listenGate: 0.006
 --- !u!82 &1383540395
 AudioSource:
   m_ObjectHideFlags: 0
@@ -1661,20 +1668,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.HeartbeatOrb
   displayName: Heartbeat orb
   color: {r: 1, g: 0.83, b: 0.42, a: 1}
+  dotsMaterial: {fileID: 2100000, guid: 5f5a3574773b64e07bd701ebdd150db1, type: 2}
   orbMaterial: {fileID: 2100000, guid: 670281a42a551438a91dfccad4c42bad, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
-  ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
-  minRadius: 0.04
-  maxRadius: 0.15
-  radiusPerSpread: 0.3
-  forwardOffset: 0.12
-  beatSwell: 0.2
+  minRadius: 0.05
+  maxRadius: 0.2
+  radiusPerSpread: 0.5
+  forwardOffset: 0.1
+  beatSwell: 0.12
+  petals: 030000000400000005000000060000000400000007000000
   push: 0.012
   spreadRange: {x: 0.12, y: 0.6}
   volumeRange: {x: 0.3, y: 1}
-  motesPerBeat: 14
-  motesPerSecond: 10
+  motesPerBeat: 16
+  motesPerSecond: 12
 --- !u!4 &1788851836
 Transform:
   m_ObjectHideFlags: 0

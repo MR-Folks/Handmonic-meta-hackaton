@@ -6,7 +6,8 @@ namespace MusicInYourHands
     /// <summary>
     /// The Note rain world: the melody falls as drops of light. Each sung note is a glowing teardrop that lands on the
     /// floor exactly as the note is sung, placed by pitch from left (low) to right (high), like a piano roll on your
-    /// floor. Landings leave glowing marks that pulse on the beat. Catch drops in your palm instead: each one splashes
+    /// floor. A fine drizzle of small drops falls with the hi-hats and a few more with every beat, so the air is
+    /// never empty. Landings leave glowing marks that pulse on the beat. Catch drops in your palm instead: each one splashes
     /// with a soft chime and ripples spread across your hand as it fills with light. Songs without a note track rain
     /// on what the analyser hears.
     /// </summary>
@@ -37,7 +38,10 @@ namespace MusicInYourHands
         [Tooltip("Seconds from appearing to landing on the floor.")]
         [SerializeField] float fallTime = 1.8f;
         [SerializeField] float catchRadius = 0.075f;
-        [SerializeField] int maxDrops = 40;
+        [SerializeField] int maxDrops = 72;
+        [Tooltip("Small drizzle drops per second at full treble, and extra drops on each beat.")]
+        [SerializeField] float drizzleRate = 14f;
+        [SerializeField] int dropsPerBeat = 4;
         [Tooltip("For songs without notes: how much a band must jump, and how loud it must be, to count as a note.")]
         [SerializeField] float onsetRise = 0.16f;
         [SerializeField] float onsetLevel = 0.45f;
@@ -60,6 +64,7 @@ namespace MusicInYourHands
             public float Size;
             public int Midi;
             public bool Active;
+            public bool Drizzle;
         }
 
         sealed class Mark
@@ -84,7 +89,7 @@ namespace MusicInYourHands
         ParticleSystem sparks;
         MaterialPropertyBlock block;
         Vector3 center, right, forward;
-        float floorY, spawnY, songTime, beatGlow;
+        float floorY, spawnY, songTime, beatGlow, drizzleDebt;
         bool anchored, built;
 
         public override void Build()
@@ -103,7 +108,7 @@ namespace MusicInYourHands
                 drop.Head.gameObject.SetActive(false);
                 drops.Add(drop);
             }
-            for (int i = 0; i < 28; i++)
+            for (int i = 0; i < 40; i++)
             {
                 var mark = new Mark { Ring = Effects.MakeQuad($"Splash {i}", transform, ringMaterial), Glow = Effects.MakeQuad($"Mark {i}", transform, glowMaterial) };
                 mark.Ring.gameObject.SetActive(false);
@@ -154,6 +159,7 @@ namespace MusicInYourHands
             bool synced = music.Upcoming != null && music.Upcoming.Count > 0;
             if (synced) SpawnFromNotes(music);
             else SpawnFromAnalysis(music, dt);
+            SpawnDrizzle(music, dt);
             UpdateDrops(rig, view, dt);
             UpdateMarks(dt);
             UpdatePalms(rig, view, music, dt);
@@ -193,7 +199,24 @@ namespace MusicInYourHands
             }
         }
 
-        Drop Spawn(int midi, Vector2 spot)
+        /// <summary>
+        /// The drizzle between melody notes: small pale drops with the treble, and a few more on each beat. They fall
+        /// faster than melody drops and leave small marks, so the melody stays the star.
+        /// </summary>
+        void SpawnDrizzle(MusicFrame music, float dt)
+        {
+            drizzleDebt += drizzleRate * Mathf.Clamp01(music.Band(5) * 1.2f) * dt;
+            int count = (int)drizzleDebt;
+            drizzleDebt -= count;
+            if (music.Beat) count += dropsPerBeat;
+            for (int i = 0; i < count; i++)
+            {
+                var drop = Spawn(84 + Random.Range(0, 12), new Vector2(Random.Range(-1.1f, 1.1f), Random.Range(-0.6f, 1.4f)), true);
+                if (drop != null) drop.LandTime = songTime + fallTime * 0.6f;
+            }
+        }
+
+        Drop Spawn(int midi, Vector2 spot, bool drizzle = false)
         {
             Drop drop = null;
             foreach (var d in drops)
@@ -203,11 +226,13 @@ namespace MusicInYourHands
             if (drop == null) return null;
             drop.Active = true;
             drop.Synced = false;
+            drop.Drizzle = drizzle;
             drop.Midi = midi;
             drop.Position = center + right * (spot.x * areaWidth * 0.5f) + forward * (spot.y * areaDepth * 0.5f);
             drop.Position.y = spawnY;
             drop.Color = PitchColors[Mathf.Abs(midi) % PitchColors.Length];
-            drop.Size = 0.024f + Mathf.Clamp01((72f - midi) / 12f) * 0.01f;
+            drop.Size = drizzle ? Random.Range(0.008f, 0.013f) : 0.026f + Mathf.Clamp01((72f - midi) / 12f) * 0.01f;
+            if (drizzle) drop.Color = Color.Lerp(Effects.Blue, Color.white, Random.Range(0.2f, 0.6f));
             drop.Streak.gameObject.SetActive(true);
             drop.Head.gameObject.SetActive(true);
             return drop;
@@ -221,7 +246,7 @@ namespace MusicInYourHands
                 if (!drop.Active) continue;
                 // Synced drops are placed from the song clock, so they always land on their note.
                 if (drop.Synced) drop.Position.y = floorY + Mathf.Clamp01((drop.LandTime - songTime) / fallTime) * (spawnY - floorY);
-                else drop.Position.y -= speed * dt;
+                else drop.Position.y -= speed * (drop.Drizzle ? 1.7f : 1f) * dt;
 
                 if (TryCatch(rig, drop)) continue;
 
@@ -232,14 +257,14 @@ namespace MusicInYourHands
                 }
 
                 // The streak hangs above the head, facing the viewer around the vertical.
-                float length = Mathf.Clamp(speed * 0.2f, 0.08f, 0.24f);
+                float length = Mathf.Clamp(speed * 0.2f, 0.08f, 0.24f) * (drop.Drizzle ? 0.7f : 1f);
                 var toView = Vector3.ProjectOnPlane(view.transform.position - drop.Position, Vector3.up);
                 var facing = toView.sqrMagnitude > 1e-6f ? Quaternion.LookRotation(-toView.normalized, Vector3.up) : Quaternion.identity;
                 drop.Streak.transform.SetPositionAndRotation(drop.Position + Vector3.up * (length * 0.5f - drop.Size * 0.3f), facing);
                 drop.Streak.transform.localScale = new Vector3(drop.Size * 1.3f, length, 1f);
                 block.Clear();
                 block.SetColor(ColorId, drop.Color);
-                block.SetFloat(IntensityId, 1.3f);
+                block.SetFloat(IntensityId, drop.Drizzle ? 0.7f : 1.3f);
                 drop.Streak.SetPropertyBlock(block);
 
                 drop.Head.transform.position = drop.Position;
@@ -247,7 +272,7 @@ namespace MusicInYourHands
                 Effects.Face(drop.Head.transform, view);
                 block.Clear();
                 block.SetColor(ColorId, drop.Color);
-                block.SetFloat(IntensityId, 1.1f);
+                block.SetFloat(IntensityId, drop.Drizzle ? 0.6f : 1.1f);
                 drop.Head.SetPropertyBlock(block);
             }
         }
@@ -264,9 +289,18 @@ namespace MusicInYourHands
                 float height = drop.Position.y - cup.y;
                 if (flat.magnitude >= catchRadius || height > 0.04f || height < -0.05f) continue;
 
+                var normal = hand.PalmNormal.sqrMagnitude > 0.5f ? hand.PalmNormal : Vector3.up;
+                if (drop.Drizzle)
+                {
+                    // Drizzle just tickles the palm: a little light and a tiny ripple, no chime.
+                    charge[side] = Mathf.Min(1.4f, charge[side] + 0.04f);
+                    AddMark(cup, normal, drop.Color, 0.08f, false);
+                    Release(drop);
+                    return true;
+                }
                 charge[side] = Mathf.Min(1.4f, charge[side] + 0.2f);
                 chargeColor[side] = Color.Lerp(chargeColor[side], drop.Color, 0.5f);
-                AddMark(cup, hand.PalmNormal.sqrMagnitude > 0.5f ? hand.PalmNormal : Vector3.up, drop.Color, 0.15f, false);
+                AddMark(cup, normal, drop.Color, 0.15f, false);
                 Burst(cup, drop.Color, 10, 0.18f, false);
                 // Soft, so it decorates the sung note rather than competing with it.
                 voices.Play(Synth.Chime(440f * Mathf.Pow(2f, (drop.Midi + 12 - 69) / 12f)), cup, 0.25f);
@@ -279,8 +313,16 @@ namespace MusicInYourHands
         void Land(Drop drop)
         {
             var at = new Vector3(drop.Position.x, floorY + 0.004f, drop.Position.z);
-            AddMark(at, Vector3.up, drop.Color, 0.32f, true);
-            Burst(at, drop.Color, 14, 0.25f, true);
+            if (drop.Drizzle)
+            {
+                AddMark(at, Vector3.up, drop.Color, 0.12f, false);
+                Burst(at, drop.Color, 3, 0.12f, true);
+            }
+            else
+            {
+                AddMark(at, Vector3.up, drop.Color, 0.5f, true);
+                Burst(at, drop.Color, 18, 0.3f, true);
+            }
             Release(drop);
         }
 
@@ -318,7 +360,7 @@ namespace MusicInYourHands
             {
                 if (m.Age < 0f) continue;
                 m.Age += dt;
-                float life = m.OnFloor ? 3f : 0.7f;
+                float life = m.OnFloor ? 4f : 0.7f;
                 if (m.Age >= life)
                 {
                     m.Age = -1f;
@@ -331,17 +373,17 @@ namespace MusicInYourHands
                 block.Clear();
                 block.SetColor(ColorId, m.Color);
                 block.SetFloat(RadiusId, Mathf.Lerp(0.05f, 0.85f, 1f - Mathf.Pow(1f - u, 3f)));
-                block.SetFloat(ThicknessId, 0.025f);
-                block.SetFloat(AlphaId, u < 1f ? Mathf.Pow(1f - u, 2f) : 0f);
+                block.SetFloat(ThicknessId, m.OnFloor ? 0.035f : 0.025f);
+                block.SetFloat(AlphaId, u < 1f ? Mathf.Pow(1f - u, 1.5f) : 0f);
                 m.Ring.SetPropertyBlock(block);
 
                 if (m.OnFloor)
                 {
                     float fade = 1f - Mathf.Clamp01((m.Age - 0.3f) / (life - 0.3f));
-                    m.Glow.transform.localScale = Vector3.one * (0.09f + beatGlow * 0.03f);
+                    m.Glow.transform.localScale = Vector3.one * (0.16f + beatGlow * 0.05f);
                     block.Clear();
                     block.SetColor(ColorId, m.Color);
-                    block.SetFloat(IntensityId, fade * (0.6f + beatGlow * 0.6f));
+                    block.SetFloat(IntensityId, fade * (1.1f + beatGlow * 0.8f));
                     m.Glow.SetPropertyBlock(block);
                 }
             }

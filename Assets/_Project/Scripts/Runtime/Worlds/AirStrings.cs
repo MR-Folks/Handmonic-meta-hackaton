@@ -33,8 +33,8 @@ namespace MusicInYourHands
         [SerializeField] float span = 1.1f;
         [SerializeField] float distance = 0.42f;
         [Tooltip("Height of the lowest string relative to the eyes, in metres.")]
-        [SerializeField] float lowest = -0.36f;
-        [SerializeField] float spacing = 0.075f;
+        [SerializeField] float lowest = -0.42f;
+        [SerializeField] float spacing = 0.062f;
         [SerializeField] int points = 72;
 
         [Header("Touch")]
@@ -197,7 +197,7 @@ namespace MusicInYourHands
 
                 var color = Color.Lerp(Colors[i], Color.white, s.Perfect * 0.5f);
                 color.a = 0.75f + band * 0.35f + s.Glow * 0.5f;
-                s.Line.Set(path, points, 0.006f * (1f + band * 0.8f + s.Glow * 1.5f + s.Ring * 20f + s.Perfect), color, view.transform.position, false);
+                s.Line.Set(path, points, 0.008f * (1f + band * 0.8f + s.Glow * 1.5f + s.Ring * 20f + s.Perfect), color, view.transform.position, false);
 
                 for (int k = 0; k < 2; k++)
                 {

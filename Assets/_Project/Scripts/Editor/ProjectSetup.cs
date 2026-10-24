@@ -371,7 +371,7 @@ namespace MusicInYourHands.EditorTools
 
             var orb = EnsureWorld<HeartbeatOrb>(manager.transform, "HeartbeatOrb", "Heartbeat orb", new Color(1f, 0.83f, 0.42f));
             SetReferences(orb, ("glowMaterial", glow), ("orbMaterial", EnsureMaterial(OrbMaterialPath, "MusicInYourHands/Orb")),
-                ("ringMaterial", EnsureMaterial(RingMaterialPath, "MusicInYourHands/Ring")),
+                ("dotsMaterial", EnsureMaterial(OrbDotsMaterialPath, "MusicInYourHands/OrbDots")),
                 ("lineMaterial", EnsureMaterial(LineMaterialPath, "MusicInYourHands/Line")));
 
             var line = EnsureMaterial(LineMaterialPath, "MusicInYourHands/Line");
@@ -402,7 +402,8 @@ namespace MusicInYourHands.EditorTools
 
             var menu = Object.FindAnyObjectByType<WorldMenu>(FindObjectsInactive.Include);
             if (menu == null) menu = new GameObject("WorldMenu", typeof(WorldMenu)).GetComponent<WorldMenu>();
-            SetReferences(menu, ("bubbleMaterial", EnsureMaterial(BubbleMaterialPath, "MusicInYourHands/Bubble")));
+            SetReferences(menu, ("bubbleMaterial", EnsureMaterial(BubbleMaterialPath, "MusicInYourHands/Bubble")), ("glowMaterial", glow),
+                ("lineMaterial", line));
 #if META_XR_CORE
             if (Object.FindAnyObjectByType<MenuButtonFeed>(FindObjectsInactive.Include) == null)
                 new GameObject("MenuButton", typeof(MenuButtonFeed));
@@ -431,6 +432,7 @@ namespace MusicInYourHands.EditorTools
 
         public const string HandMaterialPath = Root + "/Materials/Hand.mat";
         public const string OrbMaterialPath = Root + "/Materials/Orb.mat";
+        public const string OrbDotsMaterialPath = Root + "/Materials/OrbDots.mat";
         public const string LineMaterialPath = Root + "/Materials/Line.mat";
         public const string BubbleMaterialPath = Root + "/Materials/Bubble.mat";
         public const string StreakMaterialPath = Root + "/Materials/Streak.mat";

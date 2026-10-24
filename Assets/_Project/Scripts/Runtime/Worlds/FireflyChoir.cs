@@ -43,7 +43,13 @@ namespace MusicInYourHands
         {
             new Color(1f, 0.55f, 0.25f), new Color(1f, 0.82f, 0.4f), new Color(0.75f, 1f, 0.45f), new Color(0.85f, 0.95f, 1f)
         };
-        const int TrailPoints = 8;
+        // The trail keeps where the firefly was over the last quarter second, sampled every TrailStep seconds, and is
+        // drawn as a smooth curve through those samples, cut off at TrailLength so fast flights stay short.
+        const int TrailPoints = 10;
+        const float TrailStep = 0.03f;
+        const float TrailLength = 0.06f;
+        const int TrailSmooth = 3;
+        const int DrawPoints = (TrailPoints - 1) * TrailSmooth + 1;
 
         sealed class Fly
         {
@@ -51,6 +57,7 @@ namespace MusicInYourHands
             public Renderer Halo;
             public LineStrip Trail;
             public Vector3[] History;
+            public float SampleClock;
             public Vector3 Position;
             public Vector3 Velocity;
             public Vector3 Home;
@@ -62,6 +69,8 @@ namespace MusicInYourHands
         }
 
         Fly[] flies;
+        Vector3[] trailPath;
+        Color[] trailColors;
         Renderer[] palmGlows;
         MaterialPropertyBlock block;
         Vector3 center, waveOrigin;
@@ -77,6 +86,8 @@ namespace MusicInYourHands
             built = true;
             block = new MaterialPropertyBlock();
             flies = new Fly[count];
+            trailPath = new Vector3[DrawPoints];
+            trailColors = new Color[DrawPoints];
             var random = new System.Random(11);
             for (int i = 0; i < count; i++)
             {
@@ -84,7 +95,7 @@ namespace MusicInYourHands
                 {
                     Halo = Effects.MakeQuad($"Firefly Halo {i}", transform, glowMaterial),
                     Core = Effects.MakeQuad($"Firefly {i}", transform, glowMaterial),
-                    Trail = new LineStrip($"Firefly Trail {i}", transform, lineMaterial, TrailPoints),
+                    Trail = new LineStrip($"Firefly Trail {i}", transform, lineMaterial, DrawPoints),
                     History = new Vector3[TrailPoints],
                     Home = new Vector3((float)random.NextDouble() * 2 - 1, (float)random.NextDouble() * 2 - 1, (float)random.NextDouble() * 2 - 1),
                     Phase = (float)random.NextDouble() * 20f,
@@ -159,7 +170,7 @@ namespace MusicInYourHands
                 var f = flies[i];
                 if (music.Beat && Random.value < startle)
                 {
-                    f.Velocity += Random.onUnitSphere * Random.Range(0.4f, 0.9f) + Vector3.up * 0.3f;
+                    f.Velocity += Random.onUnitSphere * Random.Range(0.25f, 0.5f) + Vector3.up * 0.12f;
                     f.Startled = 0.45f;
                 }
                 f.Startled -= dt;
@@ -176,7 +187,7 @@ namespace MusicInYourHands
                 f.Position += f.Velocity * dt;
                 f.Landed = Mathf.MoveTowards(f.Landed, Vector3.Distance(f.Position, target) < 0.02f ? 1f : 0f, dt * 4f);
 
-                Draw(f, music, view, t);
+                Draw(f, music, view, t, dt);
             }
 
             DrawPalms(rig, view);
@@ -211,7 +222,7 @@ namespace MusicInYourHands
             return palm + hand.PalmNormal * (0.04f + (slot - 5) * 0.02f) + orbit * (0.05f + (slot - 5) * 0.015f);
         }
 
-        void Draw(Fly f, MusicFrame music, Camera view, float t)
+        void Draw(Fly f, MusicFrame music, Camera view, float t, float dt)
         {
             // The fly's voice glows with its band; its own blink keeps a slow rhythm; the beat's wave flashes it.
             float voice = music.Band(f.Voice + 2);
@@ -238,12 +249,51 @@ namespace MusicInYourHands
             block.SetFloat(IntensityId, glow * 0.45f);
             f.Halo.SetPropertyBlock(block);
 
-            // A short fading trail of where the firefly has just been.
-            for (int k = TrailPoints - 1; k > 0; k--) f.History[k] = f.History[k - 1];
+            // A soft comet tail along the path the firefly has just flown: a smooth curve that fades to nothing.
+            f.SampleClock += dt;
+            if (f.SampleClock >= TrailStep)
+            {
+                f.SampleClock -= TrailStep * Mathf.Floor(f.SampleClock / TrailStep);
+                for (int k = TrailPoints - 1; k > 0; k--) f.History[k] = f.History[k - 1];
+            }
             f.History[0] = f.Position;
-            var trailColor = color;
-            trailColor.a = Mathf.Clamp01(0.15f + glow * 0.25f);
-            f.Trail.Set(f.History, TrailPoints, flySize * 0.35f, trailColor, view.transform.position);
+            for (int k = 0; k < TrailPoints - 1; k++)
+            {
+                var p0 = f.History[Mathf.Max(k - 1, 0)];
+                var p1 = f.History[k];
+                var p2 = f.History[k + 1];
+                var p3 = f.History[Mathf.Min(k + 2, TrailPoints - 1)];
+                for (int j = 0; j < TrailSmooth; j++)
+                    trailPath[k * TrailSmooth + j] = CatmullRom(p0, p1, p2, p3, j / (float)TrailSmooth);
+            }
+            trailPath[DrawPoints - 1] = f.History[TrailPoints - 1];
+            // Fade along the length flown, and stop the tail at TrailLength.
+            float strength = Mathf.Clamp01(0.2f + glow * 0.3f);
+            float flown = 0f;
+            for (int k = 0; k < DrawPoints; k++)
+            {
+                if (k > 0)
+                {
+                    float step = Vector3.Distance(trailPath[k], trailPath[k - 1]);
+                    if (flown + step > TrailLength)
+                    {
+                        trailPath[k] = Vector3.Lerp(trailPath[k - 1], trailPath[k], (TrailLength - flown) / Mathf.Max(step, 1e-5f));
+                        step = TrailLength - flown;
+                    }
+                    flown += step;
+                }
+                float u = flown / TrailLength;
+                var c = color;
+                c.a = strength * (1f - u) * (1f - u);
+                trailColors[k] = c;
+            }
+            f.Trail.Set(trailPath, trailColors, DrawPoints, flySize * 0.22f, Color.white, view.transform.position, false);
+        }
+
+        static Vector3 CatmullRom(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
+        {
+            float t2 = t * t, t3 = t2 * t;
+            return 0.5f * (2f * p1 + (p2 - p0) * t + (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2 + (3f * p1 - p0 + p3 - 2f * p2) * t3);
         }
 
         /// <summary>A warm glow on the palm that grows with the fireflies resting on the hand.</summary>

@@ -51,6 +51,10 @@ namespace MusicInYourHands
         /// Unused points collapse onto the last one.
         /// </summary>
         public void Set(Vector3[] points, int count, float width, Color color, Vector3 viewer, bool fadeEnds = true)
+            => Set(points, null, count, width, color, viewer, fadeEnds);
+
+        /// <summary>As above, with a colour per point (multiplied by <paramref name="color"/>).</summary>
+        public void Set(Vector3[] points, Color[] pointColors, int count, float width, Color color, Vector3 viewer, bool fadeEnds = true)
         {
             count = Mathf.Clamp(count, 2, maxPoints);
             var local = GameObject.transform;
@@ -69,7 +73,7 @@ namespace MusicInYourHands
                 vertices[i * 2 + 1] = local.InverseTransformPoint(p + half);
                 uvs[i * 2] = new Vector2(u, 0f);
                 uvs[i * 2 + 1] = new Vector2(u, 1f);
-                var c = color;
+                var c = pointColors != null ? pointColors[k] * color : color;
                 c.a *= fade;
                 colors[i * 2] = c;
                 colors[i * 2 + 1] = c;

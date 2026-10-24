@@ -36,8 +36,9 @@ namespace MusicInYourHands.EditorTools
             var line = (ProjectSetup.LineMaterialPath, "MusicInYourHands/Line");
 
             Shot<LivingSkin>("1-living-skin", HandPose.PalmsToFace, 8f, new[] { ("glowMaterial", glow), ("ringMaterial", ring) });
-            Shot<HeartbeatOrb>("2-heartbeat-orb", HandPose.PalmsFacing, 8f, new[] { ("glowMaterial", glow), ("ringMaterial", ring), ("lineMaterial", line),
-                ("orbMaterial", (ProjectSetup.OrbMaterialPath, "MusicInYourHands/Orb")) });
+            Shot<HeartbeatOrb>("2-heartbeat-orb", HandPose.PalmsFacing, 18f, new[] { ("glowMaterial", glow), ("lineMaterial", line),
+                ("orbMaterial", (ProjectSetup.OrbMaterialPath, "MusicInYourHands/Orb")),
+                ("dotsMaterial", (ProjectSetup.OrbDotsMaterialPath, "MusicInYourHands/OrbDots")) }, closeUp: true);
             Shot<WaveformRibbon>("3-waveform-ribbon", HandPose.BacksToFace, 8f, new[] { ("glowMaterial", glow), ("lineMaterial", line) },
                 rig => { rig.Left.Pinch = 1f; rig.Right.Pinch = 1f; });
             Shot<AirStrings>("4-air-strings", HandPose.BacksToFace, 12f, new[] { ("glowMaterial", glow), ("lineMaterial", line), ("ringMaterial", ring) });
@@ -106,15 +107,17 @@ namespace MusicInYourHands.EditorTools
                 hand.transform.position += center - skin.bounds.center;
                 Vector3 want = pose switch
                 {
-                    HandPose.PalmsToFace => Vector3.back,
-                    HandPose.PalmsFacing => left ? Vector3.right : Vector3.left,
+                    HandPose.PalmsToFace or HandPose.PalmsUp => Vector3.back,
+                    // Turned a little towards the face, the way you hold a ball in front of you.
+                    HandPose.PalmsFacing => ((left ? Vector3.right : Vector3.left) + Vector3.back * 0.6f).normalized,
                     HandPose.BacksToFace => Vector3.forward,
                     _ => Vector3.forward
                 };
                 var normal = Vector3.ProjectOnPlane(PalmNormal(Bone, left), Vector3.up).normalized;
                 hand.transform.RotateAround(skin.bounds.center, Vector3.up, Vector3.SignedAngle(normal, want, Vector3.up));
                 if (pose == HandPose.PalmsUp)
-                    hand.transform.RotateAround(skin.bounds.center, Vector3.right, -80f);
+                    // Tip the hand forward: fingers point away, palm up, as if offering it.
+                    hand.transform.RotateAround(skin.bounds.center, Vector3.right, 75f);
                 else if (pose == HandPose.BacksToFace)
                     hand.transform.RotateAround(skin.bounds.center, Vector3.right, 20f);
 
@@ -157,9 +160,17 @@ namespace MusicInYourHands.EditorTools
             }
         }
 
-        static void Shot<T>(string name, HandPose pose, float pitch, (string property, (string path, string shader) material)[] materials,
-            System.Action<HandRig> holdPose = null) where T : World
+        // Set SHOTS to part of a shot's name (for example "orb") to capture only the matching shots.
+        static bool Wanted(string name)
         {
+            var only = System.Environment.GetEnvironmentVariable("SHOTS");
+            return string.IsNullOrEmpty(only) || only.Split(',').Any(name.Contains);
+        }
+
+        static void Shot<T>(string name, HandPose pose, float pitch, (string property, (string path, string shader) material)[] materials,
+            System.Action<HandRig> holdPose = null, bool closeUp = false) where T : World
+        {
+            if (!Wanted(name)) return;
             var camera = StageRoom(pitch);
             var rig = new GameObject("HandRig").AddComponent<HandRig>();
             var hands = PlaceHands(camera, pose, rig);
@@ -189,10 +200,16 @@ namespace MusicInYourHands.EditorTools
                 SetBeat(hand.Skin, clock.BeatAge, clock.Kick);
             }
             File.WriteAllBytes($"{ShotFolder}/{name}.png", Render(camera, 1600, 900).EncodeToPNG());
+            if (!closeUp) return;
+            // A second, zoomed-in shot of whatever the world is focused on, to judge the detail.
+            camera.transform.LookAt(HandSkin.FocusPosition);
+            camera.fieldOfView = 30f;
+            File.WriteAllBytes($"{ShotFolder}/{name}-close.png", Render(camera, 1200, 900).EncodeToPNG());
         }
 
         static void MenuShot()
         {
+            if (!Wanted("7-menu")) return;
             var camera = StageRoom(6f);
             var rig = new GameObject("HandRig").AddComponent<HandRig>();
             var hands = PlaceHands(camera, HandPose.BacksToFace, rig);
@@ -222,6 +239,8 @@ namespace MusicInYourHands.EditorTools
             var menu = new GameObject("WorldMenu").AddComponent<WorldMenu>();
             var wso = new SerializedObject(menu);
             wso.FindProperty("bubbleMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.BubbleMaterialPath, "MusicInYourHands/Bubble");
+            wso.FindProperty("glowMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow");
+            wso.FindProperty("lineMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.LineMaterialPath, "MusicInYourHands/Line");
             wso.ApplyModifiedPropertiesWithoutUndo();
             menu.Step(rig, manager, null, camera, 0f);
             menu.Open(camera);

@@ -264,7 +264,7 @@ namespace MusicInYourHands.EditorTools
             var so = new SerializedObject(orb);
             so.FindProperty("glowMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow");
             so.FindProperty("orbMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.OrbMaterialPath, "MusicInYourHands/Orb");
-            so.FindProperty("ringMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.RingMaterialPath, "MusicInYourHands/Ring");
+            so.FindProperty("dotsMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.OrbDotsMaterialPath, "MusicInYourHands/OrbDots");
             so.FindProperty("lineMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.LineMaterialPath, "MusicInYourHands/Line");
             so.ApplyModifiedPropertiesWithoutUndo();
             orb.Build();
@@ -316,6 +316,8 @@ namespace MusicInYourHands.EditorTools
             var menu = new GameObject("WorldMenu").AddComponent<WorldMenu>();
             var wso = new SerializedObject(menu);
             wso.FindProperty("bubbleMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.BubbleMaterialPath, "MusicInYourHands/Bubble");
+            wso.FindProperty("glowMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow");
+            wso.FindProperty("lineMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.LineMaterialPath, "MusicInYourHands/Line");
             wso.ApplyModifiedPropertiesWithoutUndo();
             // Lower the hands out of the way, as if the player had just opened the menu.
             foreach (var hand in hands) { hand.Root.transform.position += Vector3.down * 0.3f; PushHand(rig, hand); }

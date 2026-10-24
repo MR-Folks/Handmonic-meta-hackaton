@@ -4,11 +4,12 @@ namespace MusicInYourHands
 {
     /// <summary>
     /// The Heartbeat orb world: hold the song between your hands. The orb forms just beyond your palms, sized by how
-    /// far apart they are, and turns as you turn your hands, like holding a ball. It is four layers (pink, violet,
-    /// blue, gold), each a 3D supershape (the superformula) that morphs with its own frequency band, plus a halo,
-    /// two orbit rings with beads riding them, and drifting motes. Energy tendrils reach from your fingertips to it
-    /// and your hands glow with heat on the side facing it. Each kick swells it and nudges your visible hands apart
-    /// (fake resistance). Spreading your hands turns the music up.
+    /// far apart they are, and turns as you turn your hands, like holding a ball. Its shell is a cloud of glowing dots
+    /// on a 3D supershape (the superformula) whose petals sharpen as the song gets louder and grow or lose a petal
+    /// every eight beats; each kick sends a ripple across it. Inside sits a small glowing heart. Three torus-knot
+    /// trails of light wind around it with comets racing along them, energy threads flow from your fingertips into
+    /// it, and motes drift off its surface. Your hands glow with heat on the side facing it, each kick nudges your
+    /// visible hands apart (fake resistance), and spreading your hands turns the music up.
     /// </summary>
     public class HeartbeatOrb : World
     {
@@ -24,19 +25,21 @@ namespace MusicInYourHands
         };
 
         [Header("Materials")]
+        [SerializeField] Material dotsMaterial;
         [SerializeField] Material orbMaterial;
         [SerializeField] Material glowMaterial;
-        [SerializeField] Material ringMaterial;
         [SerializeField] Material lineMaterial;
 
         [Header("Orb")]
-        [SerializeField] float minRadius = 0.04f;
-        [SerializeField] float maxRadius = 0.15f;
+        [SerializeField] float minRadius = 0.05f;
+        [SerializeField] float maxRadius = 0.2f;
         [Tooltip("Orb radius as a share of the distance between the palms.")]
-        [SerializeField] float radiusPerSpread = 0.3f;
+        [SerializeField] float radiusPerSpread = 0.5f;
         [Tooltip("How far beyond the palms, away from the player's face, the orb floats (m).")]
-        [SerializeField] float forwardOffset = 0.12f;
-        [SerializeField] float beatSwell = 0.2f;
+        [SerializeField] float forwardOffset = 0.1f;
+        [SerializeField] float beatSwell = 0.12f;
+        [Tooltip("Petal counts the shell steps through, one every eight beats.")]
+        [SerializeField] int[] petals = { 3, 4, 5, 6, 4, 7 };
 
         [Header("Feel")]
         [Tooltip("How far each kick pushes the visible hands apart, in metres.")]
@@ -44,8 +47,8 @@ namespace MusicInYourHands
         [Tooltip("Palm distance (m) mapped to volume: close together is quiet, wide apart is loud.")]
         [SerializeField] Vector2 spreadRange = new Vector2(0.12f, 0.6f);
         [SerializeField] Vector2 volumeRange = new Vector2(0.3f, 1f);
-        [SerializeField] int motesPerBeat = 14;
-        [SerializeField] float motesPerSecond = 10f;
+        [SerializeField] int motesPerBeat = 16;
+        [SerializeField] float motesPerSecond = 12f;
 
         static readonly int KickId = Shader.PropertyToID("_Kick");
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
@@ -53,11 +56,14 @@ namespace MusicInYourHands
         static readonly int LobesId = Shader.PropertyToID("_Lobes");
         static readonly int SpinId = Shader.PropertyToID("_Spin");
         static readonly int BandId = Shader.PropertyToID("_Band");
+        static readonly int BandsId = Shader.PropertyToID("_Bands");
         static readonly int OpacityId = Shader.PropertyToID("_Opacity");
         static readonly int ColorId = Shader.PropertyToID("_Color");
         static readonly int IntensityId = Shader.PropertyToID("_Intensity");
-        static readonly int RadiusId = Shader.PropertyToID("_Radius");
-        static readonly int ThicknessId = Shader.PropertyToID("_Thickness");
+        static readonly int MorphId = Shader.PropertyToID("_Morph");
+        static readonly int EnergyId = Shader.PropertyToID("_Energy");
+        static readonly int WaveId = Shader.PropertyToID("_Wave");
+        static readonly int ClockId = Shader.PropertyToID("_Clock");
 
         static readonly Color Pink = new Color(1f, 0.37f, 0.68f);
         static readonly Color Violet = new Color(0.62f, 0.56f, 1f);
@@ -65,30 +71,39 @@ namespace MusicInYourHands
         static readonly Color Gold = new Color(1f, 0.83f, 0.42f);
         static readonly Color[] MoteColors = { Pink, Violet, Blue, Gold };
 
-        // Layers from outside in: size, colour, symmetry (petals), spin (sign is direction), band, base opacity.
+        // The heart inside the shell, from outside in: size, colour, petals, spin, band, base opacity.
         static readonly (float size, Color color, float lobes, float spin, int band, float opacity)[] Layers =
         {
-            (1f, Pink, 3f, 0.9f, 1, 0.14f),
-            (0.8f, Violet, 5f, -1.2f, 2, 0.18f),
-            (0.6f, Blue, 4f, 1.5f, 3, 0.22f),
-            (0.42f, Gold, 6f, -1.9f, 4, 0.3f)
+            (0.34f, Pink, 3f, 1.6f, 1, 0.16f)
         };
 
-        const int BeadsPerRing = 3;
-        const int TendrilPoints = 14;
+        // Torus knots wound around the shell: (p, q) winding, colour, comet speed (loops per second at rest).
+        static readonly (int p, int q, Color color, float speed)[] Knots =
+        {
+            (2, 3, Gold, 0.22f),
+            (3, 5, Pink, -0.16f),
+            (2, 5, Blue, 0.19f)
+        };
 
-        Transform orb, halo;
-        Transform[] layers, rings, beads;
-        Renderer[] layerRenderers, ringRenderers, beadRenderers;
-        Renderer haloRenderer;
-        LineStrip[] tendrils;
-        Vector3[] tendrilPath;
+        const int DotCount = 1500;
+        const int KnotPoints = 180;
+        const int TendrilPoints = 20;
+
+        Transform orb, halo, core, dots;
+        Transform[] layers;
+        Renderer[] layerRenderers;
+        Renderer haloRenderer, coreRenderer, dotsRenderer;
+        LineStrip[] knots, tendrils;
+        Vector3[] path;
+        Color[] pathColors;
+        float[] knotPhase;
         ParticleSystem motes;
         MaterialPropertyBlock block;
         Vector3 center, lastAxis;
         Quaternion spin = Quaternion.identity;
         Vector3 angularVelocity;
-        float radius, visibility, moteDebt, beadPhase;
+        float radius, visibility, moteDebt, morph = -1f, energy, waveAge = 9f;
+        int beats;
         bool built, hasCenter, hasAxis;
         float savedVolume = -1f;
 
@@ -112,6 +127,7 @@ namespace MusicInYourHands
             }
             if (orb != null) orb.gameObject.SetActive(false);
             if (tendrils != null) foreach (var t in tendrils) t.SetVisible(false);
+            if (knots != null) foreach (var k in knots) k.SetVisible(false);
             if (motes != null) motes.Clear();
         }
 
@@ -150,6 +166,18 @@ namespace MusicInYourHands
             }
             spin = Quaternion.Euler(angularVelocity * (Mathf.Rad2Deg * dt)) * spin;
 
+            // The shell's petal count moves on every eight beats; its sharpness follows how loud the song is.
+            waveAge += dt;
+            if (music.Beat)
+            {
+                beats++;
+                waveAge = 0f;
+            }
+            float targetMorph = petals.Length > 0 ? petals[(beats / 8) % petals.Length] : 4f;
+            morph = morph < 0f ? targetMorph : Mathf.MoveTowards(morph, targetMorph, dt * 1.6f);
+            float loud = (music.Band(1) + music.Band(2) + music.Band(3) + music.Band(4)) * 0.25f;
+            energy = Mathf.Lerp(energy, Mathf.Clamp01(loud * 0.9f + kick * 0.35f), 1f - Mathf.Exp(-6f * dt));
+
             visibility = Mathf.MoveTowards(visibility, holding ? 1f : 0f, dt * (holding ? 3f : 2f));
             bool show = visibility > 0.001f && hasCenter;
             if (orb.gameObject.activeSelf != show) orb.gameObject.SetActive(show);
@@ -157,7 +185,8 @@ namespace MusicInYourHands
             HandSkin.FocusStrength = visibility;
 
             float size = radius * 2f * (1f + kick * beatSwell) * Mathf.SmoothStep(0f, 1f, visibility);
-            if (show) DrawOrb(music, view, size, dt);
+            if (show) DrawOrb(music, view, size);
+            DrawKnots(music, view, show, size, dt);
             DrawTendrils(rig, music, view, show, size);
 
             if (show && holding)
@@ -201,19 +230,28 @@ namespace MusicInYourHands
             hasAxis = true;
         }
 
-        void DrawOrb(MusicFrame music, Camera view, float size, float dt)
+        void DrawOrb(MusicFrame music, Camera view, float size)
         {
             float kick = music.Kick;
-            float bass = music.Band(1);
             float ease = Mathf.SmoothStep(0f, 1f, visibility);
             orb.position = center;
             orb.localScale = Vector3.one * size;
             orb.rotation = spin;
 
+            block.Clear();
+            block.SetFloat(MorphId, morph);
+            block.SetFloat(EnergyId, energy);
+            block.SetVector(BandsId, new Vector4(music.Band(1), music.Band(2), music.Band(3), music.Band(4)));
+            block.SetFloat(WaveId, waveAge);
+            block.SetFloat(KickId, kick);
+            block.SetFloat(ClockId, Now);
+            block.SetFloat(AlphaId, ease);
+            dotsRenderer.SetPropertyBlock(block);
+
             for (int i = 0; i < layers.Length; i++)
             {
                 var layer = Layers[i];
-                layers[i].localScale = Vector3.one * layer.size;
+                layers[i].localScale = Vector3.one * layer.size * (1f + music.Band(layer.band) * 0.15f);
                 block.Clear();
                 block.SetColor(TintId, layer.color);
                 block.SetFloat(LobesId, layer.lobes);
@@ -230,49 +268,69 @@ namespace MusicInYourHands
                 var toView = view.transform.position - center;
                 if (toView.sqrMagnitude > 1e-6f) halo.rotation = Quaternion.LookRotation(-toView.normalized, Vector3.up);
             }
-            halo.localScale = Vector3.one * (2f + kick * 0.4f);
+            halo.localScale = Vector3.one * (2.2f + kick * 0.5f);
+            core.rotation = halo.rotation;
+            core.localScale = Vector3.one * (0.5f + kick * 0.3f + music.Band(1) * 0.1f);
             block.Clear();
-            block.SetColor(ColorId, Color.Lerp(Violet, Pink, kick));
-            block.SetFloat(IntensityId, (0.35f + kick * 0.3f + bass * 0.15f) * ease);
+            block.SetColor(ColorId, Color.Lerp(Pink, Gold, 0.35f + kick * 0.4f));
+            block.SetFloat(IntensityId, (0.6f + kick * 0.5f) * ease);
+            coreRenderer.SetPropertyBlock(block);
+            block.Clear();
+            block.SetColor(ColorId, Color.Lerp(Violet, Pink, 0.4f + kick * 0.6f));
+            block.SetFloat(IntensityId, (0.28f + kick * 0.3f + energy * 0.15f) * ease);
             haloRenderer.SetPropertyBlock(block);
+        }
 
-            // Two rings on tilted orbits that precess faster with the bass; beads ride them and race on the beat.
+        /// <summary>
+        /// Three torus knots of light wound around the shell, each slowly tumbling, with a bright comet racing along
+        /// it that speeds up with the bass. The far side of each knot is dimmer, so they read as wrapping around.
+        /// </summary>
+        void DrawKnots(MusicFrame music, Camera view, bool show, float size, float dt)
+        {
+            bool visible = show && view != null;
             float time = Now;
-            beadPhase += dt * (1.2f + bass * 2.5f + kick * 4f);
-            for (int i = 0; i < rings.Length; i++)
+            float bass = music.Band(1);
+            var eye = visible ? view.transform.position : Vector3.zero;
+            var toEye = visible ? (eye - center).normalized : Vector3.forward;
+            for (int k = 0; k < knots.Length; k++)
             {
-                float tilt = i == 0 ? 68f : -58f;
-                float precess = time * (i == 0 ? 25f : -18f) * (1f + bass * 0.8f);
-                rings[i].localRotation = Quaternion.Euler(tilt + Mathf.Sin(time * 0.6f + i) * 12f, precess, time * (i == 0 ? 9f : -13f));
-                rings[i].localScale = Vector3.one * (1.45f + i * 0.18f + kick * 0.12f);
-                block.Clear();
-                block.SetColor(ColorId, i == 0 ? Gold : Blue);
-                block.SetFloat(RadiusId, 0.92f);
-                block.SetFloat(ThicknessId, 0.012f);
-                block.SetFloat(AlphaId, (0.45f + kick * 0.45f) * ease);
-                ringRenderers[i].SetPropertyBlock(block);
-
-                for (int k = 0; k < BeadsPerRing; k++)
+                var line = knots[k];
+                line.SetVisible(visible);
+                if (!visible) continue;
+                var knot = Knots[k];
+                knotPhase[k] += dt * knot.speed * (1f + bass * 1.5f + music.Kick * 2f);
+                float head = Mathf.Repeat(knotPhase[k], 1f);
+                var tumble = Quaternion.Euler(time * (9f + k * 4f), time * (k % 2 == 0 ? 14f : -11f), k * 50f + time * 5f);
+                float bigRadius = 0.6f + k * 0.04f;
+                float tube = 0.08f + music.Band(k + 2) * 0.06f + music.Kick * 0.03f;
+                for (int i = 0; i < KnotPoints; i++)
                 {
-                    int index = i * BeadsPerRing + k;
-                    float a = beadPhase * (i == 0 ? 1f : -1.3f) + k * Mathf.PI * 2f / BeadsPerRing;
-                    var local = new Vector3(Mathf.Cos(a), Mathf.Sin(a), 0f) * 0.46f;
-                    beads[index].position = rings[i].TransformPoint(local);
-                    beads[index].localScale = Vector3.one * (0.16f + kick * 0.08f);
-                    Effects.Face(beads[index], view);
-                    block.Clear();
-                    block.SetColor(ColorId, i == 0 ? Gold : Blue);
-                    block.SetFloat(IntensityId, (1f + kick * 0.8f) * ease);
-                    beadRenderers[index].SetPropertyBlock(block);
+                    float u = i / (float)(KnotPoints - 1);
+                    float phi = u * Mathf.PI * 2f;
+                    float ring = bigRadius + tube * Mathf.Cos(knot.q * phi);
+                    var local = new Vector3(ring * Mathf.Cos(knot.p * phi), tube * Mathf.Sin(knot.q * phi), ring * Mathf.Sin(knot.p * phi));
+                    var p = orb.TransformPoint(tumble * local * 0.5f);
+                    path[i] = p;
+
+                    // The comet: bright at its head with a tail that trails behind it.
+                    float behind = Mathf.Repeat(knot.speed >= 0f ? head - u : u - head, 1f);
+                    float comet = Mathf.Exp(-behind * 14f);
+                    float near = Vector3.Dot((p - center).normalized, toEye) * 0.5f + 0.5f;
+                    var c = Color.Lerp(knot.color, Color.white, comet * comet * comet * 0.7f);
+                    c.a = (0.2f + comet * 0.9f) * Mathf.Lerp(0.3f, 1f, near);
+                    pathColors[i] = c;
                 }
+                line.Set(path, pathColors, KnotPoints, 0.003f + music.Kick * 0.0015f, new Color(1f, 1f, 1f, visibility), eye, false);
             }
         }
 
-        /// <summary>Flickering threads of energy from each fingertip to the orb's surface.</summary>
+        /// <summary>
+        /// Threads of energy from each fingertip into the orb: smooth swaying curves, pink at the hand and gold at
+        /// the orb, with bright drops flowing along them into the orb and a flare on each kick.
+        /// </summary>
         void DrawTendrils(HandRig rig, MusicFrame music, Camera view, bool show, float size)
         {
             float time = Now;
-            int flicker = Mathf.FloorToInt(time * 18f);
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
@@ -280,29 +338,38 @@ namespace MusicInYourHands
                 {
                     var line = tendrils[side * 5 + f];
                     bool visible = show && hand.IsTracked && view != null;
+                    var tip = visible ? (hand.TipJoints[f] != null ? hand.TipJoints[f].position : hand.Tips[f]) : Vector3.zero;
+                    var toTip = tip - center;
+                    float reach = toTip.magnitude;
+                    // Only fingers close to the orb are linked to it.
+                    float closeness = visible ? Mathf.Clamp01((0.32f - reach) / 0.08f) : 0f;
+                    visible &= closeness > 0.01f;
                     line.SetVisible(visible);
                     if (!visible) continue;
 
-                    var tip = hand.TipJoints[f] != null ? hand.TipJoints[f].position : hand.Tips[f];
-                    var toTip = tip - center;
-                    var end = center + toTip.normalized * size * 0.42f;
-                    var mid = (tip + end) * 0.5f;
-                    var side1 = Vector3.Cross(end - tip, Vector3.up).normalized;
-                    var side2 = Vector3.Cross(end - tip, side1).normalized;
-                    var random = new System.Random(flicker * 31 + side * 7 + f);
-                    float jag = 0.008f + music.Kick * 0.01f;
+                    var end = center + toTip / reach * size * 0.42f;
+                    var along = end - tip;
+                    var side1 = Vector3.Cross(along, Vector3.up).normalized;
+                    var side2 = Vector3.Cross(along, side1).normalized;
+                    float seed = side * 5 + f;
+                    float flow = Mathf.Repeat(time * 0.9f + seed * 0.37f, 1f);
                     for (int i = 0; i < TendrilPoints; i++)
                     {
                         float u = i / (float)(TendrilPoints - 1);
-                        // A gentle curve, with a jagged jitter that is zero at both ends.
-                        var p = Vector3.Lerp(Vector3.Lerp(tip, mid + side2 * 0.02f, u), Vector3.Lerp(mid + side2 * 0.02f, end, u), u);
                         float env = Mathf.Sin(u * Mathf.PI);
-                        p += (side1 * ((float)random.NextDouble() * 2 - 1) + side2 * ((float)random.NextDouble() * 2 - 1)) * jag * env;
-                        tendrilPath[i] = p;
+                        var p = Vector3.Lerp(tip, end, u);
+                        p += side2 * (env * 0.018f);
+                        p += side1 * (Mathf.Sin(u * 7f - time * 5f + seed) * 0.006f * env);
+                        p += side2 * (Mathf.Sin(u * 5f + time * 3.3f + seed * 2f) * 0.004f * env);
+                        path[i] = p;
+
+                        float drop = Mathf.Exp(-Mathf.Pow((u - flow) * 9f, 2f));
+                        var c = Color.Lerp(Pink, Gold, u);
+                        c = Color.Lerp(c, Color.white, drop * 0.35f);
+                        c.a = 0.12f + drop * 0.6f + music.Kick * 0.35f + music.Band(f + 1) * 0.1f;
+                        pathColors[i] = c;
                     }
-                    var color = Color.Lerp(Gold, Pink, (f / 4f) * 0.6f + music.Kick * 0.4f);
-                    color.a = (0.25f + music.Band(f + 1) * 0.35f + music.Kick * 0.4f) * visibility;
-                    line.Set(tendrilPath, TendrilPoints, 0.0035f, color, view.transform.position);
+                    line.Set(path, pathColors, TendrilPoints, 0.0026f, new Color(1f, 1f, 1f, visibility * closeness), view.transform.position);
                 }
             }
         }
@@ -333,11 +400,55 @@ namespace MusicInYourHands
                     position = center + dir * surface * Random.Range(0.85f, 1.1f),
                     velocity = dir * speed * Random.Range(0.5f, 1.2f) + swirl * speed * 0.8f,
                     startColor = MoteColors[Random.Range(0, MoteColors.Length)],
-                    startSize = Random.Range(0.005f, 0.013f),
+                    startSize = Random.Range(0.005f, 0.012f),
                     startLifetime = Random.Range(0.8f, 1.6f)
                 };
                 motes.Emit(emit, 1);
             }
+        }
+
+        /// <summary>
+        /// The dot shell's mesh: dots spread evenly over a unit sphere by the golden angle (a Fibonacci lattice), each a
+        /// quad whose four corners all sit at the dot's direction. The shader pushes them onto the shape and turns them
+        /// to face the viewer. The second UV holds a random seed per dot for its twinkle.
+        /// </summary>
+        static Mesh BuildDotMesh()
+        {
+            var vertices = new Vector3[DotCount * 4];
+            var uvs = new Vector2[DotCount * 4];
+            var seeds = new Vector2[DotCount * 4];
+            var triangles = new int[DotCount * 6];
+            float golden = Mathf.PI * (3f - Mathf.Sqrt(5f));
+            var random = new System.Random(7);
+            for (int i = 0; i < DotCount; i++)
+            {
+                float y = 1f - (i + 0.5f) * 2f / DotCount;
+                float r = Mathf.Sqrt(1f - y * y);
+                float a = golden * i;
+                var dir = new Vector3(Mathf.Cos(a) * r, y, Mathf.Sin(a) * r);
+                var seed = new Vector2((float)random.NextDouble(), i / (float)DotCount);
+                int v = i * 4;
+                for (int c = 0; c < 4; c++)
+                {
+                    vertices[v + c] = dir;
+                    seeds[v + c] = seed;
+                }
+                uvs[v] = new Vector2(0f, 0f);
+                uvs[v + 1] = new Vector2(1f, 0f);
+                uvs[v + 2] = new Vector2(0f, 1f);
+                uvs[v + 3] = new Vector2(1f, 1f);
+                int t = i * 6;
+                triangles[t] = v; triangles[t + 1] = v + 2; triangles[t + 2] = v + 1;
+                triangles[t + 3] = v + 1; triangles[t + 4] = v + 2; triangles[t + 5] = v + 3;
+            }
+            var mesh = new Mesh { name = "Orb dots" };
+            mesh.vertices = vertices;
+            mesh.uv = uvs;
+            mesh.uv2 = seeds;
+            mesh.triangles = triangles;
+            // The shader moves the dots out to up to about 0.8 of the orb's size, so keep the bounds generous.
+            mesh.bounds = new Bounds(Vector3.zero, Vector3.one * 2f);
+            return mesh;
         }
 
         public override void Build()
@@ -354,7 +465,7 @@ namespace MusicInYourHands
             for (int i = 0; i < Layers.Length; i++)
             {
                 var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                sphere.name = $"Layer {i}";
+                sphere.name = $"Heart {i}";
                 DebugShapes.RemoveCollider(sphere);
                 sphere.transform.SetParent(orb, false);
                 var r = sphere.GetComponent<Renderer>();
@@ -366,28 +477,33 @@ namespace MusicInYourHands
                 layerRenderers[i] = r;
             }
 
+            dots = new GameObject("Shell").transform;
+            dots.SetParent(orb, false);
+            dots.gameObject.AddComponent<MeshFilter>().sharedMesh = BuildDotMesh();
+            dotsRenderer = dots.gameObject.AddComponent<MeshRenderer>();
+            dotsRenderer.sharedMaterial = dotsMaterial;
+            dotsRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            dotsRenderer.receiveShadows = false;
+
             haloRenderer = Effects.MakeQuad("Halo", orb, glowMaterial);
             haloRenderer.sortingOrder = -1;
             halo = haloRenderer.transform;
+            // The heart's own light: a hot glow in the middle of the shell.
+            coreRenderer = Effects.MakeQuad("Core", orb, glowMaterial);
+            core = coreRenderer.transform;
 
-            rings = new Transform[2];
-            ringRenderers = new Renderer[2];
-            for (int i = 0; i < rings.Length; i++)
+            path = new Vector3[KnotPoints];
+            pathColors = new Color[KnotPoints];
+            knotPhase = new float[Knots.Length];
+            knots = new LineStrip[Knots.Length];
+            for (int i = 0; i < knots.Length; i++)
             {
-                ringRenderers[i] = Effects.MakeQuad($"Orbit {i}", orb, ringMaterial);
-                rings[i] = ringRenderers[i].transform;
-            }
-
-            beads = new Transform[rings.Length * BeadsPerRing];
-            beadRenderers = new Renderer[beads.Length];
-            for (int i = 0; i < beads.Length; i++)
-            {
-                beadRenderers[i] = Effects.MakeQuad($"Bead {i}", orb, glowMaterial);
-                beads[i] = beadRenderers[i].transform;
+                knotPhase[i] = i * 0.33f;
+                knots[i] = new LineStrip($"Knot {i}", transform, lineMaterial, KnotPoints);
+                knots[i].SetVisible(false);
             }
 
             tendrils = new LineStrip[10];
-            tendrilPath = new Vector3[TendrilPoints];
             for (int i = 0; i < tendrils.Length; i++)
             {
                 tendrils[i] = new LineStrip($"Tendril {i}", transform, lineMaterial, TendrilPoints);

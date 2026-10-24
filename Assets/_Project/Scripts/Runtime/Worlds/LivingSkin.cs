@@ -27,7 +27,7 @@ namespace MusicInYourHands
         };
 
         [Header("Palm waves")]
-        [SerializeField] float waveRadius = 0.3f;
+        [SerializeField] float waveRadius = 0.14f;
         [SerializeField] float waveLife = 1.1f;
         [SerializeField] Color waveColor = new Color(0.62f, 0.56f, 1f);
         [SerializeField] Color waveBeatColor = new Color(1f, 0.37f, 0.68f);
