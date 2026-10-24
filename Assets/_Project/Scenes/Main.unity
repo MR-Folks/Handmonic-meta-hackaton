@@ -195,6 +195,172 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &122405006
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 122405008}
+  - component: {fileID: 122405007}
+  m_Layer: 0
+  m_Name: NoteRain
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &122405007
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 122405006}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4823f3cda12e2469dbac910f638f567a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.NoteRain
+  displayName: Note rain
+  color: {r: 0.5, g: 0.72, b: 1, a: 1}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
+  ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
+  areaWidth: 0.8
+  areaDepth: 0.45
+  distance: 0.45
+  spawnHeight: 0.45
+  fallSpeed: 0.5
+  catchRadius: 0.075
+  maxDrops: 40
+  onsetRise: 0.16
+  onsetLevel: 0.45
+--- !u!4 &122405008
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 122405006}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &128519272
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 128519274}
+  - component: {fileID: 128519273}
+  m_Layer: 0
+  m_Name: FireflyChoir
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &128519273
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 128519272}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6c20fb67fd1bd457da74dcb13ebd148e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.FireflyChoir
+  displayName: Firefly choir
+  color: {r: 0.79, g: 0.61, b: 1, a: 1}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  count: 44
+  cloudDistance: 0.6
+  cloudRadius: 0.45
+  flySize: 0.016
+  startle: 0.4
+--- !u!4 &128519274
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 128519272}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &179923058
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 179923060}
+  - component: {fileID: 179923059}
+  m_Layer: 0
+  m_Name: AirStrings
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &179923059
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 179923058}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 592ed8b61fb3a4179bd1b463fe1e35ea, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.AirStrings
+  displayName: Air strings
+  color: {r: 0.49, g: 0.95, b: 0.79, a: 1}
+  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  span: 1.1
+  distance: 0.42
+  lowest: -0.36
+  spacing: 0.075
+  points: 72
+  grabRadius: 0.018
+  releaseDistance: 0.05
+  resistance: 0.35
+--- !u!4 &179923060
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 179923058}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &298916676
 GameObject:
   m_ObjectHideFlags: 0
@@ -434,6 +600,60 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 7715439802841928401, guid: f4f1f0ff232ea644c8a980e61825dd44, type: 3}
   m_PrefabInstance: {fileID: 1414445809}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &790749977
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 790749979}
+  - component: {fileID: 790749978}
+  m_Layer: 0
+  m_Name: WaveformRibbon
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &790749978
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 790749977}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1e77e548c19f547ef915769fd4cd0600, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.WaveformRibbon
+  displayName: Waveform ribbon
+  color: {r: 1, g: 0.7, b: 0.42, a: 1}
+  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  points: 96
+  amplitude: 0.07
+  strandWidth: 0.007
+  grabPinch: 0.75
+  releasePinch: 0.45
+  tug: 0.007
+--- !u!4 &790749979
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 790749977}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1132760866
 GameObject:
   m_ObjectHideFlags: 0
@@ -842,6 +1062,10 @@ MonoBehaviour:
   worlds:
   - {fileID: 689960895}
   - {fileID: 1788851835}
+  - {fileID: 790749978}
+  - {fileID: 179923059}
+  - {fileID: 122405007}
+  - {fileID: 128519273}
   startWorld: 0
 --- !u!4 &1462377328
 Transform:
@@ -858,6 +1082,10 @@ Transform:
   m_Children:
   - {fileID: 689960896}
   - {fileID: 1788851836}
+  - {fileID: 790749979}
+  - {fileID: 179923060}
+  - {fileID: 122405008}
+  - {fileID: 128519274}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1492539440

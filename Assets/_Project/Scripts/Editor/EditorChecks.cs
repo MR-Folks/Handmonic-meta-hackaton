@@ -39,6 +39,10 @@ namespace MusicInYourHands.EditorTools
             ok &= CheckLivingSkinPreview();
             ok &= CheckOrbPreview();
             ok &= CheckWheelPreview();
+            ok &= CheckRibbonPreview();
+            ok &= CheckStringsPreview();
+            ok &= CheckRainPreview();
+            ok &= CheckFirefliesPreview();
             Debug.Log(ok ? "[Check] All checks passed." : "[Check] Some checks FAILED.");
             return ok;
         }
@@ -216,10 +220,10 @@ namespace MusicInYourHands.EditorTools
                 clock = times[i];
                 float kick = Mathf.Exp(-clock * 7f);
                 // The beat happens at t = 0; step to each moment, wiggling the fingertips a little to make sparks.
-                if (i == 0) skin.Step(rig, bands, 1f, 0f, camera, true);
+                if (i == 0) skin.Step(rig, Music(bands, 1f, true), camera, 0f);
                 foreach (var hand in hands) { hand.Root.transform.position += Vector3.up * 0.004f; PushHand(rig, hand); }
-                skin.Step(rig, bands, kick, dt, camera, false);
-                skin.SimulateSparks(dt);
+                skin.Step(rig, Music(bands, kick, false), camera, dt);
+                skin.SimulateParticles(dt);
                 foreach (var hand in hands) SetBeat(hand.Skin, clock, kick);
 
                 var frame = Render(camera, w, h);
@@ -263,12 +267,12 @@ namespace MusicInYourHands.EditorTools
             orb.Build();
 
             float[] bands = { 0.8f, 0.6f, 0.5f, 0.5f, 0.4f, 0.5f };
-            for (int i = 0; i < 8; i++) orb.Step(rig, bands, 0f, 0.1f, false, camera);
+            for (int i = 0; i < 8; i++) orb.Step(rig, Music(bands, 0f, false), camera, 0.1f);
             const int w = 640, h = 360;
             var sheet = new Texture2D(w * 2, h, TextureFormat.RGB24, false);
             sheet.SetPixels(0, 0, w, h, Render(camera, w, h).GetPixels());
-            orb.Step(rig, bands, 1f, 0.016f, true, camera);
-            orb.SimulateMotes(0.18f);
+            orb.Step(rig, Music(bands, 1f, true), camera, 0.016f);
+            orb.SimulateParticles(0.18f);
             foreach (var hand in hands) SetBeat(hand.Skin, 0.08f, 1f);
             sheet.SetPixels(w, 0, w, h, Render(camera, w, h).GetPixels());
             sheet.Apply();
@@ -291,7 +295,11 @@ namespace MusicInYourHands.EditorTools
             var worlds = new World[]
             {
                 MakePreviewWorld<LivingSkin>(managerGo.transform, "Living skin", new Color(1f, 0.37f, 0.68f)),
-                MakePreviewWorld<HeartbeatOrb>(managerGo.transform, "Heartbeat orb", new Color(1f, 0.83f, 0.42f))
+                MakePreviewWorld<HeartbeatOrb>(managerGo.transform, "Heartbeat orb", new Color(1f, 0.83f, 0.42f)),
+                MakePreviewWorld<WaveformRibbon>(managerGo.transform, "Waveform ribbon", new Color(1f, 0.7f, 0.42f)),
+                MakePreviewWorld<AirStrings>(managerGo.transform, "Air strings", new Color(0.49f, 0.95f, 0.79f)),
+                MakePreviewWorld<NoteRain>(managerGo.transform, "Note rain", new Color(0.5f, 0.72f, 1f)),
+                MakePreviewWorld<FireflyChoir>(managerGo.transform, "Firefly choir", new Color(0.79f, 0.61f, 1f))
             };
             var manager = managerGo.AddComponent<WorldManager>();
             var mso = new SerializedObject(manager);
@@ -325,6 +333,75 @@ namespace MusicInYourHands.EditorTools
             go.SetActive(false);
             return world;
         }
+
+        static MusicFrame Music(float[] bands, float kick, bool beat) => new MusicFrame { Bands = bands, Kick = kick, Beat = beat };
+
+        static readonly float[] PreviewBands = { 0.85f, 0.7f, 0.55f, 0.6f, 0.45f, 0.55f };
+
+        /// <summary>
+        /// Stages both hands, adds the world with its materials and lets <paramref name="pose"/> adjust the hands,
+        /// then renders two moments side by side: before a beat and just after one.
+        /// </summary>
+        static bool CheckWorldPreview<T>(string label, string path, (string property, string materialPath, string shader)[] materials,
+            System.Action<List<PreviewHand>, HandRig, T> pose, float warmup) where T : World
+        {
+#if META_XR_CORE
+            var hands = StageHands(out var camera);
+            var rig = new GameObject("HandRig").AddComponent<HandRig>();
+            foreach (var hand in hands) PushHand(rig, hand);
+
+            var world = new GameObject(typeof(T).Name).AddComponent<T>();
+            var so = new SerializedObject(world);
+            foreach (var (property, materialPath, shader) in materials)
+                so.FindProperty(property).objectReferenceValue = ProjectSetup.EnsureMaterial(materialPath, shader);
+            so.ApplyModifiedPropertiesWithoutUndo();
+            world.Build();
+            pose?.Invoke(hands, rig, world);
+
+            for (float t = 0f; t < warmup; t += 0.05f)
+            {
+                world.Step(rig, Music(PreviewBands, 0.2f, false), camera, 0.05f);
+                world.SimulateParticles(0.05f);
+            }
+            const int w = 640, h = 360;
+            var sheet = new Texture2D(w * 2, h, TextureFormat.RGB24, false);
+            sheet.SetPixels(0, 0, w, h, Render(camera, w, h).GetPixels());
+            world.Step(rig, Music(PreviewBands, 1f, true), camera, 0.016f);
+            for (int i = 0; i < 3; i++)
+            {
+                world.Step(rig, Music(PreviewBands, 0.8f, false), camera, 0.04f);
+                world.SimulateParticles(0.04f);
+            }
+            foreach (var hand in hands) SetBeat(hand.Skin, 0.12f, 0.8f);
+            sheet.SetPixels(w, 0, w, h, Render(camera, w, h).GetPixels());
+            sheet.Apply();
+            return CheckImage(sheet, camera.backgroundColor, path, label);
+#else
+            return true;
+#endif
+        }
+
+        static bool CheckRibbonPreview() => CheckWorldPreview<WaveformRibbon>("Waveform ribbon preview", "Logs/preview-ribbon.png",
+            new[] { ("lineMaterial", ProjectSetup.LineMaterialPath, "MusicInYourHands/Line"), ("glowMaterial", ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow") },
+            (hands, rig, world) => { rig.Left.Pinch = 1f; rig.Right.Pinch = 1f; }, 0.6f);
+
+        static bool CheckStringsPreview() => CheckWorldPreview<AirStrings>("Air strings preview", "Logs/preview-strings.png",
+            new[] { ("lineMaterial", ProjectSetup.LineMaterialPath, "MusicInYourHands/Line"), ("glowMaterial", ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow") },
+            (hands, rig, world) => { world.PreviewPluck(2, 0.02f); world.PreviewPluck(4, 0.012f); }, 0.3f);
+
+        static bool CheckRainPreview() => CheckWorldPreview<NoteRain>("Note rain preview", "Logs/preview-rain.png",
+            new[] { ("glowMaterial", ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow"), ("lineMaterial", ProjectSetup.LineMaterialPath, "MusicInYourHands/Line"),
+                    ("ringMaterial", ProjectSetup.RingMaterialPath, "MusicInYourHands/Ring") },
+            (hands, rig, world) =>
+            {
+                var random = new System.Random(3);
+                for (int i = 0; i < 18; i++)
+                    world.PreviewDrop((float)random.NextDouble() * 2 - 1, (float)random.NextDouble() * 2 - 1, (float)random.NextDouble() * 0.9f, 2 + i % 4, i % 6 == 0);
+            }, 1.2f);
+
+        static bool CheckFirefliesPreview() => CheckWorldPreview<FireflyChoir>("Firefly choir preview", "Logs/preview-fireflies.png",
+            new[] { ("glowMaterial", ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow") },
+            (hands, rig, world) => { }, 3f);
 
 #if META_XR_CORE
         sealed class PreviewHand

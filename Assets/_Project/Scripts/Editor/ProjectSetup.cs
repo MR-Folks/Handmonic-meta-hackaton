@@ -370,9 +370,24 @@ namespace MusicInYourHands.EditorTools
             SetReferences(orb, ("glowMaterial", glow), ("orbMaterial", EnsureMaterial(OrbMaterialPath, "MusicInYourHands/Orb")),
                 ("ringMaterial", EnsureMaterial(RingMaterialPath, "MusicInYourHands/Ring")));
 
+            var line = EnsureMaterial(LineMaterialPath, "MusicInYourHands/Line");
+            var ring = EnsureMaterial(RingMaterialPath, "MusicInYourHands/Ring");
+
+            var ribbon = EnsureWorld<WaveformRibbon>(manager.transform, "WaveformRibbon", "Waveform ribbon", new Color(1f, 0.7f, 0.42f));
+            SetReferences(ribbon, ("lineMaterial", line), ("glowMaterial", glow));
+
+            var strings = EnsureWorld<AirStrings>(manager.transform, "AirStrings", "Air strings", new Color(0.49f, 0.95f, 0.79f));
+            SetReferences(strings, ("lineMaterial", line), ("glowMaterial", glow));
+
+            var rain = EnsureWorld<NoteRain>(manager.transform, "NoteRain", "Note rain", new Color(0.5f, 0.72f, 1f));
+            SetReferences(rain, ("glowMaterial", glow), ("lineMaterial", line), ("ringMaterial", ring));
+
+            var fireflies = EnsureWorld<FireflyChoir>(manager.transform, "FireflyChoir", "Firefly choir", new Color(0.79f, 0.61f, 1f));
+            SetReferences(fireflies, ("glowMaterial", glow));
+
             var so = new SerializedObject(manager);
             var list = so.FindProperty("worlds");
-            World[] order = { livingSkin, orb };
+            World[] order = { livingSkin, orb, ribbon, strings, rain, fireflies };
             list.arraySize = order.Length;
             for (int i = 0; i < order.Length; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = order[i];
             so.ApplyModifiedPropertiesWithoutUndo();
@@ -404,6 +419,7 @@ namespace MusicInYourHands.EditorTools
 
         public const string HandMaterialPath = Root + "/Materials/Hand.mat";
         public const string OrbMaterialPath = Root + "/Materials/Orb.mat";
+        public const string LineMaterialPath = Root + "/Materials/Line.mat";
         public const string GlowMaterialPath = Root + "/Materials/Glow.mat";
         public const string RingMaterialPath = Root + "/Materials/Ring.mat";
 

@@ -57,18 +57,11 @@ namespace MusicInYourHands
         readonly float[] sparkDebt = new float[10];
         ParticleSystem sparks;
         MaterialPropertyBlock block;
-        bool built, beatPending;
+        bool built;
 
-        void OnEnable()
+        protected override void OnDisable()
         {
-            Build();
-            if (MusicBus.Instance != null) MusicBus.Instance.Beat += OnBeat;
-        }
-
-        void OnDisable()
-        {
-            if (MusicBus.Instance != null) MusicBus.Instance.Beat -= OnBeat;
-            beatPending = false;
+            base.OnDisable();
             // Fingertip lights ride on the hand joints, outside this object, so take them back and hide them.
             for (int i = 0; i < tipLights.Length; i++)
             {
@@ -81,19 +74,8 @@ namespace MusicInYourHands
             if (sparks != null) sparks.Clear();
         }
 
-        void OnBeat() => beatPending = true;
-
-        void LateUpdate()
-        {
-            var rig = HandRig.Instance;
-            if (rig == null) return;
-            var bus = MusicBus.Instance;
-            Step(rig, bus != null ? bus.Bands : null, bus != null ? bus.Kick : 0f, Time.deltaTime, Camera.main, beatPending);
-            beatPending = false;
-        }
-
         /// <summary>Creates the lights, the wave pool and the spark system. Also called by the editor preview.</summary>
-        public void Build()
+        public override void Build()
         {
             if (built) return;
             built = true;
@@ -127,25 +109,18 @@ namespace MusicInYourHands
             sparks = Effects.MakeSparkSystem("Sparks", transform, glowMaterial);
         }
 
-        /// <summary>One frame of the world. Public so the editor preview can drive it without tracking or music.</summary>
-        public void Step(HandRig rig, float[] bands, float kick, float dt, Camera view, bool beat)
+        public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
         {
             Build();
-            UpdateHand(rig.Left, 0, bands, kick, view, dt, beat);
-            UpdateHand(rig.Right, 1, bands, kick, view, dt, beat);
-            if (beat)
+            UpdateHand(rig.Left, 0, music.Bands, music.Kick, view, dt, music.Beat);
+            UpdateHand(rig.Right, 1, music.Bands, music.Kick, view, dt, music.Beat);
+            if (music.Beat)
             {
-                float strength = 0.6f + 0.4f * kick;
+                float strength = 0.6f + 0.4f * music.Kick;
                 if (rig.Left.IsTracked) SpawnWaves(rig.Left, strength);
                 if (rig.Right.IsTracked) SpawnWaves(rig.Right, strength);
             }
             AdvanceWaves(dt);
-        }
-
-        /// <summary>Advances the sparks while the editor is not playing.</summary>
-        public void SimulateSparks(float seconds)
-        {
-            if (sparks != null) sparks.Simulate(seconds, true, false);
         }
 
         void UpdateHand(HandRig.Hand hand, int side, float[] bands, float kick, Camera view, float dt, bool beat)

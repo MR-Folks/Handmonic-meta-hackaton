@@ -38,6 +38,9 @@ namespace MusicInYourHands
 
         /// <summary>Each band from 0 (silent) to 1 (as loud as it has been recently).</summary>
         public float[] Bands { get; } = new float[BandCount];
+
+        /// <summary>The latest 256 audio samples, -1 to 1, for drawing the waveform.</summary>
+        public float[] Waveform { get; } = new float[256];
         public float Bass => Bands[1];
         public float Mids => Bands[3];
         public float Highs => Bands[5];
@@ -108,6 +111,8 @@ namespace MusicInYourHands
         void Update()
         {
             float dt = Time.deltaTime;
+            if (IsPlaying) source.GetOutputData(Waveform, 0);
+            else System.Array.Clear(Waveform, 0, Waveform.Length);
             UpdateBands(dt);
             UpdateBeat(dt);
             UpdateLyric();

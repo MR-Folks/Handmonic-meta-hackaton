@@ -1,0 +1,111 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace MusicInYourHands
+{
+    /// <summary>
+    /// Small sounds made in code, so worlds can answer the player's touch: a plucked string and a bell-like chime.
+    /// Notes are in A minor pentatonic, the key of the demo song.
+    /// </summary>
+    public static class Synth
+    {
+        /// <summary>A minor pentatonic from A3 up two octaves, in Hz.</summary>
+        public static readonly float[] Pentatonic =
+        {
+            220f, 261.63f, 293.66f, 329.63f, 392f, 440f, 523.25f, 587.33f, 659.25f, 783.99f, 880f
+        };
+
+        static readonly Dictionary<string, AudioClip> Cache = new Dictionary<string, AudioClip>();
+
+        static int Rate => AudioSettings.outputSampleRate > 0 ? AudioSettings.outputSampleRate : 48000;
+
+        /// <summary>A plucked string (Karplus-Strong): bright attack, warm decay.</summary>
+        public static AudioClip Pluck(float frequency)
+        {
+            string key = $"pluck {frequency:F1}";
+            if (Cache.TryGetValue(key, out var clip)) return clip;
+
+            int rate = Rate, length = (int)(rate * 1.8f);
+            int period = Mathf.Max(2, Mathf.RoundToInt(rate / frequency));
+            var ring = new float[period];
+            var random = new System.Random(period);
+            for (int i = 0; i < period; i++) ring[i] = (float)(random.NextDouble() * 2 - 1);
+
+            var data = new float[length];
+            int index = 0;
+            for (int i = 0; i < length; i++)
+            {
+                int next = (index + 1) % period;
+                float sample = ring[index];
+                ring[index] = (ring[index] + ring[next]) * 0.4985f;
+                index = next;
+                float attack = Mathf.Min(1f, i / (rate * 0.002f));
+                data[i] = sample * attack * 0.55f;
+            }
+            return Store(key, data, rate);
+        }
+
+        /// <summary>A soft bell: a sine with a few gentle overtones and a long fade.</summary>
+        public static AudioClip Chime(float frequency)
+        {
+            string key = $"chime {frequency:F1}";
+            if (Cache.TryGetValue(key, out var clip)) return clip;
+
+            int rate = Rate, length = (int)(rate * 1.4f);
+            var data = new float[length];
+            for (int i = 0; i < length; i++)
+            {
+                float t = i / (float)rate;
+                float env = Mathf.Min(1f, t / 0.004f) * Mathf.Exp(-t * 3.2f);
+                float s = Mathf.Sin(2f * Mathf.PI * frequency * t)
+                          + 0.35f * Mathf.Sin(2f * Mathf.PI * frequency * 2.01f * t) * Mathf.Exp(-t * 4f)
+                          + 0.15f * Mathf.Sin(2f * Mathf.PI * frequency * 3.97f * t) * Mathf.Exp(-t * 7f);
+                data[i] = s * env * 0.32f;
+            }
+            return Store(key, data, rate);
+        }
+
+        static AudioClip Store(string key, float[] data, int rate)
+        {
+            var clip = AudioClip.Create(key, data.Length, 1, rate, false);
+            clip.SetData(data, 0);
+            Cache[key] = clip;
+            return clip;
+        }
+    }
+
+    /// <summary>A few 3D audio sources reused round-robin, so sounds come from where they happen.</summary>
+    public sealed class AudioPool
+    {
+        readonly AudioSource[] sources;
+        int next;
+
+        public AudioPool(Transform parent, int size)
+        {
+            sources = new AudioSource[size];
+            for (int i = 0; i < size; i++)
+            {
+                var go = new GameObject($"Voice {i}");
+                go.transform.SetParent(parent, false);
+                var s = go.AddComponent<AudioSource>();
+                s.playOnAwake = false;
+                s.spatialBlend = 1f;
+                s.minDistance = 0.4f;
+                s.maxDistance = 6f;
+                s.rolloffMode = AudioRolloffMode.Logarithmic;
+                s.dopplerLevel = 0f;
+                sources[i] = s;
+            }
+        }
+
+        public void Play(AudioClip clip, Vector3 position, float volume, float pitch = 1f)
+        {
+            if (!Application.isPlaying || clip == null) return;
+            var s = sources[next];
+            next = (next + 1) % sources.Length;
+            s.transform.position = position;
+            s.pitch = pitch;
+            s.PlayOneShot(clip, volume);
+        }
+    }
+}

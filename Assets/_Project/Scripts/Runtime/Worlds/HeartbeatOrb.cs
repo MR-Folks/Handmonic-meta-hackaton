@@ -4,8 +4,9 @@ namespace MusicInYourHands
 {
     /// <summary>
     /// The Heartbeat orb world: hold the song between your hands. The orb forms just beyond your palms and is sized by
-    /// how far apart they are. It is built in layers: three nested shells swirling different ways, a glow halo, two
-    /// orbit rings and drifting motes. Each kick swells it, bursts motes and nudges your visible hands apart (fake
+    /// how far apart they are. It is built like the concept page's orb: four soft
+    /// blob layers (pink, violet, blue, gold), each with its own lobes, spin and frequency band, plus a glow halo,
+    /// two orbit rings and drifting motes. Each kick swells it, bursts motes and nudges your visible hands apart (fake
     /// resistance: the hands you see move away from your real ones for a moment). Spreading your hands turns the
     /// music up.
     /// </summary>
@@ -36,10 +37,11 @@ namespace MusicInYourHands
         [SerializeField] float motesPerSecond = 10f;
 
         static readonly int KickId = Shader.PropertyToID("_Kick");
-        static readonly int BassId = Shader.PropertyToID("_Bass");
-        static readonly int HighsId = Shader.PropertyToID("_Highs");
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
-        static readonly int LayerId = Shader.PropertyToID("_Layer");
+        static readonly int TintId = Shader.PropertyToID("_Tint");
+        static readonly int LobesId = Shader.PropertyToID("_Lobes");
+        static readonly int SpinId = Shader.PropertyToID("_Spin");
+        static readonly int BandId = Shader.PropertyToID("_Band");
         static readonly int OpacityId = Shader.PropertyToID("_Opacity");
         static readonly int ColorId = Shader.PropertyToID("_Color");
         static readonly int IntensityId = Shader.PropertyToID("_Intensity");
@@ -52,42 +54,38 @@ namespace MusicInYourHands
         static readonly Color Gold = new Color(1f, 0.83f, 0.42f);
         static readonly Color[] MoteColors = { Pink, Violet, Blue, Gold };
 
-        // Shells from outside in: relative size, base opacity.
-        static readonly (float size, float opacity)[] Shells = { (1f, 0.12f), (0.72f, 0.2f), (0.42f, 0.35f) };
+        // Blob layers from outside in: size, colour, lobes, spin (rad/s, sign is direction), band, base opacity.
+        static readonly (float size, Color color, float lobes, float spin, int band, float opacity)[] Layers =
+        {
+            (1f, Pink, 3f, 0.9f, 1, 0.14f),
+            (0.8f, Violet, 4f, -1.2f, 2, 0.18f),
+            (0.6f, Blue, 5f, 1.5f, 3, 0.22f),
+            (0.42f, Gold, 6f, -1.9f, 4, 0.3f)
+        };
 
         Transform orb, halo;
-        Transform[] shells, rings;
-        Renderer[] shellRenderers, ringRenderers;
+        Transform[] layers, rings;
+        Renderer[] layerRenderers, ringRenderers;
         Renderer haloRenderer;
         ParticleSystem motes;
         MaterialPropertyBlock block;
         Vector3 center;
         float radius, visibility, moteDebt;
-        bool built, beatPending, hasCenter;
+        bool built, hasCenter;
         float savedVolume = -1f;
         readonly Transform[] pushedRoots = new Transform[2];
 
-        void OnEnable()
+        protected override void OnEnable()
         {
-            Build();
-            var bus = MusicBus.Instance;
-            if (bus != null)
-            {
-                bus.Beat += OnBeat;
-                savedVolume = bus.Volume;
-            }
+            base.OnEnable();
+            if (MusicBus.Instance != null) savedVolume = MusicBus.Instance.Volume;
         }
 
-        void OnDisable()
+        protected override void OnDisable()
         {
-            var bus = MusicBus.Instance;
-            if (bus != null)
-            {
-                bus.Beat -= OnBeat;
-                if (savedVolume >= 0f) bus.Volume = savedVolume;
-            }
+            base.OnDisable();
+            if (MusicBus.Instance != null && savedVolume >= 0f) MusicBus.Instance.Volume = savedVolume;
             savedVolume = -1f;
-            beatPending = false;
             hasCenter = false;
             visibility = 0f;
             // Put the visible hands back where the real ones are.
@@ -100,20 +98,14 @@ namespace MusicInYourHands
             if (motes != null) motes.Clear();
         }
 
-        void OnBeat() => beatPending = true;
-
-        void LateUpdate()
-        {
-            var bus = MusicBus.Instance;
-            Step(HandRig.Instance, bus != null ? bus.Bands : null, bus != null ? bus.Kick : 0f, Time.deltaTime, beatPending, Camera.main, bus);
-            beatPending = false;
-        }
-
         /// <summary>One frame of the world. Public so the editor preview can drive it without tracking or music.</summary>
-        public void Step(HandRig rig, float[] bands, float kick, float dt, bool beat, Camera view, MusicBus bus = null)
+        public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
         {
             if (rig == null) return;
             Build();
+            float kick = music.Kick;
+            bool beat = music.Beat;
+            var bus = music.Bus;
 
             var left = rig.Left;
             var right = rig.Right;
@@ -144,27 +136,27 @@ namespace MusicInYourHands
 
             if (show)
             {
-                float bass = bands != null ? bands[1] : 0.4f;
-                float highs = bands != null ? bands[5] : 0.3f;
+                float bass = music.Band(1);
                 float ease = Mathf.SmoothStep(0f, 1f, visibility);
                 float size = radius * 2f * (1f + kick * beatSwell) * ease;
                 orb.position = center;
                 orb.localScale = Vector3.one * size;
-                float time = Application.isPlaying ? Time.time : 1.7f;
+                float time = Now;
                 orb.rotation = Quaternion.AngleAxis(time * 12f, Vector3.up);
 
-                for (int i = 0; i < shells.Length; i++)
+                for (int i = 0; i < layers.Length; i++)
                 {
-                    // Inner shells breathe a little more with the bass.
-                    shells[i].localScale = Vector3.one * Shells[i].size * (1f + bass * 0.05f * i);
+                    var layer = Layers[i];
+                    layers[i].localScale = Vector3.one * layer.size;
                     block.Clear();
+                    block.SetColor(TintId, layer.color);
+                    block.SetFloat(LobesId, layer.lobes);
+                    block.SetFloat(SpinId, layer.spin);
+                    block.SetFloat(BandId, music.Band(layer.band));
                     block.SetFloat(KickId, kick);
-                    block.SetFloat(BassId, bass);
-                    block.SetFloat(HighsId, highs);
+                    block.SetFloat(OpacityId, layer.opacity);
                     block.SetFloat(AlphaId, ease);
-                    block.SetFloat(LayerId, i);
-                    block.SetFloat(OpacityId, Shells[i].opacity);
-                    shellRenderers[i].SetPropertyBlock(block);
+                    layerRenderers[i].SetPropertyBlock(block);
                 }
 
                 if (view != null)
@@ -172,7 +164,7 @@ namespace MusicInYourHands
                     var toView = view.transform.position - center;
                     if (toView.sqrMagnitude > 1e-6f) halo.rotation = Quaternion.LookRotation(-toView.normalized, Vector3.up);
                 }
-                halo.localScale = Vector3.one * (2.4f + kick * 0.5f);
+                halo.localScale = Vector3.one * (2f + kick * 0.4f);
                 block.Clear();
                 block.SetColor(ColorId, Color.Lerp(Violet, Pink, kick));
                 block.SetFloat(IntensityId, (0.35f + kick * 0.3f + bass * 0.15f) * ease);
@@ -213,12 +205,6 @@ namespace MusicInYourHands
             }
         }
 
-        /// <summary>Advances the motes while the editor is not playing.</summary>
-        public void SimulateMotes(float seconds)
-        {
-            if (motes != null) motes.Simulate(seconds, true, false);
-        }
-
         static Vector3 PalmPosition(HandRig.Hand hand) => hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
 
         void PushHands(HandRig.Hand hand, int side, float amount)
@@ -255,7 +241,7 @@ namespace MusicInYourHands
             }
         }
 
-        public void Build()
+        public override void Build()
         {
             if (built) return;
             built = true;
@@ -264,21 +250,21 @@ namespace MusicInYourHands
             orb = new GameObject("Orb").transform;
             orb.SetParent(transform, false);
 
-            shells = new Transform[Shells.Length];
-            shellRenderers = new Renderer[Shells.Length];
-            for (int i = 0; i < Shells.Length; i++)
+            layers = new Transform[Layers.Length];
+            layerRenderers = new Renderer[Layers.Length];
+            for (int i = 0; i < Layers.Length; i++)
             {
                 var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                sphere.name = $"Shell {i}";
+                sphere.name = $"Layer {i}";
                 DebugShapes.RemoveCollider(sphere);
                 sphere.transform.SetParent(orb, false);
                 var r = sphere.GetComponent<Renderer>();
                 r.sharedMaterial = orbMaterial;
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                // Draw inner shells first, so the outer ones layer over them.
-                r.sortingOrder = Shells.Length - i;
-                shells[i] = sphere.transform;
-                shellRenderers[i] = r;
+                // Draw inner layers first, so the outer ones layer over them.
+                r.sortingOrder = Layers.Length - i;
+                layers[i] = sphere.transform;
+                layerRenderers[i] = r;
             }
 
             halo = MakeQuad("Halo", glowMaterial, out haloRenderer).transform;
