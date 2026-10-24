@@ -5,7 +5,7 @@ Shader "MusicInYourHands/Bubble"
     Properties
     {
         _Color ("Color", Color) = (1, 0.37, 0.68, 1)
-        _Icon ("Emblem (0-6)", Float) = 0
+        _Icon ("Emblem (0-7)", Float) = 0
         _Hover ("Hover 0-1", Float) = 0
         _Selected ("Current world 0-1", Float) = 0
         _Alpha ("Alpha", Float) = 1
@@ -125,7 +125,7 @@ Shader "MusicInYourHands/Bubble"
                         e += exp(-dot(q, q) * 320) * (0.5 + 0.5 * sin(t * 3 + k * 2));
                     }
                 }
-                else
+                else if (icon < 6.5)
                 {
                     // Now playing: an equaliser, or a pause sign while paused.
                     if (_Paused > 0.5)
@@ -137,6 +137,18 @@ Shader "MusicInYourHands/Bubble"
                         float h = 0.15 + bars[k] * 0.55;
                         e += step(abs(p.x - x), 0.075) * step(-0.38, p.y) * step(p.y, -0.38 + h);
                     }
+                }
+                else
+                {
+                    // Listen: a microphone on a stand, with sound rings around it while listening.
+                    float2 q = p - float2(0, 0.16);
+                    e = smoothstep(0.02, 0, length(float2(q.x, max(abs(q.y) - 0.1, 0))) - 0.12);
+                    float2 c = p - float2(0, 0.1);
+                    e += Line(abs(length(c) - 0.24), 0.035) * step(c.y, 0);
+                    e += step(abs(p.x), 0.03) * step(-0.33, p.y) * step(p.y, -0.14);
+                    e += step(abs(p.x), 0.14) * step(abs(p.y + 0.35), 0.03);
+                    float d = length(q);
+                    e += _Selected * pow(abs(sin(d * 10 - t * 4)), 10) * smoothstep(0.3, 0.38, d) * saturate(1.15 - d * 1.6) * (0.4 + _Eq.x);
                 }
                 return saturate(e);
             }

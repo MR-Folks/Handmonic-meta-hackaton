@@ -4,9 +4,13 @@ using UnityEngine;
 
 namespace MusicInYourHands
 {
+    /// <summary>Where MusicBus hears the music: its own song, or the microphone (music playing in the room).</summary>
+    public enum MusicSource { Song, Listen }
+
     /// <summary>
-    /// Plays the current song and exposes what every world reads each frame: six auto-levelled
-    /// frequency bands, a beat pulse, the exact song time and the current lyric.
+    /// Plays the current song, or listens to the room through the microphone, and exposes what every world reads
+    /// each frame: six auto-levelled frequency bands, a beat pulse, the exact song time and the current lyric.
+    /// While listening there are no lyrics or melody notes, so worlds fall back to following the bands.
     /// </summary>
     [RequireComponent(typeof(AudioSource))]
     public class MusicBus : MonoBehaviour
@@ -21,6 +25,8 @@ namespace MusicInYourHands
         [SerializeField] SongAsset startSong;
         [SerializeField] bool playOnStart = true;
         [SerializeField] bool loop = true;
+        [Tooltip("Listen starts on the microphone instead of the song.")]
+        [SerializeField] MusicSource startSource = MusicSource.Song;
 
         [Header("Analysis")]
         [Tooltip("How quickly the bands follow the music. Higher is snappier.")]
@@ -32,10 +38,27 @@ namespace MusicInYourHands
         [SerializeField] float minBeatInterval = 0.28f;
         [SerializeField] float kickDecay = 7f;
 
+        [Header("Listen mode")]
+        [Tooltip("Microphone level (RMS, 0-1) below which the room counts as silent, so its hum doesn't fill the bands.")]
+        [SerializeField, Range(0.001f, 0.05f)] float listenGate = 0.006f;
+
         readonly float[] spectrum = new float[1024];
         readonly float[] bandPeak = new float[BandCount];
+        readonly MicrophoneListener microphone = new MicrophoneListener();
         AudioSource source;
         float bassAverage;
+        float listenTime;
+        bool listenPaused, waitingForPermission;
+        volatile bool permissionDenied;
+
+        public MusicSource Source { get; private set; }
+        public bool IsListening => Source == MusicSource.Listen;
+
+        /// <summary>Microphone loudness (RMS, 0-1) while listening, for tuning the gate.</summary>
+        public float InputLevel => IsListening ? microphone.Level : 0f;
+
+        /// <summary>What the menu shows: the song title, or "Listening".</summary>
+        public string Title => IsListening ? "Listening" : CurrentSong != null ? CurrentSong.title : "Music";
 
         /// <summary>Each band from 0 (silent) to 1 (as loud as it has been recently).</summary>
         public float[] Bands { get; } = new float[BandCount];
@@ -55,8 +78,8 @@ namespace MusicInYourHands
         public LyricsTrack Lyrics { get; private set; } = LyricsTrack.Empty;
         public NoteTrack Notes { get; private set; } = NoteTrack.Empty;
 
-        /// <summary>Length of the current song in seconds, 0 without one.</summary>
-        public float SongLength => source != null && source.clip != null ? source.clip.length : 0f;
+        /// <summary>Length of the current song in seconds, 0 without one or while listening.</summary>
+        public float SongLength => !IsListening && source != null && source.clip != null ? source.clip.length : 0f;
 
         /// <summary>
         /// Adds the melody notes that start between now and <paramref name="ahead"/> seconds from now, with their
@@ -72,7 +95,7 @@ namespace MusicInYourHands
         }
         public LyricsTrack.State Lyric { get; private set; } = new LyricsTrack.State(-1, -1);
 
-        public bool IsPlaying => source != null && source.isPlaying;
+        public bool IsPlaying => IsListening ? microphone.IsRecording : source != null && source.isPlaying;
 
         /// <summary>Playback volume, 0-1. Worlds may change it (Heartbeat orb does) and should restore it.</summary>
         public float Volume
@@ -81,8 +104,12 @@ namespace MusicInYourHands
             set { if (source != null) source.volume = Mathf.Clamp01(value); }
         }
 
-        /// <summary>Song position in seconds, read from the audio clock rather than frame time.</summary>
-        public float SongTime => source != null && source.clip != null ? (float)source.timeSamples / source.clip.frequency : 0f;
+        /// <summary>
+        /// Song position in seconds, read from the audio clock rather than frame time. While listening, the seconds
+        /// spent listening.
+        /// </summary>
+        public float SongTime => IsListening ? listenTime
+            : source != null && source.clip != null ? (float)source.timeSamples / source.clip.frequency : 0f;
 
         public event Action Beat;
         public event Action<LyricsTrack.State> LyricChanged;
@@ -102,16 +129,20 @@ namespace MusicInYourHands
 
         void OnDestroy()
         {
+            microphone.Stop();
             if (Instance == this) Instance = null;
         }
 
         void Start()
         {
-            if (playOnStart && startSong != null) Play(startSong);
+            if (startSource == MusicSource.Listen) Listen();
+            else if (playOnStart && startSong != null) Play(startSong);
         }
 
         public void Play(SongAsset song)
         {
+            if (song == null) return;
+            StopListening();
             CurrentSong = song;
             Lyrics = song.lyrics != null ? LyricsTrack.Parse(song.lyrics.text) : LyricsTrack.Empty;
             Notes = song.notes != null ? NoteTrack.Parse(song.notes.text) : NoteTrack.Empty;
@@ -121,32 +152,121 @@ namespace MusicInYourHands
             source.Play();
         }
 
+        /// <summary>Stops the song and follows music playing in the room through the microphone.</summary>
+        public void Listen()
+        {
+            source.Stop();
+            Source = MusicSource.Listen;
+            Lyrics = LyricsTrack.Empty;
+            Notes = NoteTrack.Empty;
+            Lyric = new LyricsTrack.State(-1, -1);
+            listenTime = 0f;
+            listenPaused = false;
+            permissionDenied = false;
+            StartMicrophone();
+        }
+
+        /// <summary>Switches between the song and listening to the room.</summary>
+        public void ToggleListen()
+        {
+            if (IsListening) Play(CurrentSong != null ? CurrentSong : startSong);
+            else Listen();
+        }
+
         public void TogglePause()
         {
-            if (source.isPlaying) source.Pause();
+            if (IsListening)
+            {
+                listenPaused = !listenPaused;
+                if (listenPaused) microphone.Stop();
+                else StartMicrophone();
+            }
+            else if (source.isPlaying) source.Pause();
             else source.UnPause();
+        }
+
+        void StartMicrophone()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            if (!UnityEngine.Android.Permission.HasUserAuthorizedPermission(UnityEngine.Android.Permission.Microphone))
+            {
+                if (waitingForPermission) return;
+                waitingForPermission = true;
+                // The answer may come on another thread; Update picks it up.
+                var callbacks = new UnityEngine.Android.PermissionCallbacks();
+                callbacks.PermissionDenied += _ => permissionDenied = true;
+                UnityEngine.Android.Permission.RequestUserPermission(UnityEngine.Android.Permission.Microphone, callbacks);
+                return;
+            }
+#endif
+            waitingForPermission = false;
+            // Without a microphone there is nothing to listen to, so go back to the song.
+            if (!microphone.Start()) Play(CurrentSong != null ? CurrentSong : startSong);
+        }
+
+        void StopListening()
+        {
+            microphone.Stop();
+            Source = MusicSource.Song;
+            waitingForPermission = false;
+        }
+
+        void UpdatePermission()
+        {
+            if (!waitingForPermission) return;
+            if (permissionDenied)
+            {
+                Debug.LogWarning("[MusicBus] Microphone permission refused, back to the song.");
+                Play(CurrentSong != null ? CurrentSong : startSong);
+                return;
+            }
+#if UNITY_ANDROID && !UNITY_EDITOR
+            if (UnityEngine.Android.Permission.HasUserAuthorizedPermission(UnityEngine.Android.Permission.Microphone)) StartMicrophone();
+#endif
+        }
+
+        void OnApplicationPause(bool paused)
+        {
+            if (!IsListening || listenPaused) return;
+            if (paused) microphone.Stop();
+            else StartMicrophone();
         }
 
         void Update()
         {
             float dt = Time.deltaTime;
-            if (IsPlaying) source.GetOutputData(Waveform, 0);
-            else System.Array.Clear(Waveform, 0, Waveform.Length);
-            UpdateBands(dt);
+            UpdatePermission();
+            bool heard;
+            if (IsListening)
+            {
+                if (IsPlaying) listenTime += dt;
+                // A quiet room counts as silence, so the auto-levelling doesn't blow its hum up into music.
+                heard = microphone.Read(spectrum, Waveform, dt) && microphone.Level > listenGate;
+            }
+            else
+            {
+                heard = IsPlaying;
+                if (heard)
+                {
+                    source.GetOutputData(Waveform, 0);
+                    source.GetSpectrumData(spectrum, 0, FFTWindow.BlackmanHarris);
+                }
+            }
+            if (!heard) System.Array.Clear(Waveform, 0, Waveform.Length);
+            UpdateBands(heard, IsListening ? microphone.SampleRate : AudioSettings.outputSampleRate, dt);
             UpdateBeat(dt);
             UpdateLyric();
         }
 
-        void UpdateBands(float dt)
+        void UpdateBands(bool heard, int sampleRate, float dt)
         {
-            if (!IsPlaying)
+            if (!heard)
             {
                 for (int i = 0; i < BandCount; i++) Bands[i] = Mathf.MoveTowards(Bands[i], 0f, dt * 2f);
                 return;
             }
 
-            source.GetSpectrumData(spectrum, 0, FFTWindow.BlackmanHarris);
-            float binHz = AudioSettings.outputSampleRate * 0.5f / spectrum.Length;
+            float binHz = sampleRate * 0.5f / spectrum.Length;
             float memory = Mathf.Pow(levelMemoryPerSecond, dt);
             float follow = 1f - Mathf.Exp(-bandResponse * dt);
 
@@ -167,7 +287,8 @@ namespace MusicInYourHands
         void UpdateBeat(float dt)
         {
             TimeSinceBeat += dt;
-            float bass = Bands[0];
+            // Phone and laptop speakers barely reach the sub band, so while listening the bass band counts too.
+            float bass = IsListening ? Mathf.Max(Bands[0], Bands[1]) : Bands[0];
             float rise = bass - bassAverage;
             bassAverage = Mathf.Lerp(bassAverage, bass, 1f - Mathf.Exp(-6f * dt));
 

@@ -41,6 +41,14 @@ If settings drift, run **Music In Your Hands > Configure Project for Quest**. It
 - Below them, the current lyric line shows with the sung word in pink.
 - Spheres follow your fingertips: they turn pink when you pinch, and the palm sphere turns yellow when your palm faces up.
 
+## Listen mode
+Poke the coral microphone bubble below the world menu to follow music playing in the room: Spotify on a phone, a speaker, a live instrument. The headset microphone replaces the song, so the bands, beats and every world follow whatever you hear. There are no lyrics or melody notes while listening: Note rain falls from the bands instead, and Air strings play freely without guide beads. Poke it again ("Play song") to go back to the song. The centre bubble pauses listening.
+
+- The first time, the headset asks for microphone permission. If it's refused, the app goes back to the song.
+- **Listen Gate** on `MusicBus` sets how loud the room must be before it counts as music. The music debug view shows the live mic level to help tune it.
+- **Start Source** on `MusicBus` makes the app start in listen mode.
+- The app's own plucks and chimes reach the microphone too, so they nudge the visuals a little.
+
 ## Adding songs
 1. Put the audio file and its `.lrc` lyrics in `Assets/_Project/Audio`.
 2. Create a song with **Create > Music In Your Hands > Song** and assign both.

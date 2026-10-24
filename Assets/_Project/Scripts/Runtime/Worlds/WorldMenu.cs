@@ -6,7 +6,8 @@ namespace MusicInYourHands
     /// <summary>
     /// The world menu: a honeycomb of glass bubbles, like an Apple Watch home screen, opened with Meta's left-hand
     /// menu gesture. The centre bubble plays and pauses the song; the six around it are the worlds, each showing a
-    /// small animated emblem. Bubbles near where you look and near your finger swell; poke one to pop into it.
+    /// small animated emblem, and the one below them switches to listening to the room. Bubbles near where you look
+    /// and near your finger swell; poke one to pop into it.
     /// </summary>
     [DefaultExecutionOrder(170)]
     public class WorldMenu : MonoBehaviour
@@ -28,6 +29,11 @@ namespace MusicInYourHands
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
         static readonly int EqId = Shader.PropertyToID("_Eq");
         static readonly int PausedId = Shader.PropertyToID("_Paused");
+
+        // Bubble.World values for the two bubbles that aren't worlds.
+        const int NowPlaying = -1;
+        const int ListenToggle = -2;
+        static readonly Color ListenColor = new Color(0.98f, 0.62f, 0.5f);
 
         sealed class Bubble
         {
@@ -143,18 +149,21 @@ namespace MusicInYourHands
                 b.Renderer.transform.localScale = Vector3.one * Mathf.Max(scale, 1e-4f);
                 Effects.Face(b.Renderer.transform, view);
 
-                var color = b.World >= 0 ? manager.Worlds[b.World].Color : new Color(0.85f, 0.85f, 1f);
+                var color = b.World >= 0 ? manager.Worlds[b.World].Color : b.World == ListenToggle ? ListenColor : new Color(0.85f, 0.85f, 1f);
+                bool selected = b.World == ListenToggle ? bus != null && bus.IsListening : b.World == manager.Current;
                 block.Clear();
                 block.SetColor(ColorId, color);
-                block.SetFloat(IconId, b.World >= 0 ? manager.Worlds[b.World].MenuIcon : 6f);
+                block.SetFloat(IconId, b.World >= 0 ? manager.Worlds[b.World].MenuIcon : b.World == ListenToggle ? 7f : 6f);
                 block.SetFloat(HoverId, b.Hover);
-                block.SetFloat(SelectedId, b.World == manager.Current ? 1f : 0f);
+                block.SetFloat(SelectedId, selected ? 1f : 0f);
                 block.SetFloat(AlphaId, Mathf.Clamp01(show) * (1f - b.Pop * 0.85f) + b.Pop * 0.15f);
                 if (bus != null) block.SetVector(EqId, new Vector4(bus.Bands[1], bus.Bands[2], bus.Bands[3], bus.Bands[4]));
                 block.SetFloat(PausedId, bus != null && !bus.IsPlaying ? 1f : 0f);
                 b.Renderer.SetPropertyBlock(block);
 
-                b.Label.text = b.World >= 0 ? manager.Worlds[b.World].DisplayName : bus != null && bus.CurrentSong != null ? bus.CurrentSong.title : "Music";
+                b.Label.text = b.World >= 0 ? manager.Worlds[b.World].DisplayName
+                    : b.World == ListenToggle ? bus != null && bus.IsListening ? "Play song" : "Listen"
+                    : bus != null ? bus.Title : "Music";
                 b.Label.transform.position = world + root.up * -(size * 0.62f);
                 b.Label.transform.rotation = b.Renderer.transform.rotation;
                 var labelColor = Color.Lerp(Color.white, color, 0.35f);
@@ -169,14 +178,16 @@ namespace MusicInYourHands
         {
             cooldown = 0.6f;
             b.Pop = 1f;
-            float note = b.World >= 0 ? Synth.Pentatonic[6 + b.World % 5] : Synth.Pentatonic[5];
+            float note = b.World >= 0 ? Synth.Pentatonic[6 + b.World % 5] : Synth.Pentatonic[b.World == ListenToggle ? 4 : 5];
             voices.Play(Synth.Chime(note), b.Renderer.transform.position, 0.6f);
             if (b.World >= 0)
             {
                 manager.Switch(b.World);
                 closeAt = openTime + 0.35f;
             }
-            else if (bus != null) bus.TogglePause();
+            else if (bus == null) return;
+            else if (b.World == ListenToggle) bus.ToggleListen();
+            else bus.TogglePause();
         }
 
         /// <summary>Where the viewer is looking on the menu's plane, in the menu's local space.</summary>
@@ -196,7 +207,7 @@ namespace MusicInYourHands
 
         void Build(WorldManager manager)
         {
-            if (root != null && bubbles.Length == manager.Worlds.Count + 1) return;
+            if (root != null && bubbles.Length == manager.Worlds.Count + 2) return;
             if (root != null)
             {
                 if (Application.isPlaying) Destroy(root.gameObject); else DestroyImmediate(root.gameObject);
@@ -208,11 +219,12 @@ namespace MusicInYourHands
 
             var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             int count = manager.Worlds.Count;
-            bubbles = new Bubble[count + 1];
-            for (int i = 0; i <= count; i++)
+            bubbles = new Bubble[count + 2];
+            for (int i = 0; i <= count + 1; i++)
             {
-                // The centre bubble (now playing) first, then the worlds around it like a honeycomb.
-                int world = i - 1;
+                // The centre bubble (now playing) first, then the worlds around it like a honeycomb, then the listen
+                // bubble below them all.
+                int world = i <= count ? i - 1 : ListenToggle;
                 Vector2 slot = Vector2.zero;
                 if (world >= 0)
                 {
@@ -220,8 +232,10 @@ namespace MusicInYourHands
                     float ring = world < 6 ? spacing : spacing * 2f;
                     slot = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * ring;
                 }
+                else if (world == ListenToggle) slot = new Vector2(0f, -spacing * 2f);
 
-                var r = Effects.MakeQuad(world >= 0 ? $"Bubble {world}" : "Bubble Now Playing", root, bubbleMaterial);
+                string objectName = world >= 0 ? $"Bubble {world}" : world == ListenToggle ? "Bubble Listen" : "Bubble Now Playing";
+                var r = Effects.MakeQuad(objectName, root, bubbleMaterial);
                 var labelGo = new GameObject("Label");
                 labelGo.transform.SetParent(root, false);
                 var label = labelGo.AddComponent<TextMesh>();
@@ -232,7 +246,8 @@ namespace MusicInYourHands
                 label.anchor = TextAnchor.UpperCenter;
                 label.alignment = TextAlignment.Center;
 
-                bubbles[i] = new Bubble { Renderer = r, Label = label, World = world, Slot = slot, Delay = world < 0 ? 0f : 0.06f + world * 0.035f };
+                float delay = world == NowPlaying ? 0f : world == ListenToggle ? 0.06f + count * 0.035f : 0.06f + world * 0.035f;
+                bubbles[i] = new Bubble { Renderer = r, Label = label, World = world, Slot = slot, Delay = delay };
                 r.gameObject.SetActive(false);
                 labelGo.SetActive(false);
             }

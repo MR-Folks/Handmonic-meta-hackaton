@@ -92,7 +92,9 @@ namespace MusicInYourHands
                 else if (k < bus.Lyric.Word) sb.Append(words[k].Text);
                 else sb.Append("<color=#ffffff40>").Append(words[k].Text).Append("</color>");
             }
-            sb.Append('\n').Append("<size=40>").Append(bus.SongTime.ToString("0.0")).Append(" s</size>");
+            sb.Append('\n').Append("<size=40>").Append(bus.SongTime.ToString("0.0")).Append(" s");
+            if (bus.IsListening) sb.Append("  listening, mic ").Append(bus.InputLevel.ToString("0.000"));
+            sb.Append("</size>");
             lyricText.text = sb.ToString();
         }
     }
