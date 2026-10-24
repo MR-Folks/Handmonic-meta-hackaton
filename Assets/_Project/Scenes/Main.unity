@@ -996,7 +996,8 @@ MonoBehaviour:
   beatThreshold: 0.15
   minBeatInterval: 0.28
   kickDecay: 7
-  listenSilence: 0.002
+  listenNoiseMargin: 4
+  listenNoiseRise: 0.05
 --- !u!82 &1383540395
 AudioSource:
   m_ObjectHideFlags: 0
@@ -1240,6 +1241,62 @@ MonoBehaviour:
   knuckle: {fileID: 719480443}
   response: 12
   isLeft: 0
+--- !u!1 &1456184136
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1456184138}
+  - component: {fileID: 1456184137}
+  m_Layer: 0
+  m_Name: OrbitType
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1456184137
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1456184136}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 13b353353b0e64982af0dbeb84f1f13d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.OrbitType
+  displayName: Orbit type
+  color: {r: 0.88, g: 0.89, b: 0.93, a: 1}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  distance: 1.15
+  height: -0.05
+  frame: {x: 0.62, y: 0.42}
+  letterHeight: 0.56
+  drift: 0.035
+  pushRadius: 0.14
+  pullRadius: 0.7
+--- !u!4 &1456184138
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1456184136}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1462377326
 GameObject:
   m_ObjectHideFlags: 0
@@ -1280,6 +1337,8 @@ MonoBehaviour:
   - {fileID: 1153605162}
   - {fileID: 1715105674}
   - {fileID: 2137090334}
+  - {fileID: 1456184137}
+  - {fileID: 2124485061}
   startWorld: 0
 --- !u!4 &1462377328
 Transform:
@@ -1304,6 +1363,8 @@ Transform:
   - {fileID: 1153605163}
   - {fileID: 1715105675}
   - {fileID: 2137090335}
+  - {fileID: 1456184138}
+  - {fileID: 2124485062}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1492539440
@@ -1947,6 +2008,62 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2000780157}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2124485060
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2124485062}
+  - component: {fileID: 2124485061}
+  m_Layer: 0
+  m_Name: Graffiti
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2124485061
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2124485060}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 995b0d3ebfff349298e61ddd21767934, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.Graffiti
+  displayName: Graffiti
+  color: {r: 1, g: 0.7, b: 0.42, a: 1}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
+  wallRadius: 1.6
+  tagHeight: 0.2
+  holdTime: 4
+  fadeTime: 1.5
+  maxTags: 10
+  maxStrokes: 8
+--- !u!4 &2124485062
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2124485060}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}

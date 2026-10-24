@@ -64,7 +64,9 @@ namespace MusicInYourHands
                 Waveform = bus != null ? bus.Waveform : null,
                 Bus = bus,
                 SongTime = bus != null ? bus.SongTime : 0f,
-                Upcoming = upcoming
+                Upcoming = upcoming,
+                Lyrics = bus != null ? bus.Lyrics : null,
+                Lyric = bus != null ? bus.Lyric : new LyricsTrack.State(-1, -1)
             };
             beatPending = false;
             Step(rig, music, Camera.main, Time.deltaTime);

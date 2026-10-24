@@ -27,6 +27,8 @@ namespace MusicInYourHands
             "Hold your hand in the wind\nand spread your fingers",
             "Pop the bubbles\nwith a fingertip",
             "Hover a hand over the plate\nand slide it across",
+            "Push the letters, flick a ring,\nmake a fist to pull the word in",
+            "Point at a wall\nand pinch to spray",
             "The world menu"
         };
 

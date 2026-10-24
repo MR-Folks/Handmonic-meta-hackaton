@@ -6,7 +6,7 @@ Shader "MusicInYourHands/Bubble"
     Properties
     {
         _Color ("Color", Color) = (1, 0.37, 0.68, 1)
-        _Icon ("Emblem (-1 none, 0-11)", Float) = 0
+        _Icon ("Emblem (-1 none, 0-13)", Float) = 0
         _Hover ("Hover 0-1", Float) = 0
         _Selected ("Current world 0-1", Float) = 0
         _Alpha ("Alpha", Float) = 1
@@ -183,13 +183,41 @@ Shader "MusicInYourHands/Bubble"
                         e += Line(abs(length(p - c) - r), 0.035) * 0.9;
                     }
                 }
-                else
+                else if (icon < 11.5)
                 {
                     // Sand table: a Chladni figure, the sand lying on the plate's still lines.
                     float2 q = (p * 0.75 + 1) * 1.5708;
                     float n = 2 + floor(frac(t * 0.08) * 3), m = n + 2;
                     float f = cos(n * q.x) * cos(m * q.y) - cos(m * q.x) * cos(n * q.y);
                     e = smoothstep(0.22, 0.0, abs(f)) * step(max(abs(p.x), abs(p.y)), 0.62);
+                }
+                else if (icon < 12.5)
+                {
+                    // Orbit type: a giant cropped letter A with a thin orbit and a turning ring of dots.
+                    float2 q = p - float2(-0.1, -0.15);
+                    float legs = min(abs(q.x - (0.45 - q.y) * 0.38), abs(q.x + (0.45 - q.y) * 0.38)) - 0.07;
+                    float letter = step(legs, 0) * step(q.y, 0.45) * step(-0.75, q.y) + step(abs(q.y + 0.25), 0.05) * step(abs(q.x), 0.25);
+                    e = saturate(letter) * step(p.y, 0.62);
+                    e += Line(abs(length(p - float2(0.25, 0.3)) - 0.3), 0.025) * 0.8;
+                    float2 r = p - float2(0.35, -0.2);
+                    float a = atan2(r.y, r.x) + t;
+                    e += step(abs(length(r) - 0.16), 0.03) * step(0.6, frac(a * 12 / 6.2832));
+                }
+                else
+                {
+                    // Graffiti: a quick spray-painted squiggle with drips.
+                    float y = 0.12 * sin(p.x * 7 + 1.0) + 0.05;
+                    float stroke = step(abs(p.x), 0.6) * smoothstep(0.1, 0.05, abs(p.y - y));
+                    float drips = 0;
+                    [unroll] for (int k = 0; k < 3; k++)
+                    {
+                        float x = -0.35 + k * 0.32;
+                        float top = 0.12 * sin(x * 7 + 1.0) + 0.05;
+                        float len = 0.2 + 0.15 * frac(k * 0.37 + t * 0.2);
+                        drips += step(abs(p.x - x), 0.025) * step(p.y, top) * step(top - len, p.y);
+                        drips += exp(-dot(p - float2(x, top - len), p - float2(x, top - len)) * 900);
+                    }
+                    e = stroke + drips;
                 }
                 return saturate(e);
             }

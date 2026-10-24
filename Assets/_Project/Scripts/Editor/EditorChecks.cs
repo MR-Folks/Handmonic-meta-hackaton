@@ -307,7 +307,9 @@ namespace MusicInYourHands.EditorTools
                 MakePreviewWorld<SoundPool>(managerGo.transform, "Sound pool", new Color(0.37f, 0.83f, 1f)),
                 MakePreviewWorld<SoundWind>(managerGo.transform, "Sound wind", new Color(0.49f, 0.95f, 0.79f)),
                 MakePreviewWorld<BubbleNotes>(managerGo.transform, "Bubble notes", new Color(1f, 0.6f, 0.85f)),
-                MakePreviewWorld<SandTable>(managerGo.transform, "Sand table", new Color(1f, 0.86f, 0.68f))
+                MakePreviewWorld<SandTable>(managerGo.transform, "Sand table", new Color(1f, 0.86f, 0.68f)),
+                MakePreviewWorld<OrbitType>(managerGo.transform, "Orbit type", new Color(0.88f, 0.89f, 0.93f)),
+                MakePreviewWorld<Graffiti>(managerGo.transform, "Graffiti", new Color(1f, 0.7f, 0.42f))
             };
             var manager = managerGo.AddComponent<WorldManager>();
             var mso = new SerializedObject(manager);

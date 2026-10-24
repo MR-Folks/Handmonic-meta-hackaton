@@ -311,7 +311,9 @@ namespace MusicInYourHands
             captionShadow.color = new Color(0f, 0f, 0f, show * 0.55f);
             hint.color = new Color(1f, 1f, 1f, show * 0.6f);
 
-            var top = root.TransformPoint(new Vector3(0f, spacing + bubbleSize * 0.95f, 0f));
+            float highest = spacing;
+            foreach (var b in bubbles) highest = Mathf.Max(highest, b.Slot.y);
+            var top = root.TransformPoint(new Vector3(0f, highest + bubbleSize * 0.95f, 0f));
             var rotation = Quaternion.LookRotation(root.position - view.transform.position, Vector3.up);
             caption.transform.SetPositionAndRotation(top, rotation);
             captionShadow.transform.SetPositionAndRotation(top + rotation * new Vector3(0.0009f, -0.0009f, 0.001f), rotation);

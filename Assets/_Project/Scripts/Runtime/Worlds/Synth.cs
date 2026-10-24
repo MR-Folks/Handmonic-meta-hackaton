@@ -65,6 +65,28 @@ namespace MusicInYourHands
             return Store(key, data, rate);
         }
 
+        /// <summary>A spray can's hiss: a second of bright noise that loops seamlessly.</summary>
+        public static AudioClip Hiss()
+        {
+            const string key = "hiss";
+            if (Cache.TryGetValue(key, out var clip)) return clip;
+
+            int rate = Rate, length = rate;
+            var data = new float[length];
+            var random = new System.Random(9);
+            float low = 0f, prev = 0f;
+            for (int i = 0; i < length; i++)
+            {
+                float white = (float)(random.NextDouble() * 2 - 1);
+                // Take off the lowest rumble and the harshest top, leaving the "shhh".
+                low += (white - low) * 0.35f;
+                float high = low - prev * 0.96f;
+                prev = low;
+                data[i] = high * 0.35f;
+            }
+            return Store(key, data, rate);
+        }
+
         static AudioClip Store(string key, float[] data, int rate)
         {
             var clip = AudioClip.Create(key, data.Length, 1, rate, false);

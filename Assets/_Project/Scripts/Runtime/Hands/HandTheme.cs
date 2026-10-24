@@ -5,7 +5,7 @@ namespace MusicInYourHands
     /// <summary>How the hands look in a world: colours and which effect the hand shader draws.</summary>
     public struct HandTheme
     {
-        public enum Effect { Veins = 0, Heat = 1, Scanlines = 2, Electric = 3, Ripples = 4, Specks = 5, Submerged = 6, Flow = 7, Film = 8, Uplight = 9 }
+        public enum Effect { Veins = 0, Heat = 1, Scanlines = 2, Electric = 3, Ripples = 4, Specks = 5, Submerged = 6, Flow = 7, Film = 8, Uplight = 9, Halftone = 10, Paint = 11 }
 
         public Color Fill;
         public Color Edge;

@@ -20,7 +20,7 @@ Shader "MusicInYourHands/Hand"
         _PulseSpeed ("Pulse speed (m/s)", Float) = 0.55
         _PulseWidth ("Pulse width (m)", Float) = 0.022
         _PulseLength ("Wrist to fingertips (m)", Float) = 0.2
-        _Pattern ("Effect (set by the world: 0 veins, 1 heat, 2 scanlines, 3 electric, 4 ripples, 5 specks, 6 submerged, 7 flow, 8 film, 9 uplight)", Float) = 0
+        _Pattern ("Effect (set by the world: 0 veins, 1 heat, 2 scanlines, 3 electric, 4 ripples, 5 specks, 6 submerged, 7 flow, 8 film, 9 uplight, 10 halftone, 11 paint)", Float) = 0
         _PatternColor ("Effect colour (set by the world)", Color) = (1, 0.83, 0.42, 1)
         _FocusPos ("Focus point (set by the world)", Vector) = (0, 0, 0, 0)
         _FocusStrength ("Focus strength (set by the world)", Float) = 0
@@ -158,13 +158,32 @@ Shader "MusicInYourHands/Hand"
                 float k = sheen * (0.55 + _Kick * 0.45 + _Energy * 0.2);
                 return float4(lerp(c, film, 0.8) * k, sheen * 0.35);
             }
-            // Uplight: the glowing plate below lights the underside of the hand, with grains of sand glinting on it.
-            float height = positionWS.y - _FocusPos.y;
-            float lit = saturate(1 - height / 0.3) * saturate(-n.y * 0.8 + 0.25) * _FocusStrength;
-            float3 grains = positionWS * 260;
-            float glint = step(0.82, Hash(floor(grains))) * smoothstep(0.4, 0.05, length(frac(grains) - 0.5));
-            float k = lit * (0.45 + _Kick * 0.4) + glint * lit * (1.2 + _Kick);
-            return float4(c * k, lit * 0.3 + glint * lit * 0.5);
+            if (_Pattern < 9.5)
+            {
+                // Uplight: the glowing plate below lights the underside of the hand, with grains of sand glinting.
+                float height = positionWS.y - _FocusPos.y;
+                float lit = saturate(1 - height / 0.3) * saturate(-n.y * 0.8 + 0.25) * _FocusStrength;
+                float3 grains = positionWS * 260;
+                float glint = step(0.82, Hash(floor(grains))) * smoothstep(0.4, 0.05, length(frac(grains) - 0.5));
+                float k = lit * (0.45 + _Kick * 0.4) + glint * lit * (1.2 + _Kick);
+                return float4(c * k, lit * 0.3 + glint * lit * 0.5);
+            }
+            if (_Pattern < 10.5)
+            {
+                // Halftone: printed dots, bigger towards the silhouette and on the beat, like a poster.
+                float2 g = float2(dot(positionWS, float3(0.707, 0, 0.707)), positionWS.y + positionWS.x * 0.3) * 260;
+                float tone = pow(1 - abs(dot(n, v)), 1.5) * 0.85 + _Kick * 0.3 + 0.06;
+                float radius = sqrt(saturate(tone)) * 0.5;
+                float dots = smoothstep(radius, radius - 0.12, length(frac(g) - 0.5));
+                return float4(c * dots * 0.9, dots * 0.55);
+            }
+            // Paint: speckles of spray paint around the fingertip that sprays (the focus point), and a faint dusting.
+            float near = saturate(1 - length(positionWS - _FocusPos.xyz) / 0.06) * _FocusStrength;
+            float3 cells = positionWS * 320;
+            float h2 = Hash(floor(cells));
+            float speck = step(0.55, h2) * smoothstep(0.45, 0.15, length(frac(cells) - 0.5));
+            float k = speck * (near * 1.3 + 0.06 * step(0.9, h2));
+            return float4(c * k, k * 0.8);
         }
 
         struct Attributes

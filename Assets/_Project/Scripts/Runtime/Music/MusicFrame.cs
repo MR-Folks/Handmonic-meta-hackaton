@@ -17,6 +17,22 @@ namespace MusicInYourHands
         public float SongTime;
         /// <summary>Melody notes starting in the next few seconds, in song time. May be null or empty.</summary>
         public System.Collections.Generic.List<NoteTrack.Note> Upcoming;
+        /// <summary>The song's timed lyrics, and the line and word being sung. May be null (no lyrics).</summary>
+        public LyricsTrack Lyrics;
+        public LyricsTrack.State Lyric;
+
+        /// <summary>The words of the line being sung, or null.</summary>
+        public LyricsTrack.Word[] LineWords => Lyrics != null && Lyric.HasLine && Lyric.Line < Lyrics.Lines.Count ? Lyrics.Lines[Lyric.Line].Words : null;
+
+        /// <summary>The word being sung, or an empty string.</summary>
+        public string Word
+        {
+            get
+            {
+                var words = LineWords;
+                return words != null && Lyric.Word >= 0 && Lyric.Word < words.Length ? words[Lyric.Word].Text : "";
+            }
+        }
 
         public float Band(int index) => Bands != null && index >= 0 && index < Bands.Length ? Bands[index] : 0.3f;
     }

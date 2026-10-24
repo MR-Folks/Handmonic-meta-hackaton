@@ -404,7 +404,14 @@ namespace MusicInYourHands.EditorTools
 
             var so = new SerializedObject(manager);
             var list = so.FindProperty("worlds");
-            World[] order = { livingSkin, orb, ribbon, strings, rain, fireflies, pool, wind, bubbles, sand };
+            var lettering = EnsureMaterial(LetteringMaterialPath, "MusicInYourHands/Lettering");
+            var orbitType = EnsureWorld<OrbitType>(manager.transform, "OrbitType", "Orbit type", new Color(0.88f, 0.89f, 0.93f));
+            SetReferences(orbitType, ("letteringMaterial", lettering), ("lineMaterial", line), ("glowMaterial", glow));
+
+            var graffiti = EnsureWorld<Graffiti>(manager.transform, "Graffiti", "Graffiti", new Color(1f, 0.7f, 0.42f));
+            SetReferences(graffiti, ("letteringMaterial", lettering), ("lineMaterial", line), ("glowMaterial", glow), ("ringMaterial", ring));
+
+            World[] order = { livingSkin, orb, ribbon, strings, rain, fireflies, pool, wind, bubbles, sand, orbitType, graffiti };
             list.arraySize = order.Length;
             for (int i = 0; i < order.Length; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = order[i];
             so.ApplyModifiedPropertiesWithoutUndo();
@@ -452,6 +459,7 @@ namespace MusicInYourHands.EditorTools
         public const string GlowMaterialPath = Root + "/Materials/Glow.mat";
         public const string WaterMaterialPath = Root + "/Materials/Water.mat";
         public const string PlateMaterialPath = Root + "/Materials/Plate.mat";
+        public const string LetteringMaterialPath = Root + "/Materials/Lettering.mat";
         public const string RingMaterialPath = Root + "/Materials/Ring.mat";
 
         public static Material EnsureHandMaterial() => EnsureMaterial(HandMaterialPath, "MusicInYourHands/Hand");

@@ -45,6 +45,10 @@ namespace MusicInYourHands.EditorTools
             Shot<SoundWind>("9-sound-wind", HandPose.PalmsToFace, 14f, closeUp: rig => rig.Left.Palm.position,
                 handOffset: side => side == "L" ? new Vector3(-0.05f, 0f, 0.15f) : new Vector3(0.05f, -0.1f, 0f));
             Shot<BubbleNotes>("10-bubble-notes", HandPose.BacksToFace, 4f, closeUp: rig => rig.Right.Tips[1] + new Vector3(-0.08f, 0.12f, 0.12f), lead: 8f);
+            Shot<OrbitType>("12-orbit-type", HandPose.PalmsToFace, 2f, closeUp: rig => rig.Right.Palm.position + new Vector3(-0.2f, 0.05f, 0.7f),
+                handOffset: side => side == "R" ? new Vector3(0.05f, 0.05f, 0.2f) : new Vector3(0f, -0.1f, 0f));
+            Shot<Graffiti>("13-graffiti", HandPose.BacksToFace, 6f, rig => rig.Right.Pinch = 1f, closeUp: rig => new Vector3(0.3f, 1.45f, 1.55f),
+                handOffset: side => side == "R" ? new Vector3(0.02f, 0.08f, 0.12f) : new Vector3(0f, -0.15f, 0f), lead: 6f);
             Shot<SandTable>("11-sand-table", HandPose.PalmsDown, 40f, closeUp: rig => rig.Right.Palm.position + Vector3.down * 0.15f,
                 handOffset: side => side == "R" ? new Vector3(0.02f, -0.15f, 0.12f) : new Vector3(-0.05f, -0.2f, 0f));
             MenuShot();
@@ -147,6 +151,7 @@ namespace MusicInYourHands.EditorTools
         sealed class SongClock
         {
             readonly NoteTrack notes = NoteTrack.Parse(AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/_Project/Audio/GlassRoom.notes")?.text);
+            readonly LyricsTrack lyrics = LyricsTrack.Parse(AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/_Project/Audio/GlassRoom.lrc")?.text);
             readonly List<NoteTrack.Note> upcoming = new List<NoteTrack.Note>();
             readonly float[] bands = new float[6];
             public float Time = ChorusStart - 3f;
@@ -171,7 +176,7 @@ namespace MusicInYourHands.EditorTools
                 bands[5] = 0.25f + 0.25f * Mathf.Abs(Mathf.Sin(Time * Mathf.PI / (Beat * 0.5f)));
                 upcoming.Clear();
                 notes.Between(Time, Time + 3f, upcoming);
-                return new MusicFrame { Bands = bands, Kick = k, Beat = beat, SongTime = Time, Upcoming = upcoming };
+                return new MusicFrame { Bands = bands, Kick = k, Beat = beat, SongTime = Time, Upcoming = upcoming, Lyrics = lyrics, Lyric = lyrics.Lookup(Time) };
             }
         }
 
@@ -258,7 +263,9 @@ namespace MusicInYourHands.EditorTools
                 MakePreviewWorld<SoundPool>(managerGo.transform, "Sound pool", new Color(0.37f, 0.83f, 1f)),
                 MakePreviewWorld<SoundWind>(managerGo.transform, "Sound wind", new Color(0.49f, 0.95f, 0.79f)),
                 MakePreviewWorld<BubbleNotes>(managerGo.transform, "Bubble notes", new Color(1f, 0.6f, 0.85f)),
-                MakePreviewWorld<SandTable>(managerGo.transform, "Sand table", new Color(1f, 0.86f, 0.68f))
+                MakePreviewWorld<SandTable>(managerGo.transform, "Sand table", new Color(1f, 0.86f, 0.68f)),
+                MakePreviewWorld<OrbitType>(managerGo.transform, "Orbit type", new Color(0.88f, 0.89f, 0.93f)),
+                MakePreviewWorld<Graffiti>(managerGo.transform, "Graffiti", new Color(1f, 0.7f, 0.42f))
             };
             var manager = managerGo.AddComponent<WorldManager>();
             var mso = new SerializedObject(manager);
