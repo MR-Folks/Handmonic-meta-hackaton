@@ -367,7 +367,8 @@ namespace MusicInYourHands.EditorTools
             SetReferences(livingSkin, ("glowMaterial", glow), ("ringMaterial", EnsureMaterial(RingMaterialPath, "MusicInYourHands/Ring")));
 
             var orb = EnsureWorld<HeartbeatOrb>(manager.transform, "HeartbeatOrb", "Heartbeat orb", new Color(1f, 0.83f, 0.42f));
-            SetReferences(orb, ("glowMaterial", glow), ("orbMaterial", EnsureMaterial(OrbMaterialPath, "MusicInYourHands/Orb")));
+            SetReferences(orb, ("glowMaterial", glow), ("orbMaterial", EnsureMaterial(OrbMaterialPath, "MusicInYourHands/Orb")),
+                ("ringMaterial", EnsureMaterial(RingMaterialPath, "MusicInYourHands/Ring")));
 
             var so = new SerializedObject(manager);
             var list = so.FindProperty("worlds");

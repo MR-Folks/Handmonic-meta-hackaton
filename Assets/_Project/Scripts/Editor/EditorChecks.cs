@@ -258,15 +258,16 @@ namespace MusicInYourHands.EditorTools
             var so = new SerializedObject(orb);
             so.FindProperty("glowMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow");
             so.FindProperty("orbMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.OrbMaterialPath, "MusicInYourHands/Orb");
+            so.FindProperty("ringMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.RingMaterialPath, "MusicInYourHands/Ring");
             so.ApplyModifiedPropertiesWithoutUndo();
             orb.Build();
 
             float[] bands = { 0.8f, 0.6f, 0.5f, 0.5f, 0.4f, 0.5f };
-            for (int i = 0; i < 8; i++) orb.Step(rig, bands, 0f, 0.1f, false);
+            for (int i = 0; i < 8; i++) orb.Step(rig, bands, 0f, 0.1f, false, camera);
             const int w = 640, h = 360;
             var sheet = new Texture2D(w * 2, h, TextureFormat.RGB24, false);
             sheet.SetPixels(0, 0, w, h, Render(camera, w, h).GetPixels());
-            orb.Step(rig, bands, 1f, 0.016f, true);
+            orb.Step(rig, bands, 1f, 0.016f, true, camera);
             orb.SimulateMotes(0.18f);
             foreach (var hand in hands) SetBeat(hand.Skin, 0.08f, 1f);
             sheet.SetPixels(w, 0, w, h, Render(camera, w, h).GetPixels());
@@ -340,7 +341,7 @@ namespace MusicInYourHands.EditorTools
             var cameraGo = new GameObject("Preview Camera");
             camera = cameraGo.AddComponent<Camera>();
             camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = new Color(0.55f, 0.5f, 0.44f);
+            camera.backgroundColor = new Color(0.36f, 0.32f, 0.28f);
             camera.fieldOfView = 50f;
             camera.nearClipPlane = 0.02f;
             camera.transform.position = new Vector3(0f, 1.2f, 0.45f) + new Vector3(0f, 0f, -0.5f);

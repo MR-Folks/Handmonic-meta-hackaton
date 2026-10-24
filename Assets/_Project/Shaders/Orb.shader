@@ -13,6 +13,8 @@ Shader "MusicInYourHands/Orb"
         _Highs ("Highs 0-1 (set by HeartbeatOrb)", Float) = 0
         _Alpha ("Alpha (set by HeartbeatOrb)", Float) = 1
         _Ripple ("Bass ripple", Float) = 0.025
+        _Layer ("Shell index (set by HeartbeatOrb)", Float) = 0
+        _Opacity ("Base opacity (set by HeartbeatOrb)", Float) = 0.25
     }
 
     SubShader
@@ -43,6 +45,8 @@ Shader "MusicInYourHands/Orb"
                 float _Highs;
                 float _Alpha;
                 float _Ripple;
+                float _Layer;
+                float _Opacity;
             CBUFFER_END
 
             struct Attributes
@@ -88,17 +92,27 @@ Shader "MusicInYourHands/Orb"
                 float fresnel = pow(1 - ndv, 2.2);
                 float core = pow(ndv, 3);
 
-                float3 p = input.positionOS * 2;
-                float swirlA = sin(p.y * 6 + sin(p.x * 5 + t * 1.3) * 1.6 + t * 1.8) * 0.5 + 0.5;
-                float swirlB = sin(p.x * 4 - p.z * 5 + t * 0.9) * 0.5 + 0.5;
+                // Each shell turns its own way at its own speed, so the layers drift past each other.
+                float dir = fmod(_Layer, 2) < 0.5 ? 1 : -1;
+                float angle = t * (0.35 + _Layer * 0.25) * dir;
+                float s = sin(angle), c = cos(angle);
+                float3 p = input.positionOS * (2.5 + _Layer * 1.5);
+                p.xz = float2(c * p.x - s * p.z, s * p.x + c * p.z);
+
+                float warp = sin(p.x * 3.1 + t * 1.1 + _Layer) + sin(p.z * 2.7 - t * 0.8);
+                float swirlA = sin(p.y * 5 + warp * 1.4 + t * 1.6 * dir) * 0.5 + 0.5;
+                float swirlB = sin((p.x - p.z) * 4 + warp + t * 0.7) * 0.5 + 0.5;
+                // Thin bright filaments, like threads of light inside the orb.
+                float filament = pow(abs(sin(p.y * 7 + warp * 2.2 + t * 2 * dir)), 24);
+
                 float3 color = lerp(_ColorC.rgb, _ColorB.rgb, swirlA);
-                color = lerp(color, _ColorA.rgb, swirlB * 0.6);
-                color = lerp(color, _RimColor.rgb, fresnel * (0.55 + _Kick * 0.45));
+                color = lerp(color, _ColorA.rgb, swirlB * 0.7);
+                color += filament * lerp(_RimColor.rgb, 1, 0.5) * (0.6 + _Kick * 0.8 + _Highs * 0.4);
+                color = lerp(color, _RimColor.rgb, fresnel * (0.5 + _Kick * 0.5));
                 // The kick brightens the colours from inside rather than washing them out to white.
                 color *= 1 + core * (_Kick * 0.6 + _Highs * 0.15);
-                color = lerp(color, 1, core * _Kick * 0.25);
 
-                float alpha = 0.22 + fresnel * 0.75 + core * (0.1 + _Kick * 0.25);
+                float alpha = _Opacity + fresnel * 0.7 + filament * 0.5 + core * (0.05 + _Kick * 0.2);
                 return half4(color, saturate(alpha) * _Alpha);
             }
             ENDHLSL

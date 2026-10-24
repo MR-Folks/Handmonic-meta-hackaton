@@ -1289,14 +1289,17 @@ MonoBehaviour:
   color: {r: 1, g: 0.83, b: 0.42, a: 1}
   orbMaterial: {fileID: 2100000, guid: 670281a42a551438a91dfccad4c42bad, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
   minRadius: 0.04
-  maxRadius: 0.18
-  radiusPerSpread: 0.36
+  maxRadius: 0.15
+  radiusPerSpread: 0.3
+  forwardOffset: 0.12
   beatSwell: 0.2
   push: 0.012
   spreadRange: {x: 0.12, y: 0.6}
   volumeRange: {x: 0.3, y: 1}
-  motesPerBeat: 10
+  motesPerBeat: 14
+  motesPerSecond: 10
 --- !u!4 &1788851836
 Transform:
   m_ObjectHideFlags: 0
