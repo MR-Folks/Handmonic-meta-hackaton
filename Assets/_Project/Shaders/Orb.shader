@@ -77,7 +77,7 @@ Shader "MusicInYourHands/Orb"
                 float lon = atan2(dir.z, dir.x) + t * _Spin * 0.35;
                 float lat = asin(clamp(dir.y, -1, 1));
                 float energy = saturate(_Band * 0.9 + _Kick * 0.5);
-                float n1 = lerp(4.5, 1.1, energy) + 0.6 * sin(t * 0.7 + _Lobes);
+                float n1 = lerp(2.4, 0.75, energy) + 0.35 * sin(t * 0.7 + _Lobes);
                 float n2 = 1.7 + 0.7 * sin(t * 0.45 + _Lobes * 1.3);
                 float r1 = Superformula(lon, _Lobes, n1, n2, n2);
                 float r2 = Superformula(lat, _Lobes - 1, n1 + 1, 1.6, 1.6);
@@ -85,7 +85,7 @@ Shader "MusicInYourHands/Orb"
                 float len = length(shape);
                 shape *= min(1.0, 1.35 / max(len, 1e-3)) / 1.15;
                 float3 sphere = dir;
-                return lerp(sphere, shape, saturate(_Amp * 4)) * 0.5;
+                return lerp(sphere, shape, saturate(_Amp * 5)) * 0.5;
             }
 
             Varyings vert(Attributes input)

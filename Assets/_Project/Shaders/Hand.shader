@@ -86,18 +86,20 @@ Shader "MusicInYourHands/Hand"
             if (_Pattern < 2.5)
             {
                 // Oscilloscope: bright scanlines sweep from the wrist to the fingertips.
-                float scan = pow(saturate(sin(along * 140 - t * 12) * 0.5 + 0.5), 10);
+                float scan = pow(saturate(sin(along * 220 - t * 12) * 0.5 + 0.5), 24);
                 float sweep = pow(saturate(sin(along * 18 - t * 4) * 0.5 + 0.5), 3);
                 float k = scan * (0.35 + sweep * 0.8 + _Kick * 0.6);
                 return float4(c * k, k * 0.5);
             }
             if (_Pattern < 3.5)
             {
-                // Electric: tiny sparks crackle over the skin, more on the beat.
-                float3 cell = floor(positionWS * 260 + floor(t * 14) * 3.1);
-                float spark = step(0.965 - _Kick * 0.04 - _Energy * 0.02, Hash(cell));
+                // Electric: tiny round sparks crackle over the skin, more on the beat.
+                float3 grid = positionWS * 420 + floor(t * 14) * 3.1;
+                float3 cell = floor(grid);
+                float d = length(frac(grid) - 0.5);
+                float spark = step(0.95 - _Kick * 0.04 - _Energy * 0.02, Hash(cell)) * smoothstep(0.42, 0.08, d);
                 float rim = pow(1 - saturate(abs(dot(n, v))), 3) * (0.5 + 0.5 * sin(t * 37 + along * 80));
-                float k = spark * 1.3 + rim * 0.5;
+                float k = spark * 1.4 + rim * 0.5;
                 return float4(c * k, saturate(spark + rim * 0.3));
             }
             if (_Pattern < 4.5)
@@ -108,11 +110,13 @@ Shader "MusicInYourHands/Hand"
                 float k = ripple * (0.35 + _Charge * 1.2 + _Kick * 0.3) + _Charge * 0.25 * saturate(1 - r / 0.1);
                 return float4(c * k, k * 0.5);
             }
-            // Specks: warm points of light twinkle in the skin, like fireflies resting on it.
-            float3 cell2 = floor(positionWS * 95);
+            // Specks: warm round points of light twinkle in the skin, like fireflies resting on it.
+            float3 grid2 = positionWS * 140;
+            float3 cell2 = floor(grid2);
             float h = Hash(cell2);
-            float twinkle = step(0.9, h) * pow(saturate(sin(t * (2 + h * 4) + h * 40) * 0.5 + 0.5), 3);
-            float k = twinkle * (0.9 + _Kick * 0.8 + _Energy * 0.4);
+            float dot2 = smoothstep(0.38, 0.05, length(frac(grid2) - 0.5));
+            float twinkle = step(0.86, h) * dot2 * pow(saturate(sin(t * (2 + h * 4) + h * 40) * 0.5 + 0.5), 3);
+            float k = twinkle * (1.1 + _Kick * 0.8 + _Energy * 0.4);
             return float4(c * k, k * 0.6);
         }
 

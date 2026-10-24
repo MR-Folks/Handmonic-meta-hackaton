@@ -207,7 +207,6 @@ namespace MusicInYourHands.EditorTools
             var so = new SerializedObject(skin);
             so.FindProperty("glowMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow");
             so.FindProperty("ringMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.RingMaterialPath, "MusicInYourHands/Ring");
-            so.FindProperty("lineMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.LineMaterialPath, "MusicInYourHands/Line");
             so.ApplyModifiedPropertiesWithoutUndo();
             skin.Build();
 
@@ -266,6 +265,7 @@ namespace MusicInYourHands.EditorTools
             so.FindProperty("glowMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow");
             so.FindProperty("orbMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.OrbMaterialPath, "MusicInYourHands/Orb");
             so.FindProperty("ringMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.RingMaterialPath, "MusicInYourHands/Ring");
+            so.FindProperty("lineMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.LineMaterialPath, "MusicInYourHands/Line");
             so.ApplyModifiedPropertiesWithoutUndo();
             orb.Build();
 

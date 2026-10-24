@@ -207,7 +207,7 @@ namespace MusicInYourHands
             drop.Position = center + right * (spot.x * areaWidth * 0.5f) + forward * (spot.y * areaDepth * 0.5f);
             drop.Position.y = spawnY;
             drop.Color = PitchColors[Mathf.Abs(midi) % PitchColors.Length];
-            drop.Size = 0.018f + Mathf.Clamp01((72f - midi) / 12f) * 0.008f;
+            drop.Size = 0.024f + Mathf.Clamp01((72f - midi) / 12f) * 0.01f;
             drop.Streak.gameObject.SetActive(true);
             drop.Head.gameObject.SetActive(true);
             return drop;
@@ -232,7 +232,7 @@ namespace MusicInYourHands
                 }
 
                 // The streak hangs above the head, facing the viewer around the vertical.
-                float length = Mathf.Clamp(speed * 0.12f, 0.05f, 0.14f);
+                float length = Mathf.Clamp(speed * 0.2f, 0.08f, 0.24f);
                 var toView = Vector3.ProjectOnPlane(view.transform.position - drop.Position, Vector3.up);
                 var facing = toView.sqrMagnitude > 1e-6f ? Quaternion.LookRotation(-toView.normalized, Vector3.up) : Quaternion.identity;
                 drop.Streak.transform.SetPositionAndRotation(drop.Position + Vector3.up * (length * 0.5f - drop.Size * 0.3f), facing);
