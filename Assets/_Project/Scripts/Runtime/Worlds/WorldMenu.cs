@@ -6,7 +6,8 @@ namespace MusicInYourHands
     /// <summary>
     /// The world menu: a honeycomb of glass bubbles, like an Apple Watch home screen, opened with Meta's left-hand
     /// menu gesture. The centre bubble plays and pauses the song; the six around it are the worlds, each showing a
-    /// small animated emblem, and the one below them switches to listening to the room. Bubbles near where you look
+    /// small animated emblem, and the one below them switches to listening to the room, between two arrows that step
+    /// to the previous and next song (including songs added on the headset). Bubbles near where you look
     /// are a little larger. Each hand casts a soft pointer ray onto the menu (from the shoulder through the pinch);
     /// the bubble it points at swells and its name shows large above the honeycomb. Pinch to pop into it.
     /// </summary>
@@ -36,10 +37,14 @@ namespace MusicInYourHands
         static readonly int PausedId = Shader.PropertyToID("_Paused");
         static readonly int IntensityId = Shader.PropertyToID("_Intensity");
 
-        // Bubble.World values for the two bubbles that aren't worlds.
+        // Bubble.World values for the bubbles that aren't worlds.
         const int NowPlaying = -1;
         const int ListenToggle = -2;
+        const int PreviousSong = -3;
+        const int NextSong = -4;
+        const int ExtraBubbles = 4;
         static readonly Color ListenColor = new Color(0.98f, 0.62f, 0.5f);
+        static readonly Color SongColor = new Color(0.72f, 0.7f, 1f);
 
         sealed class Bubble
         {
@@ -98,6 +103,8 @@ namespace MusicInYourHands
         public void Open(Camera view)
         {
             if (view == null) return;
+            // Songs copied onto the headset while the app runs show up the next time the menu opens.
+            MusicBus.Instance?.RefreshSongs();
             open = true;
             openTime = 0f;
             closeAt = -1f;
@@ -163,7 +170,7 @@ namespace MusicInYourHands
                 bool selected = b.World == ListenToggle ? bus != null && bus.IsListening : b.World == manager.Current;
                 block.Clear();
                 block.SetColor(ColorId, BubbleColor(b, manager));
-                block.SetFloat(IconId, b.World >= 0 ? manager.Worlds[b.World].MenuIcon : b.World == ListenToggle ? 7f : 6f);
+                block.SetFloat(IconId, b.World >= 0 ? manager.Worlds[b.World].MenuIcon : Icon(b.World));
                 block.SetFloat(HoverId, b.Hover);
                 block.SetFloat(SelectedId, selected ? 1f : 0f);
                 block.SetFloat(AlphaId, Mathf.Clamp01(show) * (1f - b.Pop * 0.85f) + b.Pop * 0.15f);
@@ -192,13 +199,25 @@ namespace MusicInYourHands
             if (root.gameObject.activeSelf != (anyVisible || open)) root.gameObject.SetActive(anyVisible || open);
         }
 
+        static float Icon(int bubble) => bubble switch { ListenToggle => 7f, NextSong => 14f, PreviousSong => 15f, _ => 6f };
+
+        static bool IsSongStep(Bubble b) => b.World == PreviousSong || b.World == NextSong;
+
         Color BubbleColor(Bubble b, WorldManager manager) =>
-            b.World >= 0 ? manager.Worlds[b.World].Color : b.World == ListenToggle ? ListenColor : new Color(0.85f, 0.85f, 1f);
+            b.World >= 0 ? manager.Worlds[b.World].Color : b.World == ListenToggle ? ListenColor : IsSongStep(b) ? SongColor : new Color(0.85f, 0.85f, 1f);
 
         string BubbleName(Bubble b, WorldManager manager, MusicBus bus) =>
             b.World >= 0 ? manager.Worlds[b.World].DisplayName
             : b.World == ListenToggle ? bus != null && bus.IsListening ? "Play the song" : "Listen to the room"
+            : IsSongStep(b) ? SongStepName(bus, b.World == NextSong ? 1 : -1)
             : bus == null ? "Music" : bus.IsPlaying ? $"Pause {bus.Title}" : $"Play {bus.Title}";
+
+        static string SongStepName(MusicBus bus, int step)
+        {
+            var song = bus != null ? bus.SongAt(step) : null;
+            string where = step > 0 ? "Next" : "Previous";
+            return song == null ? $"{where} song" : $"{where}: {song.title}";
+        }
 
         /// <summary>
         /// Finds where each hand points: a ray from an estimated shoulder through the point between thumb and index
@@ -324,7 +343,7 @@ namespace MusicInYourHands
         {
             cooldown = 0.6f;
             b.Pop = 1f;
-            float note = b.World >= 0 ? Synth.Pentatonic[6 + b.World % 5] : Synth.Pentatonic[b.World == ListenToggle ? 4 : 5];
+            float note = b.World >= 0 ? Synth.Pentatonic[6 + b.World % 5] : Synth.Pentatonic[b.World == ListenToggle ? 4 : IsSongStep(b) ? 3 : 5];
             voices.Play(Synth.Chime(note), b.Renderer.transform.position, 0.6f);
             if (b.World >= 0)
             {
@@ -333,6 +352,7 @@ namespace MusicInYourHands
             }
             else if (bus == null) return;
             else if (b.World == ListenToggle) bus.ToggleListen();
+            else if (IsSongStep(b)) bus.StepSong(b.World == NextSong ? 1 : -1);
             else bus.TogglePause();
         }
 
@@ -352,7 +372,8 @@ namespace MusicInYourHands
         }
 
         // Hexagonal honeycomb cells around the centre: the first six worlds ring it, the next ones sit in the outer
-        // ring at its sides and lower corners (the bottom cell is the listen bubble).
+        // ring at its sides and lower corners (the bottom cell is the listen bubble, with the song arrows in the
+        // outer corners on either side of it).
         static readonly float[] OuterAngles = { 0f, 180f, 300f, 240f, 60f, 120f };
 
         Vector2 WorldSlot(int world)
@@ -384,7 +405,7 @@ namespace MusicInYourHands
 
         void Build(WorldManager manager)
         {
-            if (root != null && bubbles.Length == manager.Worlds.Count + 2) return;
+            if (root != null && bubbles.Length == manager.Worlds.Count + ExtraBubbles) return;
             if (root != null)
             {
                 if (Application.isPlaying) Destroy(root.gameObject); else DestroyImmediate(root.gameObject);
@@ -396,17 +417,22 @@ namespace MusicInYourHands
 
             var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             int count = manager.Worlds.Count;
-            bubbles = new Bubble[count + 2];
-            for (int i = 0; i <= count + 1; i++)
+            bubbles = new Bubble[count + ExtraBubbles];
+            for (int i = 0; i < bubbles.Length; i++)
             {
                 // The centre bubble (now playing) first, then the worlds around it like a honeycomb, then the listen
-                // bubble below them all.
-                int world = i <= count ? i - 1 : ListenToggle;
-                Vector2 slot = world >= 0 ? WorldSlot(world) : world == ListenToggle ? new Vector2(0f, -spacing * 2f) : Vector2.zero;
+                // bubble below them all and the song arrows beside it.
+                int world = i <= count ? i - 1 : ListenToggle - (i - count - 1);
+                Vector2 slot = world >= 0 ? WorldSlot(world)
+                    : world == ListenToggle ? new Vector2(0f, -spacing * 2f)
+                    : world == PreviousSong ? new Vector2(-Mathf.Sqrt(3f), -1f) * spacing
+                    : world == NextSong ? new Vector2(Mathf.Sqrt(3f), -1f) * spacing
+                    : Vector2.zero;
 
-                string objectName = world >= 0 ? $"Bubble {world}" : world == ListenToggle ? "Bubble Listen" : "Bubble Now Playing";
+                string objectName = world >= 0 ? $"Bubble {world}" : world == ListenToggle ? "Bubble Listen"
+                    : world == PreviousSong ? "Bubble Previous Song" : world == NextSong ? "Bubble Next Song" : "Bubble Now Playing";
                 var r = Effects.MakeQuad(objectName, root, bubbleMaterial);
-                float delay = world == NowPlaying ? 0f : world == ListenToggle ? 0.06f + count * 0.035f : 0.06f + world * 0.035f;
+                float delay = world == NowPlaying ? 0f : world >= 0 ? 0.06f + world * 0.035f : 0.06f + (count - 1 - world) * 0.035f;
                 bubbles[i] = new Bubble { Renderer = r, World = world, Slot = slot, Delay = delay };
                 r.gameObject.SetActive(false);
             }

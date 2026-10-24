@@ -43,6 +43,7 @@ namespace MusicInYourHands.EditorTools
             ok &= CheckStringsPreview();
             ok &= CheckRainPreview();
             ok &= CheckFirefliesPreview();
+            ok &= CheckSongs();
             Debug.Log(ok ? "[Check] All checks passed." : "[Check] Some checks FAILED.");
             return ok;
         }

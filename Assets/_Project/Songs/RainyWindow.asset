@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c0466a019d91d4f99b98ae349150b337, type: 3}
+  m_Name: RainyWindow
+  m_EditorClassIdentifier: Assembly-CSharp::MusicInYourHands.SongAsset
+  title: Rainy Window
+  artist: Music In Your Hands demo
+  clip: {fileID: 8300000, guid: 1a01f83754224fe48072a2d48e8ab313, type: 3}
+  lyrics: {fileID: 4606409926849070353, guid: 8f21114e2b5c4d7da6f05474680b3475, type: 3}
+  notes: {fileID: 4606409926849070353, guid: a2761165e6e74069bebca1d015c38b11, type: 3}
+  lyricsOffset: 0

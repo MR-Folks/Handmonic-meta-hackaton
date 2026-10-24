@@ -23,6 +23,8 @@ namespace MusicInYourHands
         public static MusicBus Instance { get; private set; }
 
         [SerializeField] SongAsset startSong;
+        [Tooltip("The songs the menu steps through, after the start song. Songs added in the Songs folder on the headset follow them.")]
+        [SerializeField] List<SongAsset> songs = new List<SongAsset>();
         [SerializeField] bool playOnStart = true;
         [SerializeField] bool loop = true;
         [Tooltip("Listen starts on the microphone instead of the song.")]
@@ -50,6 +52,9 @@ namespace MusicInYourHands
         readonly float[] bandNoise = new float[BandCount];
         readonly MicrophoneListener microphone = new MicrophoneListener();
         AudioSource source;
+        readonly List<SongAsset> playlist = new List<SongAsset>();
+        List<SongAsset> added = new List<SongAsset>();
+        SongAsset loading;
         float bassAverage;
         float listenTime;
         bool listenPaused, waitingForPermission;
@@ -79,6 +84,9 @@ namespace MusicInYourHands
         public int BeatCount { get; private set; }
 
         public SongAsset CurrentSong { get; private set; }
+
+        /// <summary>Every song the menu steps through: the built-in ones, then the ones added on the headset.</summary>
+        public IReadOnlyList<SongAsset> Songs => playlist;
         public LyricsTrack Lyrics { get; private set; } = LyricsTrack.Empty;
         public NoteTrack Notes { get; private set; } = NoteTrack.Empty;
 
@@ -139,6 +147,7 @@ namespace MusicInYourHands
 
         void Start()
         {
+            RefreshSongs();
             if (startSource == MusicSource.Listen) Listen();
             else if (playOnStart && startSong != null) Play(startSong);
         }
@@ -146,6 +155,29 @@ namespace MusicInYourHands
         public void Play(SongAsset song)
         {
             if (song == null) return;
+            // An added song's audio is loaded first; the current song keeps playing meanwhile.
+            if (song.IsAdded && song.clip == null)
+            {
+                loading = song;
+                StartCoroutine(AddedSongs.Load(song, ok =>
+                {
+                    if (loading != song)
+                    {
+                        if (song != CurrentSong) AddedSongs.Unload(song);
+                        return;
+                    }
+                    loading = null;
+                    if (ok) Play(song);
+                }));
+                return;
+            }
+            loading = null;
+            if (CurrentSong != null && CurrentSong != song && CurrentSong.IsAdded)
+            {
+                source.Stop();
+                source.clip = null;
+                AddedSongs.Unload(CurrentSong);
+            }
             StopListening();
             CurrentSong = song;
             Lyrics = song.lyrics != null ? LyricsTrack.Parse(song.lyrics.text) : LyricsTrack.Empty;
@@ -155,6 +187,33 @@ namespace MusicInYourHands
             source.clip = song.clip;
             source.loop = loop;
             source.Play();
+        }
+
+        /// <summary>Plays the song <paramref name="step"/> places after the current one, or before it when negative.</summary>
+        public void StepSong(int step) => Play(SongAt(step));
+
+        /// <summary>The song <paramref name="step"/> places from the current one (or the one loading), wrapping around.</summary>
+        public SongAsset SongAt(int step)
+        {
+            if (playlist.Count == 0) return null;
+            int i = playlist.IndexOf(loading != null ? loading : CurrentSong);
+            if (i < 0) return playlist[step > 0 ? 0 : playlist.Count - 1];
+            return playlist[((i + step) % playlist.Count + playlist.Count) % playlist.Count];
+        }
+
+        /// <summary>Lists the built-in songs, then looks again for songs added in the Songs folder on the headset.</summary>
+        public void RefreshSongs()
+        {
+            var found = AddedSongs.Scan(added);
+            foreach (var old in added)
+                if (!found.Contains(old) && old != CurrentSong && old != loading) Destroy(old);
+            added = found;
+
+            playlist.Clear();
+            if (startSong != null) playlist.Add(startSong);
+            foreach (var song in songs)
+                if (song != null && !playlist.Contains(song)) playlist.Add(song);
+            playlist.AddRange(added);
         }
 
         /// <summary>Stops the song and follows music playing in the room through the microphone.</summary>

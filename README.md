@@ -10,7 +10,7 @@ A hand-tracked mixed reality music visualizer for Meta Quest 3. You play with th
 ## Project layout
 ```
 Assets/_Project/
-  Audio/      demo song "Glass Room" (WAV) and its word-timed lyrics (LRC)
+  Audio/      four demo songs (WAV), their word-timed lyrics (LRC) and melody notes (.notes)
   Songs/      SongAsset files: audio + lyrics + offset
   Scenes/     Main.unity
   Scripts/
@@ -23,7 +23,9 @@ Assets/_Project/
 Docs/
   concept-book.html      the interactive concept page with all worlds and lyric styles
 Tools/
-  render_glass_room.py   renders the demo song and its LRC
+  render_songs.py        renders the demo songs, their LRC lyrics and .notes melodies
+  songkit.py             the instruments, voice and file writers the songs share
+  songs/                 one script per demo song
 ```
 
 ## Setup
@@ -50,9 +52,30 @@ Poke the coral microphone bubble below the world menu to follow music playing in
 - The app's own plucks and chimes reach the microphone too, so they nudge the visuals a little.
 - On the headset the mic records through `Assets/Plugins/Android/RoomMicrophone.java` with Android's `UNPROCESSED` input. Unity's own `Microphone` uses the voice input, which hears you but leaves music in the room almost silent. For a new headset, `adb shell touch /sdcard/Android/data/com.musicinyourhands.app/files/mic-probe` makes the next Listen log how loud each input hears the room (`adb logcat -s RoomMicrophone`). A `mic-source.txt` there with an Android audio source number forces one.
 
-## Adding songs
+## Demo songs
+Four original songs ship with the app, so they are safe to use anywhere, including store videos:
+
+| Song | Style |
+| --- | --- |
+| Glass Room | synth pop, A minor, 96 BPM |
+| Neon Tide | house, F minor, 124 BPM: four on the floor, pumping offbeat bass and stabs, a build and a drop |
+| Rainy Window | lo-fi hip hop, C major, 80 BPM: jazzy electric piano, swung boom-bap beat, vinyl dust |
+| Paper Boat | folk waltz in 3/4, G major, 144 BPM: nylon guitar, upright bass, brushes, glockenspiel |
+
+In the menu, the arrow bubbles on either side of the listen bubble step to the previous and next song. `python3 Tools/render_songs.py` renders them all again (or name some, like `neon_tide`); each song is a short script in `Tools/songs`, and a new one there is picked up automatically. Add its SongAsset to **Songs** on `MusicBus` (or to `DemoSongs` in `ProjectSetup`).
+
+## People's own songs
+People can play their own music: they copy an audio file (`.mp3`, `.ogg` or `.wav`) into the app's `Songs` folder on the headset, with an optional `.lrc` lyrics file of the same name, and it joins the songs the arrows step through. Lines show at the times in the `.lrc`; words too when it has a time per word, otherwise they are spread across the line. Name files `Artist - Title`, or use `[ti:]` and `[ar:]` tags in the `.lrc`.
+
+- The folder is `Android/data/com.musicinyourhands.app/files/Songs`. The app creates it, with a short how-to, the first time it runs. Copy files with Meta Quest Developer Hub's file manager or `adb push "Artist - Title.mp3" /sdcard/Android/data/com.musicinyourhands.app/files/Songs/`.
+- The menu looks for new files each time it opens. An added song's audio is loaded only while it plays.
+- They have no melody notes, so the worlds that use them behave as in Listen mode.
+- The app only plays these files and shows their lyrics to the person wearing the headset; nothing is uploaded or shared.
+
+## Adding built-in songs
 1. Put the audio file and its `.lrc` lyrics in `Assets/_Project/Audio`.
 2. Create a song with **Create > Music In Your Hands > Song** and assign both.
 3. If the lyrics are a little early or late, adjust **Lyrics Offset** on the song.
+4. Add it to **Songs** on `MusicBus`.
 
 Only ship songs you have the rights to, including the rights to show their lyrics.

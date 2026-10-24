@@ -6,7 +6,7 @@ Shader "MusicInYourHands/Bubble"
     Properties
     {
         _Color ("Color", Color) = (1, 0.37, 0.68, 1)
-        _Icon ("Emblem (-1 none, 0-13)", Float) = 0
+        _Icon ("Emblem (-1 none, 0-15)", Float) = 0
         _Hover ("Hover 0-1", Float) = 0
         _Selected ("Current world 0-1", Float) = 0
         _Alpha ("Alpha", Float) = 1
@@ -203,7 +203,7 @@ Shader "MusicInYourHands/Bubble"
                     float a = atan2(r.y, r.x) + t;
                     e += step(abs(length(r) - 0.16), 0.03) * step(0.6, frac(a * 12 / 6.2832));
                 }
-                else
+                else if (icon < 13.5)
                 {
                     // Graffiti: a quick spray-painted squiggle with drips.
                     float y = 0.12 * sin(p.x * 7 + 1.0) + 0.05;
@@ -218,6 +218,18 @@ Shader "MusicInYourHands/Bubble"
                         drips += exp(-dot(p - float2(x, top - len), p - float2(x, top - len)) * 900);
                     }
                     e = stroke + drips;
+                }
+                else
+                {
+                    // Next song (14) or previous song (15, mirrored): two arrowheads and a bar, nudging forward.
+                    float2 q = float2(icon > 14.5 ? -p.x : p.x, p.y);
+                    q.x -= 0.04 * (0.5 + 0.5 * sin(t * 3));
+                    [unroll] for (int k = 0; k < 2; k++)
+                    {
+                        float x0 = -0.44 + k * 0.34;
+                        e += step(x0, q.x) * step(abs(q.y), 0.3 * saturate((x0 + 0.34 - q.x) / 0.34));
+                    }
+                    e += step(abs(q.x - 0.32), 0.045) * step(abs(q.y), 0.3);
                 }
                 return saturate(e);
             }

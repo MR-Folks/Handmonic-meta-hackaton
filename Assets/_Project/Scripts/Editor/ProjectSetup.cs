@@ -31,7 +31,9 @@ namespace MusicInYourHands.EditorTools
         const string Root = "Assets/_Project";
         const string UrpPath = Root + "/Settings/URP-Quest.asset";
         const string RendererPath = Root + "/Settings/URP-Quest_Renderer.asset";
-        const string SongPath = Root + "/Songs/GlassRoom.asset";
+        // The demo songs, rendered by Tools/render_songs.py: (file name in Audio and Songs, title). The first one starts.
+        static readonly (string file, string title)[] DemoSongs =
+            { ("GlassRoom", "Glass Room"), ("NeonTide", "Neon Tide"), ("RainyWindow", "Rainy Window"), ("PaperBoat", "Paper Boat") };
         public const string MainScenePath = Root + "/Scenes/Main.unity";
         const string ApplicationId = "com.musicinyourhands.app";
         static readonly string[] OpenXRFeaturesToEnable = { "MetaQuestFeature", "MetaXRFeature" };
@@ -46,7 +48,7 @@ namespace MusicInYourHands.EditorTools
         [MenuItem("Music In Your Hands/Rebuild Main Scene")]
         public static void RebuildScene()
         {
-            EnsureMainScene(EnsureDemoSong(), rebuild: true);
+            EnsureMainScene(EnsureDemoSongs(), rebuild: true);
         }
 
         public static void RunBatch()
@@ -61,7 +63,7 @@ namespace MusicInYourHands.EditorTools
             EnsureUrp();
             ConfigureXR();
             ConfigureMetaProject();
-            EnsureMainScene(EnsureDemoSong(), rebuild: false);
+            EnsureMainScene(EnsureDemoSongs(), rebuild: false);
             AssetDatabase.SaveAssets();
             Debug.Log("[Setup] Music In Your Hands project setup finished.");
         }
@@ -188,40 +190,49 @@ namespace MusicInYourHands.EditorTools
 #endif
         }
 
-        static SongAsset EnsureDemoSong()
+        static SongAsset[] EnsureDemoSongs()
         {
             EnsureFolder(Root + "/Songs");
-            var song = AssetDatabase.LoadAssetAtPath<SongAsset>(SongPath);
-            if (song == null)
+            var songs = new SongAsset[DemoSongs.Length];
+            for (int i = 0; i < DemoSongs.Length; i++)
             {
-                song = ScriptableObject.CreateInstance<SongAsset>();
-                AssetDatabase.CreateAsset(song, SongPath);
+                var (file, title) = DemoSongs[i];
+                var path = $"{Root}/Songs/{file}.asset";
+                var song = AssetDatabase.LoadAssetAtPath<SongAsset>(path);
+                if (song == null)
+                {
+                    song = ScriptableObject.CreateInstance<SongAsset>();
+                    AssetDatabase.CreateAsset(song, path);
+                }
+                song.title = title;
+                song.artist = "Music In Your Hands demo";
+                song.clip = AssetDatabase.LoadAssetAtPath<AudioClip>($"{Root}/Audio/{file}.wav");
+                song.lyrics = AssetDatabase.LoadAssetAtPath<TextAsset>($"{Root}/Audio/{file}.lrc");
+                song.notes = AssetDatabase.LoadAssetAtPath<TextAsset>($"{Root}/Audio/{file}.notes");
+                EditorUtility.SetDirty(song);
+                if (song.clip == null) Debug.LogWarning($"[Setup] {file}.wav was not found, so {title} has no audio.");
+                if (song.lyrics == null) Debug.LogWarning($"[Setup] {file}.lrc was not found, so {title} has no lyrics.");
+                songs[i] = song;
             }
-            song.title = "Glass Room";
-            song.artist = "Music In Your Hands demo";
-            song.clip = AssetDatabase.LoadAssetAtPath<AudioClip>(Root + "/Audio/GlassRoom.wav");
-            song.lyrics = AssetDatabase.LoadAssetAtPath<TextAsset>(Root + "/Audio/GlassRoom.lrc");
-            song.notes = AssetDatabase.LoadAssetAtPath<TextAsset>(Root + "/Audio/GlassRoom.notes");
-            EditorUtility.SetDirty(song);
-            if (song.clip == null) Debug.LogWarning("[Setup] GlassRoom.wav was not found, so the demo song has no audio.");
-            if (song.lyrics == null) Debug.LogWarning("[Setup] GlassRoom.lrc was not found, so the demo song has no lyrics.");
-            return song;
+            return songs;
         }
 
-        static void EnsureMainScene(SongAsset song, bool rebuild)
+        static void EnsureMainScene(SongAsset[] songs, bool rebuild)
         {
             EnsureFolder(Root + "/Scenes");
             var scene = File.Exists(MainScenePath) && !rebuild
                 ? EditorSceneManager.OpenScene(MainScenePath, OpenSceneMode.Single)
                 : EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
-            if (Object.FindAnyObjectByType<MusicBus>() == null)
-            {
-                var music = new GameObject("MusicBus", typeof(AudioSource), typeof(MusicBus));
-                var so = new SerializedObject(music.GetComponent<MusicBus>());
-                so.FindProperty("startSong").objectReferenceValue = song;
-                so.ApplyModifiedPropertiesWithoutUndo();
-            }
+            var bus = Object.FindAnyObjectByType<MusicBus>();
+            if (bus == null) bus = new GameObject("MusicBus", typeof(AudioSource), typeof(MusicBus)).GetComponent<MusicBus>();
+            var so = new SerializedObject(bus);
+            var start = so.FindProperty("startSong");
+            if (start.objectReferenceValue == null) start.objectReferenceValue = songs[0];
+            var list = so.FindProperty("songs");
+            list.arraySize = songs.Length;
+            for (int i = 0; i < songs.Length; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = songs[i];
+            so.ApplyModifiedPropertiesWithoutUndo();
 
             if (Object.FindAnyObjectByType<HandRig>() == null) new GameObject("HandRig", typeof(HandRig));
 

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace MusicInYourHands
@@ -18,5 +19,13 @@ namespace MusicInYourHands
 
         [Tooltip("Seconds added to the song time before looking up lyrics. Use it to nudge an LRC that is slightly early or late.")]
         public float lyricsOffset;
+
+        /// <summary>
+        /// For a song the person added on the headset: its audio file, loaded only while it plays, and its lyrics
+        /// file, read each time it starts. Empty for the songs built into the app.
+        /// </summary>
+        [NonSerialized] public string audioPath, lyricsPath;
+
+        public bool IsAdded => !string.IsNullOrEmpty(audioPath);
     }
 }

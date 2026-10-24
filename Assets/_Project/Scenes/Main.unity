@@ -988,6 +988,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MusicInYourHands.MusicBus
   startSong: {fileID: 11400000, guid: 72a957a8bb3d84047bdb07ff426b8355, type: 2}
+  songs:
+  - {fileID: 11400000, guid: 72a957a8bb3d84047bdb07ff426b8355, type: 2}
+  - {fileID: 11400000, guid: 9eac96caf5a340eb99c21e1e08aa5e80, type: 2}
+  - {fileID: 11400000, guid: 871367888b9847e4b4d65005b06d8e18, type: 2}
+  - {fileID: 11400000, guid: afb643e518ac4bef9b478ea475e315a3, type: 2}
   playOnStart: 1
   loop: 1
   startSource: 0
