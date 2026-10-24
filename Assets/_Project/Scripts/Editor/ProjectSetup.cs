@@ -238,12 +238,7 @@ namespace MusicInYourHands.EditorTools
             if (handDebug == null) handDebug = new GameObject("HandDebugView", typeof(HandDebugView)).GetComponent<HandDebugView>();
             handDebug.gameObject.SetActive(false);
 
-            var livingSkin = Object.FindAnyObjectByType<LivingSkin>(FindObjectsInactive.Include);
-            if (livingSkin == null) livingSkin = new GameObject("LivingSkin", typeof(LivingSkin)).GetComponent<LivingSkin>();
-            var skinSo = new SerializedObject(livingSkin);
-            skinSo.FindProperty("glowMaterial").objectReferenceValue = EnsureMaterial(GlowMaterialPath, "MusicInYourHands/Glow");
-            skinSo.FindProperty("ringMaterial").objectReferenceValue = EnsureMaterial(RingMaterialPath, "MusicInYourHands/Ring");
-            skinSo.ApplyModifiedPropertiesWithoutUndo();
+            EnsureWorlds();
             if (Object.FindAnyObjectByType<RuntimeDiagnostics>() == null) new GameObject("RuntimeDiagnostics", typeof(RuntimeDiagnostics));
 
             var debugMaterial = EnsureDebugMaterial();
@@ -357,7 +352,57 @@ namespace MusicInYourHands.EditorTools
         }
 #endif
 
+        /// <summary>
+        /// The worlds and the wheel: a "Worlds" object with WorldManager, one child per world in wheel order, and the
+        /// WorldWheel. Existing objects are kept and only their references and names are refreshed.
+        /// </summary>
+        static void EnsureWorlds()
+        {
+            var glow = EnsureMaterial(GlowMaterialPath, "MusicInYourHands/Glow");
+
+            var manager = Object.FindAnyObjectByType<WorldManager>(FindObjectsInactive.Include);
+            if (manager == null) manager = new GameObject("Worlds", typeof(WorldManager)).GetComponent<WorldManager>();
+
+            var livingSkin = EnsureWorld<LivingSkin>(manager.transform, "LivingSkin", "Living skin", new Color(1f, 0.37f, 0.68f));
+            SetReferences(livingSkin, ("glowMaterial", glow), ("ringMaterial", EnsureMaterial(RingMaterialPath, "MusicInYourHands/Ring")));
+
+            var orb = EnsureWorld<HeartbeatOrb>(manager.transform, "HeartbeatOrb", "Heartbeat orb", new Color(1f, 0.83f, 0.42f));
+            SetReferences(orb, ("glowMaterial", glow), ("orbMaterial", EnsureMaterial(OrbMaterialPath, "MusicInYourHands/Orb")));
+
+            var so = new SerializedObject(manager);
+            var list = so.FindProperty("worlds");
+            World[] order = { livingSkin, orb };
+            list.arraySize = order.Length;
+            for (int i = 0; i < order.Length; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = order[i];
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            var wheel = Object.FindAnyObjectByType<WorldWheel>(FindObjectsInactive.Include);
+            if (wheel == null) wheel = new GameObject("WorldWheel", typeof(WorldWheel)).GetComponent<WorldWheel>();
+            SetReferences(wheel, ("glowMaterial", glow));
+        }
+
+        static T EnsureWorld<T>(Transform parent, string objectName, string displayName, Color color) where T : World
+        {
+            var world = Object.FindAnyObjectByType<T>(FindObjectsInactive.Include);
+            if (world == null) world = new GameObject(objectName, typeof(T)).GetComponent<T>();
+            world.transform.SetParent(parent, false);
+            world.gameObject.SetActive(true);
+            var so = new SerializedObject(world);
+            so.FindProperty("displayName").stringValue = displayName;
+            so.FindProperty("color").colorValue = color;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            return world;
+        }
+
+        static void SetReferences(Object target, params (string property, Object value)[] values)
+        {
+            var so = new SerializedObject(target);
+            foreach (var (property, value) in values) so.FindProperty(property).objectReferenceValue = value;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         public const string HandMaterialPath = Root + "/Materials/Hand.mat";
+        public const string OrbMaterialPath = Root + "/Materials/Orb.mat";
         public const string GlowMaterialPath = Root + "/Materials/Glow.mat";
         public const string RingMaterialPath = Root + "/Materials/Ring.mat";
 

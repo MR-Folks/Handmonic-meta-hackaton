@@ -33,6 +33,11 @@ namespace MusicInYourHands
             /// </summary>
             public Transform PalmJoint;
             public readonly Transform[] TipJoints = new Transform[5];
+            /// <summary>
+            /// The visible hand's root. Worlds may nudge its local position for fake resistance (the visible hand
+            /// moves away from the real one for a moment) and must put it back to zero when they stop.
+            /// </summary>
+            public Transform VisualRoot;
 
             internal int LastFrame = -1;
 

@@ -53,6 +53,13 @@ namespace MusicInYourHands
 
         public bool IsPlaying => source != null && source.isPlaying;
 
+        /// <summary>Playback volume, 0-1. Worlds may change it (Heartbeat orb does) and should restore it.</summary>
+        public float Volume
+        {
+            get => source != null ? source.volume : 1f;
+            set { if (source != null) source.volume = Mathf.Clamp01(value); }
+        }
+
         /// <summary>Song position in seconds, read from the audio clock rather than frame time.</summary>
         public float SongTime => source != null && source.clip != null ? (float)source.timeSamples / source.clip.frequency : 0f;
 

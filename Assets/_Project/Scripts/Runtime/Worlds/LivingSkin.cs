@@ -9,7 +9,7 @@ namespace MusicInYourHands
     /// The pulse that runs through the hand itself lives in the hand shader (see HandSkin).
     /// </summary>
     [DefaultExecutionOrder(150)]
-    public class LivingSkin : MonoBehaviour
+    public class LivingSkin : World
     {
         [Header("Materials")]
         [SerializeField] Material glowMaterial;
@@ -59,15 +59,26 @@ namespace MusicInYourHands
         MaterialPropertyBlock block;
         bool built, beatPending;
 
-        void Start()
+        void OnEnable()
         {
             Build();
             if (MusicBus.Instance != null) MusicBus.Instance.Beat += OnBeat;
         }
 
-        void OnDestroy()
+        void OnDisable()
         {
             if (MusicBus.Instance != null) MusicBus.Instance.Beat -= OnBeat;
+            beatPending = false;
+            // Fingertip lights ride on the hand joints, outside this object, so take them back and hide them.
+            for (int i = 0; i < tipLights.Length; i++)
+            {
+                if (tipLights[i] == null) continue;
+                tipLights[i].SetParent(transform, false);
+                tipLights[i].gameObject.SetActive(false);
+                hadTip[i] = false;
+            }
+            foreach (var wave in waves) wave.Transform.gameObject.SetActive(false);
+            if (sparks != null) sparks.Clear();
         }
 
         void OnBeat() => beatPending = true;
@@ -113,7 +124,7 @@ namespace MusicInYourHands
                 waves.Add(new Wave { Transform = quad.transform, Renderer = quad.GetComponent<Renderer>(), Age = -1f });
             }
 
-            sparks = MakeSparks();
+            sparks = Effects.MakeSparkSystem("Sparks", transform, glowMaterial);
         }
 
         /// <summary>One frame of the world. Public so the editor preview can drive it without tracking or music.</summary>
@@ -273,54 +284,6 @@ namespace MusicInYourHands
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             r.receiveShadows = false;
             return quad;
-        }
-
-        ParticleSystem MakeSparks()
-        {
-            var go = new GameObject("Sparks");
-            go.transform.SetParent(transform, false);
-            var ps = go.AddComponent<ParticleSystem>();
-            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-
-            var main = ps.main;
-            main.playOnAwake = false;
-            main.loop = true;
-            main.simulationSpace = ParticleSystemSimulationSpace.World;
-            main.maxParticles = 800;
-            main.startSpeed = 0f;
-            main.gravityModifier = -0.012f;
-
-            var emission = ps.emission;
-            emission.rateOverTime = 0f;
-
-            var shape = ps.shape;
-            shape.enabled = false;
-
-            var color = ps.colorOverLifetime;
-            color.enabled = true;
-            var gradient = new Gradient();
-            gradient.SetKeys(
-                new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
-                new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.1f), new GradientAlphaKey(0.6f, 0.6f), new GradientAlphaKey(0f, 1f) });
-            color.color = gradient;
-
-            var size = ps.sizeOverLifetime;
-            size.enabled = true;
-            size.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 0.2f)));
-
-            var noise = ps.noise;
-            noise.enabled = true;
-            noise.strength = 0.03f;
-            noise.frequency = 1.2f;
-            noise.scrollSpeed = 0.4f;
-
-            var renderer = go.GetComponent<ParticleSystemRenderer>();
-            renderer.sharedMaterial = glowMaterial;
-            renderer.renderMode = ParticleSystemRenderMode.Billboard;
-            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-
-            if (Application.isPlaying) ps.Play();
-            return ps;
         }
     }
 }

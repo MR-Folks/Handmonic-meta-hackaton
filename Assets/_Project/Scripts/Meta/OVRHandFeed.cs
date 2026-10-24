@@ -76,7 +76,11 @@ namespace MusicInYourHands.Meta
                 palm = null;
                 return false;
             }
-            if (HandRig.Instance != null) HandRig.Instance.SetJoints(isLeft, palm, tips);
+            if (HandRig.Instance != null)
+            {
+                HandRig.Instance.SetJoints(isLeft, palm, tips);
+                HandRig.Instance.Get(isLeft).VisualRoot = skeleton.transform;
+            }
             return true;
         }
 

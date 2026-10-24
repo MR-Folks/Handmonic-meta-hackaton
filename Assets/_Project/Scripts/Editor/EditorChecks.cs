@@ -37,6 +37,8 @@ namespace MusicInYourHands.EditorTools
             ok &= CheckPreview(material);
             ok &= CheckHandPreview();
             ok &= CheckLivingSkinPreview();
+            ok &= CheckOrbPreview();
+            ok &= CheckWheelPreview();
             Debug.Log(ok ? "[Check] All checks passed." : "[Check] Some checks FAILED.");
             return ok;
         }
@@ -228,6 +230,99 @@ namespace MusicInYourHands.EditorTools
 #else
             return true;
 #endif
+        }
+
+        /// <summary>
+        /// Renders the Heartbeat orb held between two hands, at rest and on a kick, side by side:
+        /// Logs/preview-heartbeat-orb.png.
+        /// </summary>
+        static bool CheckOrbPreview()
+        {
+#if META_XR_CORE
+            var hands = StageHands(out var camera);
+            // Turn the palms towards each other, as if holding something between them.
+            foreach (var hand in hands)
+            {
+                var bones = hand.Root.GetComponentsInChildren<Transform>();
+                Transform Bone(string n) => bones.First(t => t.name == n);
+                var normal = Vector3.ProjectOnPlane(PalmNormal(Bone, hand.Left), Vector3.up).normalized;
+                var want = hand.Left ? Vector3.right : Vector3.left;
+                var c = hand.Skin.bounds.center;
+                hand.Root.transform.RotateAround(c, Vector3.up, Vector3.SignedAngle(normal, want, Vector3.up) * 0.8f);
+                hand.Root.transform.position += (hand.Left ? Vector3.left : Vector3.right) * 0.03f;
+            }
+            var rig = new GameObject("HandRig").AddComponent<HandRig>();
+            foreach (var hand in hands) PushHand(rig, hand);
+
+            var orb = new GameObject("HeartbeatOrb").AddComponent<HeartbeatOrb>();
+            var so = new SerializedObject(orb);
+            so.FindProperty("glowMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow");
+            so.FindProperty("orbMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.OrbMaterialPath, "MusicInYourHands/Orb");
+            so.ApplyModifiedPropertiesWithoutUndo();
+            orb.Build();
+
+            float[] bands = { 0.8f, 0.6f, 0.5f, 0.5f, 0.4f, 0.5f };
+            for (int i = 0; i < 8; i++) orb.Step(rig, bands, 0f, 0.1f, false);
+            const int w = 640, h = 360;
+            var sheet = new Texture2D(w * 2, h, TextureFormat.RGB24, false);
+            sheet.SetPixels(0, 0, w, h, Render(camera, w, h).GetPixels());
+            orb.Step(rig, bands, 1f, 0.016f, true);
+            orb.SimulateMotes(0.18f);
+            foreach (var hand in hands) SetBeat(hand.Skin, 0.08f, 1f);
+            sheet.SetPixels(w, 0, w, h, Render(camera, w, h).GetPixels());
+            sheet.Apply();
+            return CheckImage(sheet, camera.backgroundColor, "Logs/preview-heartbeat-orb.png", "Heartbeat orb preview");
+#else
+            return true;
+#endif
+        }
+
+        /// <summary>Renders the world wheel open above the left hand: Logs/preview-wheel.png.</summary>
+        static bool CheckWheelPreview()
+        {
+#if META_XR_CORE
+            var hands = StageHands(out var camera);
+            var rig = new GameObject("HandRig").AddComponent<HandRig>();
+            foreach (var hand in hands) PushHand(rig, hand);
+
+            var glow = ProjectSetup.EnsureMaterial(ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow");
+            var managerGo = new GameObject("Worlds");
+            var worlds = new World[]
+            {
+                MakePreviewWorld<LivingSkin>(managerGo.transform, "Living skin", new Color(1f, 0.37f, 0.68f)),
+                MakePreviewWorld<HeartbeatOrb>(managerGo.transform, "Heartbeat orb", new Color(1f, 0.83f, 0.42f))
+            };
+            var manager = managerGo.AddComponent<WorldManager>();
+            var mso = new SerializedObject(manager);
+            var list = mso.FindProperty("worlds");
+            list.arraySize = worlds.Length;
+            for (int i = 0; i < worlds.Length; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = worlds[i];
+            mso.ApplyModifiedPropertiesWithoutUndo();
+            manager.Switch(0);
+
+            var wheel = new GameObject("WorldWheel").AddComponent<WorldWheel>();
+            var wso = new SerializedObject(wheel);
+            wso.FindProperty("glowMaterial").objectReferenceValue = glow;
+            wso.ApplyModifiedPropertiesWithoutUndo();
+            for (int i = 0; i < 10; i++) wheel.Step(rig, manager, camera, 0.05f, forceOpenLeft: true);
+
+            return CheckImage(Render(camera, 960, 540), camera.backgroundColor, "Logs/preview-wheel.png", "Wheel preview");
+#else
+            return true;
+#endif
+        }
+
+        static T MakePreviewWorld<T>(Transform parent, string displayName, Color color) where T : World
+        {
+            var go = new GameObject(displayName);
+            go.transform.SetParent(parent, false);
+            var world = go.AddComponent<T>();
+            var so = new SerializedObject(world);
+            so.FindProperty("displayName").stringValue = displayName;
+            so.FindProperty("color").colorValue = color;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            go.SetActive(false);
+            return world;
         }
 
 #if META_XR_CORE
