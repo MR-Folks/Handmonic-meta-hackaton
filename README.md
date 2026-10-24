@@ -45,9 +45,10 @@ If settings drift, run **Music In Your Hands > Configure Project for Quest**. It
 Poke the coral microphone bubble below the world menu to follow music playing in the room: Spotify on a phone, a speaker, a live instrument. The headset microphone replaces the song, so the bands, beats and every world follow whatever you hear. There are no lyrics or melody notes while listening: Note rain falls from the bands instead, and Air strings play freely without guide beads. Poke it again ("Play song") to go back to the song. The centre bubble pauses listening.
 
 - The first time, the headset asks for microphone permission. If it's refused, the app goes back to the song.
-- **Listen Gate** on `MusicBus` sets how loud the room must be before it counts as music. The music debug view shows the live mic level to help tune it.
+- **Listen Silence** on `MusicBus` sets how loud the room must be before it counts as music. The music debug view shows the live mic level to help tune it.
 - **Start Source** on `MusicBus` makes the app start in listen mode.
 - The app's own plucks and chimes reach the microphone too, so they nudge the visuals a little.
+- On the headset the mic records through `Assets/Plugins/Android/RoomMicrophone.java` with Android's `UNPROCESSED` input. Unity's own `Microphone` uses the voice input, which hears you but leaves music in the room almost silent. For a new headset, `adb shell touch /sdcard/Android/data/com.musicinyourhands.app/files/mic-probe` makes the next Listen log how loud each input hears the room (`adb logcat -s RoomMicrophone`). A `mic-source.txt` there with an Android audio source number forces one.
 
 ## Adding songs
 1. Put the audio file and its `.lrc` lyrics in `Assets/_Project/Audio`.

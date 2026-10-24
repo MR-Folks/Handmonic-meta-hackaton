@@ -39,8 +39,9 @@ namespace MusicInYourHands
         [SerializeField] float kickDecay = 7f;
 
         [Header("Listen mode")]
-        [Tooltip("Microphone level (RMS, 0-1) below which the room counts as silent, so its hum doesn't fill the bands.")]
-        [SerializeField, Range(0.001f, 0.05f)] float listenGate = 0.006f;
+        [Tooltip("Microphone level (RMS, 0-1) below which the room counts as silent, so its hum doesn't fill the bands. " +
+                 "Loud music from a phone speaker measured 0.015-0.025 on a Quest 3S.")]
+        [SerializeField, Range(0.0002f, 0.05f)] float listenSilence = 0.002f;
 
         readonly float[] spectrum = new float[1024];
         readonly float[] bandPeak = new float[BandCount];
@@ -241,7 +242,7 @@ namespace MusicInYourHands
             {
                 if (IsPlaying) listenTime += dt;
                 // A quiet room counts as silence, so the auto-levelling doesn't blow its hum up into music.
-                heard = microphone.Read(spectrum, Waveform, dt) && microphone.Level > listenGate;
+                heard = microphone.Read(spectrum, Waveform, dt) && microphone.Level > listenSilence;
             }
             else
             {

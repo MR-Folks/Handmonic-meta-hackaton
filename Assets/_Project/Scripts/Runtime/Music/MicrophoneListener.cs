@@ -5,7 +5,10 @@ namespace MusicInYourHands
     /// <summary>
     /// Records the headset microphone and turns the latest samples into a spectrum shaped like
     /// AudioSource.GetSpectrumData, so MusicBus can follow music playing in the room from any source.
-    /// Nothing is played back: the samples are read straight from the recording clip.
+    /// Nothing is played back. On the headset it records through the RoomMicrophone plugin, because Unity's
+    /// Microphone uses Quest's voice-tuned input, which hears the wearer but leaves music in the room silent.
+    /// For a new headset, put an empty "mic-probe" file in the app's files folder to log how loud each input hears
+    /// the room, or a "mic-source.txt" with an Android audio source number to force one.
     /// </summary>
     public class MicrophoneListener
     {
@@ -20,8 +23,17 @@ namespace MusicInYourHands
         AudioClip clip;
         string device;
         float waveformPeak = 0.05f;
+#if UNITY_ANDROID && !UNITY_EDITOR
+        // The latest samples from the plugin, in a ring that write points into.
+        readonly float[] history = new float[WindowSize];
+        int write;
+        AndroidJavaObject plugin;
+        bool started;
 
+        public bool IsRecording => started;
+#else
         public bool IsRecording => clip != null && Microphone.IsRecording(device);
+#endif
         public int SampleRate { get; private set; } = PreferredRate;
 
         /// <summary>Loudness of the latest samples (RMS, 0-1).</summary>
@@ -42,6 +54,9 @@ namespace MusicInYourHands
         public bool Start()
         {
             if (IsRecording) return true;
+#if UNITY_ANDROID && !UNITY_EDITOR
+            return StartPlugin();
+#else
             if (Microphone.devices.Length == 0)
             {
                 Debug.LogWarning("[MusicBus] No microphone found.");
@@ -58,14 +73,63 @@ namespace MusicInYourHands
             }
             System.Array.Clear(samples, 0, samples.Length);
             return true;
+#endif
         }
 
         public void Stop()
         {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            if (started) plugin.Call("stop");
+            started = false;
+#else
             if (clip != null) Microphone.End(device);
             clip = null;
+#endif
             Level = 0f;
         }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        bool StartPlugin()
+        {
+            try
+            {
+                plugin ??= new AndroidJavaObject("com.musicinyourhands.audio.RoomMicrophone");
+                SampleRate = PreferredRate;
+                System.Array.Clear(history, 0, history.Length);
+                string folder = Application.persistentDataPath;
+                if (System.IO.File.Exists(System.IO.Path.Combine(folder, "mic-probe")))
+                {
+                    Debug.Log("[MusicBus] Probing the microphone inputs; see the RoomMicrophone log.");
+                    plugin.Call("probeThenStart", SampleRate);
+                    return started = true;
+                }
+                int wanted = -1;
+                var sourceFile = System.IO.Path.Combine(folder, "mic-source.txt");
+                if (System.IO.File.Exists(sourceFile)) int.TryParse(System.IO.File.ReadAllText(sourceFile).Trim(), out wanted);
+                started = plugin.Call<bool>("start", wanted, SampleRate);
+                if (!started) Debug.LogWarning("[MusicBus] The microphone would not start.");
+                return started;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[MusicBus] The microphone plugin failed: {e.Message}");
+                return started = false;
+            }
+        }
+
+        /// <summary>Moves the samples recorded since last frame into the history and lays it out oldest first.</summary>
+        void ReadPlugin()
+        {
+            var fresh = plugin.Call<float[]>("take");
+            int from = Mathf.Max(0, fresh.Length - WindowSize);
+            for (int i = from; i < fresh.Length; i++)
+            {
+                history[write] = fresh[i];
+                write = (write + 1) % WindowSize;
+            }
+            for (int i = 0; i < WindowSize; i++) samples[i] = history[(write + i) % WindowSize];
+        }
+#endif
 
         /// <summary>
         /// Reads the latest samples into <paramref name="spectrum"/> (magnitudes from 0 Hz up to half the sample rate)
@@ -74,11 +138,15 @@ namespace MusicInYourHands
         public bool Read(float[] spectrum, float[] waveform, float dt)
         {
             if (!IsRecording) return false;
+#if UNITY_ANDROID && !UNITY_EDITOR
+            ReadPlugin();
+#else
             int position = Microphone.GetPosition(device);
             int start = position - WindowSize;
             if (start < 0) start += clip.samples;
             // Reads past the end of the looping clip wrap around to its start.
             clip.GetData(samples, start);
+#endif
 
             float sum = 0f, peak = 0f;
             for (int i = 0; i < WindowSize; i++)

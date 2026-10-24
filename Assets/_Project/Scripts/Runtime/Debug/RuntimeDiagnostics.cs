@@ -35,7 +35,7 @@ namespace MusicInYourHands
             string right = rig != null && rig.Right.IsTracked ? Fmt(rig.Right.Palm.position) : "-";
 
             int listeners = FindObjectsByType<AudioListener>(FindObjectsSortMode.None).Length;
-            Debug.Log($"[Diag] cam={camInfo} | listeners={listeners} listenerVol={AudioListener.volume:F2} paused={AudioListener.pause} | audio={audio} | palmL={left} palmR={right} | source={(bus != null ? bus.Source.ToString() : "-")} mic={(bus != null ? bus.InputLevel : 0f):F3} | bass={(bus != null ? bus.Bass : 0f):F2}");
+            Debug.Log($"[Diag] cam={camInfo} | listeners={listeners} listenerVol={AudioListener.volume:F2} paused={AudioListener.pause} | audio={audio} | palmL={left} palmR={right} | source={(bus != null ? bus.Source.ToString() : "-")} mic={(bus != null ? bus.InputLevel : 0f):F4} | bass={(bus != null ? bus.Bass : 0f):F2}");
         }
     }
 }
