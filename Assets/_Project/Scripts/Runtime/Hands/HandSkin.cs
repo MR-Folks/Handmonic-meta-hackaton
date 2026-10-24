@@ -21,6 +21,7 @@ namespace MusicInYourHands
         static readonly int HandForward = Shader.PropertyToID("_HandForward");
         static readonly int Kick = Shader.PropertyToID("_Kick");
         static readonly int Energy = Shader.PropertyToID("_Energy");
+        static readonly int BeatAge = Shader.PropertyToID("_BeatAge");
 
         MaterialPropertyBlock block;
         float energy;
@@ -57,7 +58,9 @@ namespace MusicInYourHands
                 block.SetVector(WristPos, wrist.position);
                 block.SetVector(HandForward, (knuckle.position - wrist.position).normalized);
             }
-            block.SetFloat(Kick, MusicBus.Instance != null ? MusicBus.Instance.Kick : 0f);
+            var bus = MusicBus.Instance;
+            block.SetFloat(Kick, bus != null ? bus.Kick : 0f);
+            block.SetFloat(BeatAge, bus != null ? bus.TimeSinceBeat : 10f);
             block.SetFloat(Energy, energy);
             target.SetPropertyBlock(block);
         }

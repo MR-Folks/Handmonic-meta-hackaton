@@ -16,6 +16,10 @@ Shader "MusicInYourHands/Hand"
         _HandForward ("Wrist to fingers (set by HandSkin)", Vector) = (0, 0, 0, 0)
         _Kick ("Beat 0-1 (set by HandSkin)", Float) = 0
         _Energy ("Music energy 0-1 (set by HandSkin)", Float) = 0
+        _BeatAge ("Seconds since the beat (set by HandSkin)", Float) = 10
+        _PulseSpeed ("Pulse speed (m/s)", Float) = 0.55
+        _PulseWidth ("Pulse width (m)", Float) = 0.022
+        _PulseLength ("Wrist to fingertips (m)", Float) = 0.2
     }
 
     SubShader
@@ -37,6 +41,10 @@ Shader "MusicInYourHands/Hand"
             float4 _HandForward;
             float _Kick;
             float _Energy;
+            float _BeatAge;
+            float _PulseSpeed;
+            float _PulseWidth;
+            float _PulseLength;
         CBUFFER_END
 
         struct Attributes
@@ -60,6 +68,17 @@ Shader "MusicInYourHands/Hand"
             if (dot(_HandForward.xyz, _HandForward.xyz) < 1e-6) return 1;
             float along = dot(positionWS - _WristPos.xyz, _HandForward.xyz);
             return saturate((along + 0.01) / max(_WristFade, 1e-4));
+        }
+
+        // A band of light that runs from the wrist to the fingertips after each beat, fading as it reaches them.
+        float BeatPulse(float3 positionWS)
+        {
+            if (dot(_HandForward.xyz, _HandForward.xyz) < 1e-6) return 0;
+            float along = dot(positionWS - _WristPos.xyz, _HandForward.xyz);
+            float front = _BeatAge * _PulseSpeed;
+            float band = exp(-pow((along - front) / max(_PulseWidth, 1e-4), 2));
+            float travelled = saturate(front / max(_PulseLength, 1e-3));
+            return band * (1 - travelled * travelled);
         }
 
         Varyings Build(Attributes input, float extrude)
@@ -100,8 +119,10 @@ Shader "MusicInYourHands/Hand"
                 float3 v = normalize(GetWorldSpaceViewDir(input.positionWS));
                 float rim = pow(1 - saturate(abs(dot(n, v))), _RimPower) * (_RimStrength + _Kick * 0.6);
                 float3 edge = lerp(_EdgeColor.rgb, _GlowColor.rgb, _Kick * 0.8);
+                float pulse = BeatPulse(input.positionWS);
                 float3 color = lerp(_FillColor.rgb, edge, saturate(rim)) + _GlowColor.rgb * (_Energy * 0.08);
-                float alpha = lerp(_FillColor.a, 1, saturate(rim)) * WristFade(input.positionWS);
+                color += lerp(_GlowColor.rgb, 1, 0.25) * pulse * 0.9;
+                float alpha = max(lerp(_FillColor.a, 1, saturate(rim)), pulse * 0.85) * WristFade(input.positionWS);
                 return half4(color, alpha);
             }
             ENDHLSL
@@ -126,7 +147,9 @@ Shader "MusicInYourHands/Hand"
             half4 frag(Varyings input) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
-                float3 color = lerp(_EdgeColor.rgb, _GlowColor.rgb, _Kick * 0.8);
+                float pulse = BeatPulse(input.positionWS);
+                float3 color = lerp(_EdgeColor.rgb, _GlowColor.rgb, saturate(_Kick * 0.8 + pulse));
+                color = lerp(color, 1, pulse * 0.4);
                 return half4(color, _EdgeColor.a * WristFade(input.positionWS));
             }
             ENDHLSL

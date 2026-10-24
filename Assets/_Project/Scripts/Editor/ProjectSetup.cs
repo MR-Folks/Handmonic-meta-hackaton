@@ -224,19 +224,30 @@ namespace MusicInYourHands.EditorTools
 
             if (Object.FindAnyObjectByType<HandRig>() == null) new GameObject("HandRig", typeof(HandRig));
 
-            if (Object.FindAnyObjectByType<MusicDebugView>() == null)
+            // The debug views (band bars, lyric line, joint dots) are switched off for the polished experience.
+            // Turn the MusicDebugView or HandDebugView object on in the scene to see them again.
+            var musicDebug = Object.FindAnyObjectByType<MusicDebugView>(FindObjectsInactive.Include);
+            if (musicDebug == null)
             {
-                var debugView = new GameObject("MusicDebugView", typeof(MusicDebugView));
-                debugView.transform.position = new Vector3(0f, 1.2f, 1f);
+                musicDebug = new GameObject("MusicDebugView", typeof(MusicDebugView)).GetComponent<MusicDebugView>();
+                musicDebug.transform.position = new Vector3(0f, 1.2f, 1f);
             }
+            musicDebug.gameObject.SetActive(false);
 
-            // The joint dots are a debugging aid, so they start switched off. Turn the HandDebugView object on to see them.
-            if (Object.FindAnyObjectByType<HandDebugView>(FindObjectsInactive.Include) == null)
-                new GameObject("HandDebugView", typeof(HandDebugView)).SetActive(false);
+            var handDebug = Object.FindAnyObjectByType<HandDebugView>(FindObjectsInactive.Include);
+            if (handDebug == null) handDebug = new GameObject("HandDebugView", typeof(HandDebugView)).GetComponent<HandDebugView>();
+            handDebug.gameObject.SetActive(false);
+
+            var livingSkin = Object.FindAnyObjectByType<LivingSkin>(FindObjectsInactive.Include);
+            if (livingSkin == null) livingSkin = new GameObject("LivingSkin", typeof(LivingSkin)).GetComponent<LivingSkin>();
+            var skinSo = new SerializedObject(livingSkin);
+            skinSo.FindProperty("glowMaterial").objectReferenceValue = EnsureMaterial(GlowMaterialPath, "MusicInYourHands/Glow");
+            skinSo.FindProperty("ringMaterial").objectReferenceValue = EnsureMaterial(RingMaterialPath, "MusicInYourHands/Ring");
+            skinSo.ApplyModifiedPropertiesWithoutUndo();
             if (Object.FindAnyObjectByType<RuntimeDiagnostics>() == null) new GameObject("RuntimeDiagnostics", typeof(RuntimeDiagnostics));
 
             var debugMaterial = EnsureDebugMaterial();
-            foreach (var view in Object.FindObjectsByType<MusicDebugView>(FindObjectsSortMode.None)) SetMaterial(view, debugMaterial);
+            foreach (var view in Object.FindObjectsByType<MusicDebugView>(FindObjectsInactive.Include, FindObjectsSortMode.None)) SetMaterial(view, debugMaterial);
             foreach (var view in Object.FindObjectsByType<HandDebugView>(FindObjectsInactive.Include, FindObjectsSortMode.None)) SetMaterial(view, debugMaterial);
 
             if (Object.FindAnyObjectByType<Light>() == null)
@@ -347,14 +358,19 @@ namespace MusicInYourHands.EditorTools
 #endif
 
         public const string HandMaterialPath = Root + "/Materials/Hand.mat";
+        public const string GlowMaterialPath = Root + "/Materials/Glow.mat";
+        public const string RingMaterialPath = Root + "/Materials/Ring.mat";
 
-        public static Material EnsureHandMaterial()
+        public static Material EnsureHandMaterial() => EnsureMaterial(HandMaterialPath, "MusicInYourHands/Hand");
+
+        /// <summary>Loads the material, creating it from the shader the first time. Tuned values live in the asset.</summary>
+        public static Material EnsureMaterial(string path, string shaderName)
         {
             EnsureFolder(Root + "/Materials");
-            var material = AssetDatabase.LoadAssetAtPath<Material>(HandMaterialPath);
+            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (material != null) return material;
-            material = new Material(Shader.Find("MusicInYourHands/Hand")) { name = "Hand" };
-            AssetDatabase.CreateAsset(material, HandMaterialPath);
+            material = new Material(Shader.Find(shaderName)) { name = Path.GetFileNameWithoutExtension(path) };
+            AssetDatabase.CreateAsset(material, path);
             return material;
         }
 

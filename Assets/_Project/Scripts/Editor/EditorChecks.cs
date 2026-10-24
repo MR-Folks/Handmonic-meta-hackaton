@@ -36,6 +36,7 @@ namespace MusicInYourHands.EditorTools
             ok &= CheckDebugMaterial(out var material);
             ok &= CheckPreview(material);
             ok &= CheckHandPreview();
+            ok &= CheckLivingSkinPreview();
             Debug.Log(ok ? "[Check] All checks passed." : "[Check] Some checks FAILED.");
             return ok;
         }
@@ -175,77 +176,147 @@ namespace MusicInYourHands.EditorTools
                 return false;
             }
 
-            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            var root = new GameObject("Hands Preview");
-            var hands = new List<Renderer>();
-            var kicks = new List<float>();
-            foreach (var (side, x, kick) in new[] { ("L", -0.11f, 0f), ("R", 0.11f, 1f) })
+            var hands = StageHands(out var camera);
+            for (int h = 0; h < hands.Count; h++)
+                SetBeat(hands[h].Skin, h == 0 ? 10f : 0.02f, h == 0 ? 0f : 1f);
+            return CheckImage(Render(camera, 960, 540), camera.backgroundColor, "Logs/preview-hands.png", "Hand preview");
+#else
+            return true;
+#endif
+        }
+
+        /// <summary>
+        /// Renders the Living skin world at four moments after a beat (pulse through the hand, palm waves spreading,
+        /// fingertip lights, sparks) into one 2x2 image: Logs/preview-living-skin.png.
+        /// </summary>
+        static bool CheckLivingSkinPreview()
+        {
+#if META_XR_CORE
+            var hands = StageHands(out var camera);
+            var rig = new GameObject("HandRig").AddComponent<HandRig>();
+            foreach (var hand in hands) PushHand(rig, hand);
+
+            var skin = new GameObject("LivingSkin").AddComponent<LivingSkin>();
+            var so = new SerializedObject(skin);
+            so.FindProperty("glowMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow");
+            so.FindProperty("ringMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.RingMaterialPath, "MusicInYourHands/Ring");
+            so.ApplyModifiedPropertiesWithoutUndo();
+            skin.Build();
+
+            float[] times = { 0.05f, 0.22f, 0.45f, 0.85f };
+            float[] bands = { 0.9f, 0.7f, 0.55f, 0.6f, 0.4f, 0.5f };
+            const int w = 640, h = 360;
+            var sheet = new Texture2D(w * 2, h * 2, TextureFormat.RGB24, false);
+            float clock = 0f;
+            for (int i = 0; i < times.Length; i++)
             {
-                var path = $"Packages/com.meta.xr.sdk.core/Prefabs/OpenXRCustomHandPrefab_{side}.prefab";
-                var hand = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(path), root.transform);
-                ProjectSetup.ApplyHandLook(hand);
-                var skin = hand.GetComponentInChildren<SkinnedMeshRenderer>();
-                // Stand the hand up with the palm facing the camera, like holding it up in front of you.
-                var wrist = hand.GetComponentsInChildren<Transform>().First(t => t.name == "XRHand_Wrist");
-                var knuckle = hand.GetComponentsInChildren<Transform>().First(t => t.name == "XRHand_MiddleProximal");
-                var up = (knuckle.position - wrist.position).normalized;
-                hand.transform.rotation = Quaternion.FromToRotation(up, Vector3.up) * hand.transform.rotation;
-                hand.transform.position += new Vector3(x, 1.2f, 0.45f) - skin.bounds.center;
+                float dt = times[i] - clock;
+                clock = times[i];
+                float kick = Mathf.Exp(-clock * 7f);
+                // The beat happens at t = 0; step to each moment, wiggling the fingertips a little to make sparks.
+                if (i == 0) skin.Step(rig, bands, 1f, 0f, camera, true);
+                foreach (var hand in hands) { hand.Root.transform.position += Vector3.up * 0.004f; PushHand(rig, hand); }
+                skin.Step(rig, bands, kick, dt, camera, false);
+                skin.SimulateSparks(dt);
+                foreach (var hand in hands) SetBeat(hand.Skin, clock, kick);
 
-                hands.Add(skin);
-                kicks.Add(kick);
+                var frame = Render(camera, w, h);
+                sheet.SetPixels((i % 2) * w, (1 - i / 2) * h, w, h, frame.GetPixels());
             }
+            sheet.Apply();
+            return CheckImage(sheet, camera.backgroundColor, "Logs/preview-living-skin.png", "Living skin preview");
+#else
+            return true;
+#endif
+        }
 
-            var cameraGo = new GameObject("Hand Preview Camera");
-            var camera = cameraGo.AddComponent<Camera>();
+#if META_XR_CORE
+        sealed class PreviewHand
+        {
+            public GameObject Root;
+            public SkinnedMeshRenderer Skin;
+            public bool Left;
+        }
+
+        /// <summary>Both Meta hands with the project look, held up palm-forward in front of a passthrough-coloured camera.</summary>
+        static List<PreviewHand> StageHands(out Camera camera)
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            var cameraGo = new GameObject("Preview Camera");
+            camera = cameraGo.AddComponent<Camera>();
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.55f, 0.5f, 0.44f);
-            camera.fieldOfView = 40f;
+            camera.fieldOfView = 50f;
             camera.nearClipPlane = 0.02f;
-            camera.transform.position = new Vector3(0f, 1.2f, 0.45f) + new Vector3(0f, 0f, -0.42f);
+            camera.transform.position = new Vector3(0f, 1.2f, 0.45f) + new Vector3(0f, 0f, -0.5f);
             camera.transform.LookAt(new Vector3(0f, 1.2f, 0.45f));
 
-            // The bind pose may face away from the camera; turn each hand so its palm faces the viewer.
-            for (int h = 0; h < hands.Count; h++)
+            var hands = new List<PreviewHand>();
+            foreach (var (side, x) in new[] { ("L", -0.11f), ("R", 0.11f) })
             {
-                var r = hands[h];
-                var t = r.GetComponentInParent<HandSkin>().transform;
-                var center = r.bounds.center;
-                var toCamera = (camera.transform.position - center).normalized;
-                var bones = t.GetComponentsInChildren<Transform>();
-                var index = bones.First(b => b.name == "XRHand_IndexProximal").position;
-                var little = bones.First(b => b.name == "XRHand_LittleProximal").position;
-                var wristPos = bones.First(b => b.name == "XRHand_Wrist").position;
-                var palmNormal = Vector3.Cross(index - wristPos, little - wristPos).normalized;
-                if (t.name.Contains("_R") || t.name.Contains("Right")) palmNormal = -palmNormal;
-                if (Vector3.Dot(palmNormal, toCamera) < 0f) t.RotateAround(center, Vector3.up, 180f);
-                t.GetComponent<HandSkin>().Apply();
+                var path = $"Packages/com.meta.xr.sdk.core/Prefabs/OpenXRCustomHandPrefab_{side}.prefab";
+                var hand = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(path));
+                ProjectSetup.ApplyHandLook(hand);
+                var skin = hand.GetComponentInChildren<SkinnedMeshRenderer>();
+                var bones = hand.GetComponentsInChildren<Transform>();
+                Transform Bone(string n) => bones.First(t => t.name == n);
 
-                // Simulate the beat: the left hand at rest, the right at a beat peak.
-                var block = new MaterialPropertyBlock();
-                r.GetPropertyBlock(block);
-                block.SetFloat("_Kick", kicks[h]);
-                block.SetFloat("_Energy", kicks[h] * 0.6f);
-                r.SetPropertyBlock(block);
+                // Stand the hand up, then turn it so the palm faces the camera.
+                var up = (Bone("XRHand_MiddleProximal").position - Bone("XRHand_Wrist").position).normalized;
+                hand.transform.rotation = Quaternion.FromToRotation(up, Vector3.up) * hand.transform.rotation;
+                hand.transform.position += new Vector3(x, 1.2f, 0.45f) - skin.bounds.center;
+                bool left = side == "L";
+                if (Vector3.Dot(PalmNormal(Bone, left), (camera.transform.position - skin.bounds.center).normalized) < 0f)
+                    hand.transform.RotateAround(skin.bounds.center, Vector3.up, 180f);
+                hand.GetComponent<HandSkin>().Apply();
+                hands.Add(new PreviewHand { Root = hand, Skin = skin, Left = left });
             }
+            return hands;
+        }
 
-            var image = Render(camera, 960, 540);
-            File.WriteAllBytes("Logs/preview-hands.png", image.EncodeToPNG());
+        static Vector3 PalmNormal(System.Func<string, Transform> bone, bool left)
+        {
+            var wrist = bone("XRHand_Wrist").position;
+            var normal = Vector3.Cross(bone("XRHand_IndexProximal").position - wrist, bone("XRHand_LittleProximal").position - wrist).normalized;
+            return left ? normal : -normal;
+        }
 
+        /// <summary>Feeds a preview hand into HandRig the way OVRHandFeed does on the headset.</summary>
+        static void PushHand(HandRig rig, PreviewHand hand)
+        {
+            var bones = hand.Root.GetComponentsInChildren<Transform>();
+            Transform Bone(string n) => bones.First(t => t.name == n);
+            var tipJoints = new[] { "XRHand_ThumbTip", "XRHand_IndexTip", "XRHand_MiddleTip", "XRHand_RingTip", "XRHand_LittleTip" }.Select(Bone).ToArray();
+            var palm = Bone("XRHand_Palm");
+            rig.SetJoints(hand.Left, palm, tipJoints);
+            rig.Push(hand.Left, true, new Pose(palm.position, palm.rotation), PalmNormal(Bone, hand.Left), tipJoints.Select(t => t.position).ToArray());
+            hand.Root.GetComponent<HandSkin>().Apply();
+        }
+
+        static void SetBeat(Renderer r, float beatAge, float kick)
+        {
+            var block = new MaterialPropertyBlock();
+            r.GetPropertyBlock(block);
+            block.SetFloat("_BeatAge", beatAge);
+            block.SetFloat("_Kick", kick);
+            block.SetFloat("_Energy", kick * 0.6f);
+            r.SetPropertyBlock(block);
+        }
+#endif
+
+        static bool CheckImage(Texture2D image, Color background, string path, string label)
+        {
+            File.WriteAllBytes(path, image.EncodeToPNG());
             int magenta = 0, drawn = 0;
-            var background = camera.backgroundColor;
             foreach (var p in image.GetPixels())
             {
                 if (Mathf.Abs(p.r - background.r) + Mathf.Abs(p.g - background.g) + Mathf.Abs(p.b - background.b) > 0.06f) drawn++;
                 if (p.r > 0.85f && p.g < 0.15f && p.b > 0.85f) magenta++;
             }
             bool ok = drawn > 2000 && magenta < 50;
-            if (ok) Debug.Log($"[Check] Hand preview rendered {drawn} pixels with no magenta. Saved Logs/preview-hands.png.");
-            else Debug.LogError($"[Check] Hand preview problem: {drawn} pixels drawn, {magenta} magenta. See Logs/preview-hands.png.");
+            if (ok) Debug.Log($"[Check] {label} rendered {drawn} pixels with no magenta. Saved {path}.");
+            else Debug.LogError($"[Check] {label} problem: {drawn} pixels drawn, {magenta} magenta. See {path}.");
             return ok;
-#else
-            return true;
-#endif
         }
 
         static Texture2D Render(Camera camera, int width, int height)
