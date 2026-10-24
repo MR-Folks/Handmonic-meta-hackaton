@@ -1,11 +1,12 @@
 // A soap-bubble button for the world menu, drawn on a camera-facing quad: a clear glass body, an iridescent rim,
-// a glossy highlight and a small animated emblem of the world inside. _Icon picks the emblem.
+// a glossy highlight and a small animated emblem of the world inside. _Icon picks the emblem (-1 for none, as the
+// Bubble notes world uses it for its plain bubbles).
 Shader "MusicInYourHands/Bubble"
 {
     Properties
     {
         _Color ("Color", Color) = (1, 0.37, 0.68, 1)
-        _Icon ("Emblem (0-7)", Float) = 0
+        _Icon ("Emblem (-1 none, 0-11)", Float) = 0
         _Hover ("Hover 0-1", Float) = 0
         _Selected ("Current world 0-1", Float) = 0
         _Alpha ("Alpha", Float) = 1
@@ -73,6 +74,7 @@ Shader "MusicInYourHands/Bubble"
             float Emblem(float2 p, float icon, float t)
             {
                 float e = 0;
+                if (icon < -0.5) return 0;
                 if (icon < 0.5)
                 {
                     // Living skin: waves leaving a palm.
@@ -138,7 +140,7 @@ Shader "MusicInYourHands/Bubble"
                         e += step(abs(p.x - x), 0.075) * step(-0.38, p.y) * step(p.y, -0.38 + h);
                     }
                 }
-                else
+                else if (icon < 7.5)
                 {
                     // Listen: a microphone on a stand, with sound rings around it while listening.
                     float2 q = p - float2(0, 0.16);
@@ -149,6 +151,45 @@ Shader "MusicInYourHands/Bubble"
                     e += step(abs(p.x), 0.14) * step(abs(p.y + 0.35), 0.03);
                     float d = length(q);
                     e += _Selected * pow(abs(sin(d * 10 - t * 4)), 10) * smoothstep(0.3, 0.38, d) * saturate(1.15 - d * 1.6) * (0.4 + _Eq.x);
+                }
+                else if (icon < 8.5)
+                {
+                    // Sound pool: a liquid surface seen at an angle, rings spreading from a dipped fingertip.
+                    float2 q = float2(p.x, (p.y + 0.1) * 2.4);
+                    float d = length(q);
+                    e = pow(abs(sin(d * 7 - t * 3)), 10) * saturate(1 - d * 0.9) * step(abs(p.y + 0.1), 0.4);
+                    e += step(abs(p.x), 0.03) * step(-0.08, p.y) * step(p.y, 0.55) * 0.9;
+                }
+                else if (icon < 9.5)
+                {
+                    // Sound wind: streams of particles flowing around a small obstacle.
+                    [unroll] for (int k = 0; k < 5; k++)
+                    {
+                        float lane = -0.48 + k * 0.24;
+                        float bend = 0.16 * exp(-p.x * p.x * 9) * sign(lane) * step(0.01, abs(lane));
+                        float y = lane + bend;
+                        float dash = pow(saturate(sin(p.x * 14 - t * 6 + k * 1.7) * 0.5 + 0.5), 3);
+                        e += Line(abs(p.y - y), 0.03) * dash * step(abs(p.x), 0.8);
+                    }
+                    e += smoothstep(0.1, 0.06, length(p)) * 0.8;
+                }
+                else if (icon < 10.5)
+                {
+                    // Bubble notes: three small bubbles rising.
+                    [unroll] for (int k = 0; k < 3; k++)
+                    {
+                        float r = 0.14 + k * 0.05;
+                        float2 c = float2(-0.36 + k * 0.36, 0.7 - frac(t * 0.25 + k * 0.33) * 1.4);
+                        e += Line(abs(length(p - c) - r), 0.035) * 0.9;
+                    }
+                }
+                else
+                {
+                    // Sand table: a Chladni figure, the sand lying on the plate's still lines.
+                    float2 q = (p * 0.75 + 1) * 1.5708;
+                    float n = 2 + floor(frac(t * 0.08) * 3), m = n + 2;
+                    float f = cos(n * q.x) * cos(m * q.y) - cos(m * q.x) * cos(n * q.y);
+                    e = smoothstep(0.22, 0.0, abs(f)) * step(max(abs(p.x), abs(p.y)), 0.62);
                 }
                 return saturate(e);
             }

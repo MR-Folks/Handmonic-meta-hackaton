@@ -1,0 +1,108 @@
+// The Sound pool's liquid surface: a see-through teal sheet whose heights come from SoundPool's wave simulation.
+// Slopes catch a soft highlight, a lattice of tiny lights in the liquid brightens where waves run (like the concept
+// page's dotted pool), and the edges fade into a thin glowing lip so the pool sits in the room without a hard box.
+Shader "MusicInYourHands/Water"
+{
+    Properties
+    {
+        _Deep ("Deep colour", Color) = (0.05, 0.22, 0.32, 0.42)
+        _Shallow ("Crest colour", Color) = (0.37, 0.83, 1, 1)
+        _Lip ("Edge glow", Color) = (0.6, 0.92, 1, 1)
+        _Dots ("Dot lattice (columns, rows)", Vector) = (56, 40, 0, 0)
+        _Kick ("Beat 0-1 (set by SoundPool)", Float) = 0
+        _Alpha ("Fade (set by SoundPool)", Float) = 1
+    }
+
+    SubShader
+    {
+        Tags { "RenderType" = "Transparent" "Queue" = "Transparent+1" "RenderPipeline" = "UniversalPipeline" "IgnoreProjector" = "True" }
+
+        Pass
+        {
+            Tags { "LightMode" = "UniversalForward" }
+            Cull Off
+            ZWrite Off
+            ZTest LEqual
+            Blend SrcAlpha OneMinusSrcAlpha, One OneMinusSrcAlpha
+
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            #pragma multi_compile_instancing
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _Deep;
+                float4 _Shallow;
+                float4 _Lip;
+                float4 _Dots;
+                float _Kick;
+                float _Alpha;
+            CBUFFER_END
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float3 normalOS : NORMAL;
+                float2 uv : TEXCOORD0;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float3 positionWS : TEXCOORD0;
+                float3 normalWS : TEXCOORD1;
+                float2 uv : TEXCOORD2;
+                float height : TEXCOORD3;
+                UNITY_VERTEX_OUTPUT_STEREO
+            };
+
+            Varyings vert(Attributes input)
+            {
+                Varyings output = (Varyings)0;
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
+                output.positionWS = TransformObjectToWorld(input.positionOS.xyz);
+                output.normalWS = TransformObjectToWorldNormal(input.normalOS);
+                output.positionCS = TransformWorldToHClip(output.positionWS);
+                output.uv = input.uv;
+                output.height = input.positionOS.y;
+                return output;
+            }
+
+            half4 frag(Varyings input) : SV_Target
+            {
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+                float3 n = normalize(input.normalWS);
+                if (n.y < 0) n = -n;
+                float3 v = normalize(GetWorldSpaceViewDir(input.positionWS));
+                float fresnel = pow(1 - saturate(dot(n, v)), 3);
+                float slope = saturate(1 - n.y) * 18;
+
+                // Highlight from a soft light above and behind the viewer.
+                float3 light = normalize(float3(0.25, 1, -0.35));
+                float spec = pow(saturate(dot(reflect(-light, n), v)), 60) * 1.6;
+
+                float crest = saturate(abs(input.height) * 140 + slope * 0.4);
+                float3 color = lerp(_Deep.rgb, _Shallow.rgb, saturate(crest * 0.7 + fresnel * 0.4));
+
+                // A lattice of tiny lights, brighter where the liquid moves.
+                float2 cell = frac(input.uv * _Dots.xy) - 0.5;
+                float dots = smoothstep(0.2, 0.05, length(cell)) * (0.04 + crest * 0.9 + _Kick * 0.15);
+
+                // Soft edges with a thin glowing lip.
+                float2 e = min(input.uv, 1 - input.uv);
+                float edge = min(e.x * 1.4, e.y);
+                float inside = smoothstep(0.0, 0.05, edge);
+                float lip = exp(-pow((edge - 0.012) / 0.006, 2)) * (0.7 + _Kick * 0.5);
+
+                color += _Shallow.rgb * dots + spec + _Lip.rgb * lip;
+                float alpha = _Deep.a * 0.5 + fresnel * 0.3 + crest * 0.2 + dots * 0.5 + spec;
+                alpha = saturate(alpha) * inside + lip;
+                return half4(color, saturate(alpha) * _Alpha);
+            }
+            ENDHLSL
+        }
+    }
+}

@@ -23,6 +23,10 @@ namespace MusicInYourHands
             "Push a fingertip into a string,\npluck when a bead reaches the ring",
             "Hold a palm out\nunder the falling notes",
             "Hold out an open hand\nand let the fireflies land",
+            "Dip your hand into the pool\nand listen",
+            "Hold your hand in the wind\nand spread your fingers",
+            "Pop the bubbles\nwith a fingertip",
+            "Hover a hand over the plate\nand slide it across",
             "The world menu"
         };
 

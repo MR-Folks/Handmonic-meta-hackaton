@@ -18,8 +18,8 @@ namespace MusicInYourHands
         [SerializeField] Material lineMaterial;
         [SerializeField] float distance = 0.42f;
         [SerializeField] float drop = 0.06f;
-        [SerializeField] float spacing = 0.11f;
-        [SerializeField] float bubbleSize = 0.095f;
+        [SerializeField] float spacing = 0.1f;
+        [SerializeField] float bubbleSize = 0.088f;
         [Tooltip("Pinch strength (0-1) that selects, and the strength the pinch must drop below before it can select again.")]
         [SerializeField] Vector2 pinchThresholds = new Vector2(0.85f, 0.5f);
 
@@ -349,6 +349,21 @@ namespace MusicInYourHands
             return 1f + c3 * Mathf.Pow(x - 1f, 3f) + c1 * Mathf.Pow(x - 1f, 2f);
         }
 
+        // Hexagonal honeycomb cells around the centre: the first six worlds ring it, the next ones sit in the outer
+        // ring at its sides and lower corners (the bottom cell is the listen bubble).
+        static readonly float[] OuterAngles = { 0f, 180f, 300f, 240f, 60f, 120f };
+
+        Vector2 WorldSlot(int world)
+        {
+            if (world < 6)
+            {
+                float angle = (90f - 60f * world) * Mathf.Deg2Rad;
+                return new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * spacing;
+            }
+            float outer = OuterAngles[(world - 6) % OuterAngles.Length] * Mathf.Deg2Rad;
+            return new Vector2(Mathf.Cos(outer), Mathf.Sin(outer)) * spacing * Mathf.Sqrt(3f);
+        }
+
         TextMesh MakeText(string objectName, Font font, int fontSize, float characterSize, TextAnchor anchor, FontStyle style)
         {
             var go = new GameObject(objectName);
@@ -385,14 +400,7 @@ namespace MusicInYourHands
                 // The centre bubble (now playing) first, then the worlds around it like a honeycomb, then the listen
                 // bubble below them all.
                 int world = i <= count ? i - 1 : ListenToggle;
-                Vector2 slot = Vector2.zero;
-                if (world >= 0)
-                {
-                    float angle = (90f - 60f * world) * Mathf.Deg2Rad;
-                    float ring = world < 6 ? spacing : spacing * 2f;
-                    slot = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * ring;
-                }
-                else if (world == ListenToggle) slot = new Vector2(0f, -spacing * 2f);
+                Vector2 slot = world >= 0 ? WorldSlot(world) : world == ListenToggle ? new Vector2(0f, -spacing * 2f) : Vector2.zero;
 
                 string objectName = world >= 0 ? $"Bubble {world}" : world == ListenToggle ? "Bubble Listen" : "Bubble Now Playing";
                 var r = Effects.MakeQuad(objectName, root, bubbleMaterial);

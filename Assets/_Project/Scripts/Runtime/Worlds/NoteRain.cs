@@ -31,10 +31,10 @@ namespace MusicInYourHands
 
         [Header("Rain")]
         [SerializeField] float areaWidth = 0.9f;
-        [SerializeField] float areaDepth = 0.5f;
-        [SerializeField] float distance = 0.55f;
+        [SerializeField] float areaDepth = 0.4f;
+        [SerializeField] float distance = 0.62f;
         [Tooltip("Where drops appear, relative to the eyes.")]
-        [SerializeField] float spawnHeight = 0.5f;
+        [SerializeField] float spawnHeight = 0.35f;
         [Tooltip("Seconds from appearing to landing on the floor.")]
         [SerializeField] float fallTime = 1.8f;
         [SerializeField] float catchRadius = 0.075f;
@@ -211,7 +211,7 @@ namespace MusicInYourHands
             if (music.Beat) count += dropsPerBeat;
             for (int i = 0; i < count; i++)
             {
-                var drop = Spawn(84 + Random.Range(0, 12), new Vector2(Random.Range(-1.1f, 1.1f), Random.Range(-0.6f, 1.4f)), true);
+                var drop = Spawn(84 + Random.Range(0, 12), new Vector2(Random.Range(-1.1f, 1.1f), Random.Range(-1f, 1.2f)), true);
                 if (drop != null) drop.LandTime = songTime + fallTime * 0.6f;
             }
         }
@@ -231,8 +231,8 @@ namespace MusicInYourHands
             drop.Position = center + right * (spot.x * areaWidth * 0.5f) + forward * (spot.y * areaDepth * 0.5f);
             drop.Position.y = spawnY;
             drop.Color = PitchColors[Mathf.Abs(midi) % PitchColors.Length];
-            drop.Size = drizzle ? Random.Range(0.008f, 0.013f) : 0.026f + Mathf.Clamp01((72f - midi) / 12f) * 0.01f;
-            if (drizzle) drop.Color = Color.Lerp(Effects.Blue, Color.white, Random.Range(0.2f, 0.6f));
+            drop.Size = drizzle ? Random.Range(0.007f, 0.011f) : 0.026f + Mathf.Clamp01((72f - midi) / 12f) * 0.01f;
+            if (drizzle) drop.Color = Color.Lerp(Effects.Blue, Color.white, Random.Range(0.1f, 0.35f));
             drop.Streak.gameObject.SetActive(true);
             drop.Head.gameObject.SetActive(true);
             return drop;
@@ -257,14 +257,14 @@ namespace MusicInYourHands
                 }
 
                 // The streak hangs above the head, facing the viewer around the vertical.
-                float length = Mathf.Clamp(speed * 0.2f, 0.08f, 0.24f) * (drop.Drizzle ? 0.7f : 1f);
+                float length = Mathf.Clamp(speed * 0.2f, 0.08f, 0.24f) * (drop.Drizzle ? 0.35f : 1f);
                 var toView = Vector3.ProjectOnPlane(view.transform.position - drop.Position, Vector3.up);
                 var facing = toView.sqrMagnitude > 1e-6f ? Quaternion.LookRotation(-toView.normalized, Vector3.up) : Quaternion.identity;
-                drop.Streak.transform.SetPositionAndRotation(drop.Position + Vector3.up * (length * 0.5f - drop.Size * 0.3f), facing);
+                drop.Streak.transform.SetPositionAndRotation(drop.Position + Vector3.up * (length * 0.5f - length * 0.1f), facing);
                 drop.Streak.transform.localScale = new Vector3(drop.Size * 1.3f, length, 1f);
                 block.Clear();
                 block.SetColor(ColorId, drop.Color);
-                block.SetFloat(IntensityId, drop.Drizzle ? 0.7f : 1.3f);
+                block.SetFloat(IntensityId, drop.Drizzle ? 0.45f : 1.3f);
                 drop.Streak.SetPropertyBlock(block);
 
                 drop.Head.transform.position = drop.Position;
@@ -272,7 +272,7 @@ namespace MusicInYourHands
                 Effects.Face(drop.Head.transform, view);
                 block.Clear();
                 block.SetColor(ColorId, drop.Color);
-                block.SetFloat(IntensityId, drop.Drizzle ? 0.6f : 1.1f);
+                block.SetFloat(IntensityId, drop.Drizzle ? 0.5f : 1.1f);
                 drop.Head.SetPropertyBlock(block);
             }
         }

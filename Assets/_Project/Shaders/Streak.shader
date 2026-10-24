@@ -61,11 +61,13 @@ Shader "MusicInYourHands/Streak"
                 float2 uv = input.uv;
                 float taper = lerp(1, 0.12, saturate(uv.y));
                 float across = abs(uv.x * 2 - 1) / taper;
-                float body = exp(-across * across * 3) * pow(1 - uv.y, 1.8);
-                float core = exp(-across * across * 30) * pow(1 - uv.y, 3);
-                float head = exp(-pow(uv.y / 0.08, 2)) * exp(-pow(uv.x * 2 - 1, 2) * 2.5);
-                float3 color = lerp(_Color.rgb, 1, saturate(core * 0.6 + head * 0.6));
-                float alpha = saturate((body * 0.75 + core + head * 1.2) * _Intensity * _Color.a);
+                // Only the tail: it fades in just above the bottom edge, where the drop's round glow sits, so the
+                // quad's edge never shows.
+                float start = smoothstep(0.0, 0.14, uv.y);
+                float body = exp(-across * across * 3) * pow(1 - uv.y, 1.8) * start;
+                float core = exp(-across * across * 30) * pow(1 - uv.y, 3) * start;
+                float3 color = lerp(_Color.rgb, 1, saturate(core * 0.6));
+                float alpha = saturate((body * 0.75 + core) * _Intensity * _Color.a);
                 return half4(color, alpha);
             }
             ENDHLSL

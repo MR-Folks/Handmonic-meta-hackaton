@@ -1,6 +1,5 @@
-// One layer of the Heartbeat orb: a soft blob with a few rounded lobes that turn around it, swelling with its own
-// frequency band. Several layers of different colours, lobe counts and spin directions stack into the orb, like
-// the layered shape on the concept page.
+// The Heartbeat orb's heart: a soft blob with a few rounded lobes that turn around it, swelling with its own
+// frequency band. It glows additively and draws both sides, so its folds never sort wrongly or drop out.
 Shader "MusicInYourHands/Orb"
 {
     Properties
@@ -22,10 +21,10 @@ Shader "MusicInYourHands/Orb"
         Pass
         {
             Tags { "LightMode" = "UniversalForward" }
-            Cull Back
+            Cull Off
             ZWrite Off
             ZTest LEqual
-            Blend SrcAlpha OneMinusSrcAlpha, One OneMinusSrcAlpha
+            Blend SrcAlpha One, One OneMinusSrcAlpha
 
             HLSLPROGRAM
             #pragma vertex vert
@@ -116,7 +115,7 @@ Shader "MusicInYourHands/Orb"
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
                 float3 n = normalize(input.normalWS);
                 float3 v = normalize(GetWorldSpaceViewDir(input.positionWS));
-                float ndv = saturate(dot(n, v));
+                float ndv = abs(dot(n, v));
                 float fresnel = pow(1 - ndv, 2.4);
 
                 // A soft shimmer that drifts across the surface.
@@ -124,7 +123,7 @@ Shader "MusicInYourHands/Orb"
                 float3 color = _Tint.rgb * (0.7 + 0.25 * shimmer + 0.6 * fresnel);
                 color = lerp(color, 1, fresnel * (0.2 + _Kick * 0.35));
 
-                float alpha = _Opacity + fresnel * 0.55 * (1 + _Kick * 0.4);
+                float alpha = _Opacity * (0.5 + ndv * 0.5) + fresnel * 0.35 * (1 + _Kick * 0.6);
                 return half4(color, saturate(alpha) * _Alpha);
             }
             ENDHLSL

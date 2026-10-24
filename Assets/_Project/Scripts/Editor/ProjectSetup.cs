@@ -32,7 +32,7 @@ namespace MusicInYourHands.EditorTools
         const string UrpPath = Root + "/Settings/URP-Quest.asset";
         const string RendererPath = Root + "/Settings/URP-Quest_Renderer.asset";
         const string SongPath = Root + "/Songs/GlassRoom.asset";
-        const string ScenePath = Root + "/Scenes/Main.unity";
+        public const string MainScenePath = Root + "/Scenes/Main.unity";
         const string ApplicationId = "com.musicinyourhands.app";
         static readonly string[] OpenXRFeaturesToEnable = { "MetaQuestFeature", "MetaXRFeature" };
 
@@ -211,8 +211,8 @@ namespace MusicInYourHands.EditorTools
         static void EnsureMainScene(SongAsset song, bool rebuild)
         {
             EnsureFolder(Root + "/Scenes");
-            var scene = File.Exists(ScenePath) && !rebuild
-                ? EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single)
+            var scene = File.Exists(MainScenePath) && !rebuild
+                ? EditorSceneManager.OpenScene(MainScenePath, OpenSceneMode.Single)
                 : EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
             if (Object.FindAnyObjectByType<MusicBus>() == null)
@@ -261,8 +261,8 @@ namespace MusicInYourHands.EditorTools
             foreach (var feed in Object.FindObjectsByType<OVRHandFeed>(FindObjectsSortMode.None)) ApplyHandLook(feed.gameObject);
 #endif
 
-            EditorSceneManager.SaveScene(scene, ScenePath);
-            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
+            EditorSceneManager.SaveScene(scene, MainScenePath);
+            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(MainScenePath, true) };
         }
 
         public const string DebugMaterialPath = Root + "/Materials/DebugUnlit.mat";
@@ -389,9 +389,22 @@ namespace MusicInYourHands.EditorTools
             var fireflies = EnsureWorld<FireflyChoir>(manager.transform, "FireflyChoir", "Firefly choir", new Color(0.79f, 0.61f, 1f));
             SetReferences(fireflies, ("glowMaterial", glow), ("lineMaterial", line));
 
+            var pool = EnsureWorld<SoundPool>(manager.transform, "SoundPool", "Sound pool", new Color(0.37f, 0.83f, 1f));
+            SetReferences(pool, ("waterMaterial", EnsureMaterial(WaterMaterialPath, "MusicInYourHands/Water")), ("glowMaterial", glow));
+
+            var wind = EnsureWorld<SoundWind>(manager.transform, "SoundWind", "Sound wind", new Color(0.49f, 0.95f, 0.79f));
+            SetReferences(wind, ("glowMaterial", glow), ("ringMaterial", ring));
+
+            var bubbles = EnsureWorld<BubbleNotes>(manager.transform, "BubbleNotes", "Bubble notes", new Color(1f, 0.6f, 0.85f));
+            SetReferences(bubbles, ("bubbleMaterial", EnsureMaterial(BubbleMaterialPath, "MusicInYourHands/Bubble")), ("ringMaterial", ring),
+                ("glowMaterial", glow));
+
+            var sand = EnsureWorld<SandTable>(manager.transform, "SandTable", "Sand table", new Color(1f, 0.86f, 0.68f));
+            SetReferences(sand, ("plateMaterial", EnsureMaterial(PlateMaterialPath, "MusicInYourHands/Plate")), ("glowMaterial", glow));
+
             var so = new SerializedObject(manager);
             var list = so.FindProperty("worlds");
-            World[] order = { livingSkin, orb, ribbon, strings, rain, fireflies };
+            World[] order = { livingSkin, orb, ribbon, strings, rain, fireflies, pool, wind, bubbles, sand };
             list.arraySize = order.Length;
             for (int i = 0; i < order.Length; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = order[i];
             so.ApplyModifiedPropertiesWithoutUndo();
@@ -437,6 +450,8 @@ namespace MusicInYourHands.EditorTools
         public const string BubbleMaterialPath = Root + "/Materials/Bubble.mat";
         public const string StreakMaterialPath = Root + "/Materials/Streak.mat";
         public const string GlowMaterialPath = Root + "/Materials/Glow.mat";
+        public const string WaterMaterialPath = Root + "/Materials/Water.mat";
+        public const string PlateMaterialPath = Root + "/Materials/Plate.mat";
         public const string RingMaterialPath = Root + "/Materials/Ring.mat";
 
         public static Material EnsureHandMaterial() => EnsureMaterial(HandMaterialPath, "MusicInYourHands/Hand");

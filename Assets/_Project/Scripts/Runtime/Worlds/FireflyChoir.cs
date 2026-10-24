@@ -170,7 +170,10 @@ namespace MusicInYourHands
                 var f = flies[i];
                 if (music.Beat && Random.value < startle)
                 {
-                    f.Velocity += Random.onUnitSphere * Random.Range(0.25f, 0.5f) + Vector3.up * 0.12f;
+                    // Startled fireflies dart off sideways around the swarm's middle rather than straight up.
+                    var around = Vector3.Cross(Vector3.up, f.Position - center);
+                    around = around.sqrMagnitude > 1e-6f ? around.normalized : Random.onUnitSphere;
+                    f.Velocity += around * Random.Range(0.2f, 0.4f) + Random.insideUnitSphere * 0.15f;
                     f.Startled = 0.45f;
                 }
                 f.Startled -= dt;
@@ -293,7 +296,7 @@ namespace MusicInYourHands
         static Vector3 CatmullRom(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
         {
             float t2 = t * t, t3 = t2 * t;
-            return 0.5f * (2f * p1 + (p2 - p0) * t + (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2 + (3f * p1 - p0 + p3 - 2f * p2) * t3);
+            return 0.5f * (2f * p1 + (p2 - p0) * t + (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2 + (3f * p1 - p0 + p3 - 3f * p2) * t3);
         }
 
         /// <summary>A warm glow on the palm that grows with the fireflies resting on the hand.</summary>

@@ -20,7 +20,7 @@ Shader "MusicInYourHands/Hand"
         _PulseSpeed ("Pulse speed (m/s)", Float) = 0.55
         _PulseWidth ("Pulse width (m)", Float) = 0.022
         _PulseLength ("Wrist to fingertips (m)", Float) = 0.2
-        _Pattern ("Effect (set by the world: 0 veins, 1 heat, 2 scanlines, 3 electric, 4 ripples, 5 specks)", Float) = 0
+        _Pattern ("Effect (set by the world: 0 veins, 1 heat, 2 scanlines, 3 electric, 4 ripples, 5 specks, 6 submerged, 7 flow, 8 film, 9 uplight)", Float) = 0
         _PatternColor ("Effect colour (set by the world)", Color) = (1, 0.83, 0.42, 1)
         _FocusPos ("Focus point (set by the world)", Vector) = (0, 0, 0, 0)
         _FocusStrength ("Focus strength (set by the world)", Float) = 0
@@ -63,6 +63,8 @@ Shader "MusicInYourHands/Hand"
             p *= 17.0;
             return frac(p.x * p.y * p.z * (p.x + p.y + p.z));
         }
+
+        float3 Hue(float h) { return saturate(abs(frac(h + float3(0, 2, 1) / 3) * 6 - 3) - 1); }
 
         // Each world dresses the hand differently. Returns light to add (rgb) and extra opacity (a).
         float4 HandEffect(float3 positionWS, float3 n, float3 v)
@@ -111,14 +113,58 @@ Shader "MusicInYourHands/Hand"
                 float k = ripple * (0.35 + _Charge * 1.2 + _Kick * 0.3) + _Charge * 0.25 * saturate(1 - r / 0.1);
                 return float4(c * k, k * 0.5);
             }
-            // Specks: warm round points of light twinkle in the skin, like fireflies resting on it.
-            float3 grid2 = positionWS * 140;
-            float3 cell2 = floor(grid2);
-            float h = Hash(cell2);
-            float dot2 = smoothstep(0.38, 0.05, length(frac(grid2) - 0.5));
-            float twinkle = step(0.86, h) * dot2 * pow(saturate(sin(t * (2 + h * 4) + h * 40) * 0.5 + 0.5), 3);
-            float k = twinkle * (1.1 + _Kick * 0.8 + _Energy * 0.4);
-            return float4(c * k, k * 0.6);
+            if (_Pattern < 5.5)
+            {
+                // Specks: warm round points of light twinkle in the skin, like fireflies resting on it.
+                float3 grid2 = positionWS * 140;
+                float3 cell2 = floor(grid2);
+                float h = Hash(cell2);
+                float dot2 = smoothstep(0.38, 0.05, length(frac(grid2) - 0.5));
+                float twinkle = step(0.86, h) * dot2 * pow(saturate(sin(t * (2 + h * 4) + h * 40) * 0.5 + 0.5), 3);
+                float k = twinkle * (1.1 + _Kick * 0.8 + _Energy * 0.4);
+                return float4(c * k, k * 0.6);
+            }
+            if (_Pattern < 6.5)
+            {
+                // Submerged: below the water level (the focus point's height) the hand is tinted with drifting
+                // caustics, and a bright line marks where it meets the surface.
+                float depth = _FocusPos.y - positionWS.y;
+                float below = smoothstep(-0.002, 0.01, depth) * _FocusStrength;
+                float caustic = pow(saturate(sin(positionWS.x * 150 + t * 3.1) * sin(positionWS.z * 170 - t * 2.3) * 0.5 + 0.5), 4);
+                float waterline = exp(-depth * depth / 0.00002) * _FocusStrength;
+                float k = below * (0.22 + caustic * 0.8 + _Kick * 0.2) + waterline * 1.6;
+                return float4(c * k, below * 0.3 + waterline * 0.7);
+            }
+            if (_Pattern < 7.5)
+            {
+                // Flow: dashes of light stream over the skin away from the wind's source (the focus point), brightest
+                // on the side the wind hits.
+                float3 flow = positionWS - _FocusPos.xyz;
+                float d = length(flow);
+                flow /= max(d, 1e-4);
+                float3 across = normalize(cross(flow, float3(0, 1, 0)) + 1e-4);
+                float lane = floor(dot(positionWS, across) * 160 + positionWS.y * 140);
+                float dash = pow(saturate(sin(d * 90 - t * 16 + Hash(float3(lane, 1, 2)) * 40) * 0.5 + 0.5), 12);
+                float facing = saturate(-dot(n, flow)) * 0.7 + 0.3;
+                float k = dash * step(0.45, Hash(float3(lane, 3, 4))) * facing * (0.5 + _Energy * 0.8 + _Kick * 0.6) * _FocusStrength;
+                return float4(c * k, k * 0.5);
+            }
+            if (_Pattern < 8.5)
+            {
+                // Film: a soap-film sheen, its rainbow shifting with the viewing angle and drifting slowly.
+                float ndv = abs(dot(n, v));
+                float3 film = Hue(frac(ndv * 1.7 + along * 4 + t * 0.06));
+                float sheen = pow(1 - ndv, 1.6) * 0.9 + 0.08;
+                float k = sheen * (0.55 + _Kick * 0.45 + _Energy * 0.2);
+                return float4(lerp(c, film, 0.8) * k, sheen * 0.35);
+            }
+            // Uplight: the glowing plate below lights the underside of the hand, with grains of sand glinting on it.
+            float height = positionWS.y - _FocusPos.y;
+            float lit = saturate(1 - height / 0.3) * saturate(-n.y * 0.8 + 0.25) * _FocusStrength;
+            float3 grains = positionWS * 260;
+            float glint = step(0.82, Hash(floor(grains))) * smoothstep(0.4, 0.05, length(frac(grains) - 0.5));
+            float k = lit * (0.45 + _Kick * 0.4) + glint * lit * (1.2 + _Kick);
+            return float4(c * k, lit * 0.3 + glint * lit * 0.5);
         }
 
         struct Attributes

@@ -74,7 +74,7 @@ namespace MusicInYourHands
         // The heart inside the shell, from outside in: size, colour, petals, spin, band, base opacity.
         static readonly (float size, Color color, float lobes, float spin, int band, float opacity)[] Layers =
         {
-            (0.34f, Pink, 3f, 1.6f, 1, 0.16f)
+            (0.34f, Pink, 3f, 1.6f, 1, 0.22f)
         };
 
         // Torus knots wound around the shell: (p, q) winding, colour, comet speed (loops per second at rest).

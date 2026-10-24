@@ -16,7 +16,7 @@ namespace MusicInYourHands.EditorTools
     /// </summary>
     public static partial class EditorChecks
     {
-        enum HandPose { PalmsToFace, PalmsFacing, PalmsUp, BacksToFace }
+        enum HandPose { PalmsToFace, PalmsFacing, PalmsUp, PalmsDown, BacksToFace }
 
         const string ShotFolder = "Logs/shots";
         const float Beat = 60f / 96f;
@@ -31,20 +31,22 @@ namespace MusicInYourHands.EditorTools
         {
 #if META_XR_CORE
             Directory.CreateDirectory(ShotFolder);
-            var glow = (ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow");
-            var ring = (ProjectSetup.RingMaterialPath, "MusicInYourHands/Ring");
-            var line = (ProjectSetup.LineMaterialPath, "MusicInYourHands/Line");
+            LoadSceneSettings();
 
-            Shot<LivingSkin>("1-living-skin", HandPose.PalmsToFace, 8f, new[] { ("glowMaterial", glow), ("ringMaterial", ring) });
-            Shot<HeartbeatOrb>("2-heartbeat-orb", HandPose.PalmsFacing, 18f, new[] { ("glowMaterial", glow), ("lineMaterial", line),
-                ("orbMaterial", (ProjectSetup.OrbMaterialPath, "MusicInYourHands/Orb")),
-                ("dotsMaterial", (ProjectSetup.OrbDotsMaterialPath, "MusicInYourHands/OrbDots")) }, closeUp: true);
-            Shot<WaveformRibbon>("3-waveform-ribbon", HandPose.BacksToFace, 8f, new[] { ("glowMaterial", glow), ("lineMaterial", line) },
-                rig => { rig.Left.Pinch = 1f; rig.Right.Pinch = 1f; });
-            Shot<AirStrings>("4-air-strings", HandPose.BacksToFace, 12f, new[] { ("glowMaterial", glow), ("lineMaterial", line), ("ringMaterial", ring) });
-            Shot<NoteRain>("5-note-rain", HandPose.PalmsUp, 34f, new[] { ("glowMaterial", glow), ("ringMaterial", ring),
-                ("streakMaterial", (ProjectSetup.StreakMaterialPath, "MusicInYourHands/Streak")) });
-            Shot<FireflyChoir>("6-firefly-choir", HandPose.PalmsToFace, 8f, new[] { ("glowMaterial", glow), ("lineMaterial", line) });
+            Shot<LivingSkin>("1-living-skin", HandPose.PalmsToFace, 8f);
+            Shot<HeartbeatOrb>("2-heartbeat-orb", HandPose.PalmsFacing, 18f, closeUp: rig => HandSkin.FocusPosition);
+            Shot<WaveformRibbon>("3-waveform-ribbon", HandPose.BacksToFace, 8f, rig => { rig.Left.Pinch = 1f; rig.Right.Pinch = 1f; });
+            Shot<AirStrings>("4-air-strings", HandPose.BacksToFace, 12f);
+            Shot<NoteRain>("5-note-rain", HandPose.PalmsUp, 34f, closeUp: rig => rig.Right.Palm.position + new Vector3(-0.1f, 0.1f, 0.05f));
+            Shot<FireflyChoir>("6-firefly-choir", HandPose.PalmsToFace, 8f, closeUp: rig => rig.Right.Palm.position);
+            // The right hand dips into the pool; the left rests above it.
+            Shot<SoundPool>("8-sound-pool", HandPose.PalmsDown, 38f, closeUp: rig => rig.Right.Palm.position + Vector3.down * 0.04f,
+                handOffset: side => side == "R" ? new Vector3(-0.03f, -0.27f, 0.12f) : new Vector3(0f, -0.12f, 0.1f));
+            Shot<SoundWind>("9-sound-wind", HandPose.PalmsToFace, 14f, closeUp: rig => rig.Left.Palm.position,
+                handOffset: side => side == "L" ? new Vector3(-0.05f, 0f, 0.15f) : new Vector3(0.05f, -0.1f, 0f));
+            Shot<BubbleNotes>("10-bubble-notes", HandPose.BacksToFace, 4f, closeUp: rig => rig.Right.Tips[1] + new Vector3(-0.08f, 0.12f, 0.12f), lead: 8f);
+            Shot<SandTable>("11-sand-table", HandPose.PalmsDown, 40f, closeUp: rig => rig.Right.Palm.position + Vector3.down * 0.15f,
+                handOffset: side => side == "R" ? new Vector3(0.02f, -0.15f, 0.12f) : new Vector3(-0.05f, -0.2f, 0f));
             MenuShot();
             Debug.Log($"[Shots] Saved screenshots to {ShotFolder}.");
             return true;
@@ -54,6 +56,17 @@ namespace MusicInYourHands.EditorTools
         }
 
 #if META_XR_CORE
+        // Each world's settings as saved in the main scene, so the shots match what runs on the headset.
+        static readonly Dictionary<System.Type, string> SceneSettings = new Dictionary<System.Type, string>();
+
+        static void LoadSceneSettings()
+        {
+            SceneSettings.Clear();
+            EditorSceneManager.OpenScene(ProjectSetup.MainScenePath, OpenSceneMode.Single);
+            foreach (var world in Object.FindObjectsByType<World>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                SceneSettings[world.GetType()] = EditorJsonUtility.ToJson(world);
+        }
+
         /// <summary>A room standing in for passthrough: floor and three walls in soft, warm grey tones.</summary>
         static Camera StageRoom(float pitch)
         {
@@ -87,7 +100,7 @@ namespace MusicInYourHands.EditorTools
         }
 
         /// <summary>Both hands about 35 cm in front, at chest height, held the way the world asks for.</summary>
-        static List<PreviewHand> PlaceHands(Camera camera, HandPose pose, HandRig rig)
+        static List<PreviewHand> PlaceHands(Camera camera, HandPose pose, HandRig rig, System.Func<string, Vector3> offset = null)
         {
             var hands = new List<PreviewHand>();
             foreach (var (side, x) in new[] { ("L", -0.15f), ("R", 0.15f) })
@@ -103,20 +116,22 @@ namespace MusicInYourHands.EditorTools
                 // Fingers up, then turn the palm the way the pose wants.
                 var up = (Bone("XRHand_MiddleProximal").position - Bone("XRHand_Wrist").position).normalized;
                 hand.transform.rotation = Quaternion.FromToRotation(up, Vector3.up) * hand.transform.rotation;
-                var center = new Vector3(x, 1.3f, 0.36f);
+                var center = new Vector3(x, 1.3f, 0.36f) + (offset?.Invoke(side) ?? Vector3.zero);
                 hand.transform.position += center - skin.bounds.center;
                 Vector3 want = pose switch
                 {
                     HandPose.PalmsToFace or HandPose.PalmsUp => Vector3.back,
                     // Turned a little towards the face, the way you hold a ball in front of you.
                     HandPose.PalmsFacing => ((left ? Vector3.right : Vector3.left) + Vector3.back * 0.6f).normalized,
-                    HandPose.BacksToFace => Vector3.forward,
+                    HandPose.BacksToFace or HandPose.PalmsDown => Vector3.forward,
                     _ => Vector3.forward
                 };
                 var normal = Vector3.ProjectOnPlane(PalmNormal(Bone, left), Vector3.up).normalized;
                 hand.transform.RotateAround(skin.bounds.center, Vector3.up, Vector3.SignedAngle(normal, want, Vector3.up));
                 if (pose == HandPose.PalmsUp)
                     // Tip the hand forward: fingers point away, palm up, as if offering it.
+                    hand.transform.RotateAround(skin.bounds.center, Vector3.right, 75f);
+                else if (pose == HandPose.PalmsDown)
                     hand.transform.RotateAround(skin.bounds.center, Vector3.right, 75f);
                 else if (pose == HandPose.BacksToFace)
                     hand.transform.RotateAround(skin.bounds.center, Vector3.right, 20f);
@@ -167,44 +182,58 @@ namespace MusicInYourHands.EditorTools
             return string.IsNullOrEmpty(only) || only.Split(',').Any(name.Contains);
         }
 
-        static void Shot<T>(string name, HandPose pose, float pitch, (string property, (string path, string shader) material)[] materials,
-            System.Action<HandRig> holdPose = null, bool closeUp = false) where T : World
+        /// <summary>
+        /// One world's screenshot from head height. With <paramref name="closeUp"/>, also a zoomed-in filmstrip of
+        /// four frames 0.1 s apart around that point (name-close.png), to judge detail and motion.
+        /// </summary>
+        static void Shot<T>(string name, HandPose pose, float pitch, System.Action<HandRig> holdPose = null,
+            System.Func<HandRig, Vector3> closeUp = null, System.Func<string, Vector3> handOffset = null, float lead = 3f) where T : World
         {
             if (!Wanted(name)) return;
             var camera = StageRoom(pitch);
             var rig = new GameObject("HandRig").AddComponent<HandRig>();
-            var hands = PlaceHands(camera, pose, rig);
+            var hands = PlaceHands(camera, pose, rig, handOffset);
 
             var world = new GameObject(typeof(T).Name).AddComponent<T>();
-            var so = new SerializedObject(world);
-            foreach (var (property, (path, shader)) in materials)
-                so.FindProperty(property).objectReferenceValue = ProjectSetup.EnsureMaterial(path, shader);
-            so.ApplyModifiedPropertiesWithoutUndo();
+            if (SceneSettings.TryGetValue(typeof(T), out var json)) EditorJsonUtility.FromJsonOverwrite(json, world);
+            else Debug.LogWarning($"[Shots] {typeof(T).Name} is not in the main scene; using its defaults.");
             world.Build();
             HandSkin.Theme = world.Theme;
             HandSkin.FocusStrength = 0f;
             HandSkin.Charge[0] = HandSkin.Charge[1] = 0f;
 
-            // Play up to just after the chorus's first beat.
-            var clock = new SongClock();
+            // Play from <lead> seconds before the chorus to just after its first beat.
+            var clock = new SongClock { Time = ChorusStart - lead };
             const float dt = 1f / 30f;
-            while (clock.Time < ChorusStart + 0.09f)
+            void Play(float until)
             {
-                holdPose?.Invoke(rig);
-                world.Step(rig, clock.Advance(dt), camera, dt);
-                world.SimulateParticles(dt);
+                while (clock.Time < until)
+                {
+                    holdPose?.Invoke(rig);
+                    world.Step(rig, clock.Advance(dt), camera, dt);
+                    world.SimulateParticles(dt);
+                }
+                foreach (var hand in hands)
+                {
+                    hand.Root.GetComponent<HandSkin>().Apply();
+                    SetBeat(hand.Skin, clock.BeatAge, clock.Kick);
+                }
             }
-            foreach (var hand in hands)
-            {
-                hand.Root.GetComponent<HandSkin>().Apply();
-                SetBeat(hand.Skin, clock.BeatAge, clock.Kick);
-            }
+            Play(ChorusStart + 0.09f);
             File.WriteAllBytes($"{ShotFolder}/{name}.png", Render(camera, 1600, 900).EncodeToPNG());
-            if (!closeUp) return;
-            // A second, zoomed-in shot of whatever the world is focused on, to judge the detail.
-            camera.transform.LookAt(HandSkin.FocusPosition);
-            camera.fieldOfView = 30f;
-            File.WriteAllBytes($"{ShotFolder}/{name}-close.png", Render(camera, 1200, 900).EncodeToPNG());
+            if (closeUp == null) return;
+
+            camera.fieldOfView = 34f;
+            const int w = 800, h = 450;
+            var sheet = new Texture2D(w * 2, h * 2, TextureFormat.RGB24, false);
+            for (int frame = 0; frame < 4; frame++)
+            {
+                if (frame > 0) Play(clock.Time + 0.1f);
+                camera.transform.LookAt(closeUp(rig));
+                sheet.SetPixels(frame % 2 * w, (1 - frame / 2) * h, w, h, Render(camera, w, h).GetPixels());
+            }
+            sheet.Apply();
+            File.WriteAllBytes($"{ShotFolder}/{name}-close.png", sheet.EncodeToPNG());
         }
 
         static void MenuShot()
@@ -225,7 +254,11 @@ namespace MusicInYourHands.EditorTools
                 MakePreviewWorld<WaveformRibbon>(managerGo.transform, "Waveform ribbon", new Color(1f, 0.7f, 0.42f)),
                 MakePreviewWorld<AirStrings>(managerGo.transform, "Air strings", new Color(0.49f, 0.95f, 0.79f)),
                 MakePreviewWorld<NoteRain>(managerGo.transform, "Note rain", new Color(0.5f, 0.72f, 1f)),
-                MakePreviewWorld<FireflyChoir>(managerGo.transform, "Firefly choir", new Color(0.79f, 0.61f, 1f))
+                MakePreviewWorld<FireflyChoir>(managerGo.transform, "Firefly choir", new Color(0.79f, 0.61f, 1f)),
+                MakePreviewWorld<SoundPool>(managerGo.transform, "Sound pool", new Color(0.37f, 0.83f, 1f)),
+                MakePreviewWorld<SoundWind>(managerGo.transform, "Sound wind", new Color(0.49f, 0.95f, 0.79f)),
+                MakePreviewWorld<BubbleNotes>(managerGo.transform, "Bubble notes", new Color(1f, 0.6f, 0.85f)),
+                MakePreviewWorld<SandTable>(managerGo.transform, "Sand table", new Color(1f, 0.86f, 0.68f))
             };
             var manager = managerGo.AddComponent<WorldManager>();
             var mso = new SerializedObject(manager);

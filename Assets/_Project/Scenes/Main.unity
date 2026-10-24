@@ -229,10 +229,10 @@ MonoBehaviour:
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   streakMaterial: {fileID: 2100000, guid: 141076a49ca5548e9a16f7ac49f7d207, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
-  areaWidth: 0.8
-  areaDepth: 0.45
-  distance: 0.45
-  spawnHeight: 0.45
+  areaWidth: 0.9
+  areaDepth: 0.4
+  distance: 0.62
+  spawnHeight: 0.35
   fallTime: 1.8
   catchRadius: 0.075
   maxDrops: 72
@@ -786,8 +786,8 @@ MonoBehaviour:
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   distance: 0.42
   drop: 0.06
-  spacing: 0.11
-  bubbleSize: 0.095
+  spacing: 0.1
+  bubbleSize: 0.088
   pinchThresholds: {x: 0.85, y: 0.5}
 --- !u!4 &1126936837
 Transform:
@@ -853,6 +853,63 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1153605161
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1153605163}
+  - component: {fileID: 1153605162}
+  m_Layer: 0
+  m_Name: SoundWind
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1153605162
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1153605161}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cac449c98bf1b4c9b8ee7c553f527bea, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.SoundWind
+  displayName: Sound wind
+  color: {r: 0.49, g: 0.95, b: 0.79, a: 1}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
+  vent: {x: -0.35, y: -0.15, z: 1.3}
+  aim: {x: 0.15, y: -0.35, z: 0.25}
+  maxParticles: 1400
+  baseRate: 90
+  speed: 0.8
+  lifetime: 3.2
+  tipRadius: 0.016
+  palmRadius: 0.04
+  fistRadius: 0.065
+--- !u!4 &1153605163
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1153605161}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!137 &1157063446 stripped
 SkinnedMeshRenderer:
@@ -939,7 +996,7 @@ MonoBehaviour:
   beatThreshold: 0.15
   minBeatInterval: 0.28
   kickDecay: 7
-  listenGate: 0.006
+  listenSilence: 0.002
 --- !u!82 &1383540395
 AudioSource:
   m_ObjectHideFlags: 0
@@ -1219,6 +1276,10 @@ MonoBehaviour:
   - {fileID: 179923059}
   - {fileID: 122405007}
   - {fileID: 128519273}
+  - {fileID: 2000780158}
+  - {fileID: 1153605162}
+  - {fileID: 1715105674}
+  - {fileID: 2137090334}
   startWorld: 0
 --- !u!4 &1462377328
 Transform:
@@ -1239,6 +1300,10 @@ Transform:
   - {fileID: 179923060}
   - {fileID: 122405008}
   - {fileID: 128519274}
+  - {fileID: 2000780159}
+  - {fileID: 1153605163}
+  - {fileID: 1715105675}
+  - {fileID: 2137090335}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1492539440
@@ -1592,6 +1657,60 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1512639469}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1715105673
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1715105675}
+  - component: {fileID: 1715105674}
+  m_Layer: 0
+  m_Name: BubbleNotes
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1715105674
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1715105673}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b4a6879bb0404df28c7b029e5f2d607, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.BubbleNotes
+  displayName: Bubble notes
+  color: {r: 1, g: 0.6, b: 0.85, a: 1}
+  bubbleMaterial: {fileID: 2100000, guid: fa89d5024587b4c8e83405b9bccf5a04, type: 2}
+  ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  distance: 0.5
+  width: 0.7
+  heightRange: {x: -0.5, y: 0.35}
+  riseSpeed: {x: 0.09, y: 0.14}
+  maxBubbles: 36
+--- !u!4 &1715105675
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1715105673}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1727063938
 GameObject:
   m_ObjectHideFlags: 0
@@ -1778,6 +1897,117 @@ Transform:
   m_Children:
   - {fileID: 1492539441}
   m_Father: {fileID: 1512639471}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2000780157
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2000780159}
+  - component: {fileID: 2000780158}
+  m_Layer: 0
+  m_Name: SoundPool
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2000780158
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2000780157}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b687e5615a6e14fbbb8680a104ac977d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.SoundPool
+  displayName: Sound pool
+  color: {r: 0.37, g: 0.83, b: 1, a: 1}
+  waterMaterial: {fileID: 2100000, guid: 5a8cb478aa2674256bde3519ded63635, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  size: {x: 0.7, y: 0.48}
+  distance: 0.5
+  belowEyes: 0.52
+  columns: 72
+  rows: 50
+  damping: 0.988
+  muffledCutoff: 650
+  fullDip: 0.1
+  dropTime: 0.5
+--- !u!4 &2000780159
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2000780157}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2137090333
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2137090335}
+  - component: {fileID: 2137090334}
+  m_Layer: 0
+  m_Name: SandTable
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2137090334
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2137090333}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bf11b7f97ea4e47909fed5d42a2a34f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.SandTable
+  displayName: Sand table
+  color: {r: 1, g: 0.86, b: 0.68, a: 1}
+  plateMaterial: {fileID: 2100000, guid: 8a2b5c99e3f8449c2968547889d421aa, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  plateSize: 0.46
+  distance: 0.48
+  belowEyes: 0.52
+  grains: 2400
+  grainSize: 0.0045
+  hoverHeight: 0.3
+--- !u!4 &2137090335
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2137090333}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

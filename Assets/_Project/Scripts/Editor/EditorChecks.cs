@@ -303,7 +303,11 @@ namespace MusicInYourHands.EditorTools
                 MakePreviewWorld<WaveformRibbon>(managerGo.transform, "Waveform ribbon", new Color(1f, 0.7f, 0.42f)),
                 MakePreviewWorld<AirStrings>(managerGo.transform, "Air strings", new Color(0.49f, 0.95f, 0.79f)),
                 MakePreviewWorld<NoteRain>(managerGo.transform, "Note rain", new Color(0.5f, 0.72f, 1f)),
-                MakePreviewWorld<FireflyChoir>(managerGo.transform, "Firefly choir", new Color(0.79f, 0.61f, 1f))
+                MakePreviewWorld<FireflyChoir>(managerGo.transform, "Firefly choir", new Color(0.79f, 0.61f, 1f)),
+                MakePreviewWorld<SoundPool>(managerGo.transform, "Sound pool", new Color(0.37f, 0.83f, 1f)),
+                MakePreviewWorld<SoundWind>(managerGo.transform, "Sound wind", new Color(0.49f, 0.95f, 0.79f)),
+                MakePreviewWorld<BubbleNotes>(managerGo.transform, "Bubble notes", new Color(1f, 0.6f, 0.85f)),
+                MakePreviewWorld<SandTable>(managerGo.transform, "Sand table", new Color(1f, 0.86f, 0.68f))
             };
             var manager = managerGo.AddComponent<WorldManager>();
             var mso = new SerializedObject(manager);
