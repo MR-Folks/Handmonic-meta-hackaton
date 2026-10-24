@@ -39,12 +39,15 @@ namespace MusicInYourHands
         [SerializeField] float kickDecay = 7f;
 
         [Header("Listen mode")]
-        [Tooltip("Microphone level (RMS, 0-1) below which the room counts as silent, so its hum doesn't fill the bands. " +
-                 "Loud music from a phone speaker measured 0.015-0.025 on a Quest 3S.")]
-        [SerializeField, Range(0.0002f, 0.05f)] float listenSilence = 0.002f;
+        [Tooltip("How many times louder than the room's own hum a band must be to count as music. Higher ignores more " +
+                 "background noise; lower follows quieter music.")]
+        [SerializeField, Range(1.5f, 10f)] float listenNoiseMargin = 4f;
+        [Tooltip("How fast each band's hum estimate may rise, per second, so it settles on the room rather than the music.")]
+        [SerializeField, Range(0.01f, 0.3f)] float listenNoiseRise = 0.05f;
 
         readonly float[] spectrum = new float[1024];
         readonly float[] bandPeak = new float[BandCount];
+        readonly float[] bandNoise = new float[BandCount];
         readonly MicrophoneListener microphone = new MicrophoneListener();
         AudioSource source;
         float bassAverage;
@@ -148,6 +151,7 @@ namespace MusicInYourHands
             Lyrics = song.lyrics != null ? LyricsTrack.Parse(song.lyrics.text) : LyricsTrack.Empty;
             Notes = song.notes != null ? NoteTrack.Parse(song.notes.text) : NoteTrack.Empty;
             Lyric = new LyricsTrack.State(-1, -1);
+            for (int i = 0; i < BandCount; i++) bandPeak[i] = 0.0001f;
             source.clip = song.clip;
             source.loop = loop;
             source.Play();
@@ -164,6 +168,8 @@ namespace MusicInYourHands
             listenTime = 0f;
             listenPaused = false;
             permissionDenied = false;
+            // The microphone's spectrum is on its own scale, so forget the song's levels and learn the room's hum anew.
+            for (int i = 0; i < BandCount; i++) bandPeak[i] = bandNoise[i] = 0f;
             StartMicrophone();
         }
 
@@ -241,8 +247,7 @@ namespace MusicInYourHands
             if (IsListening)
             {
                 if (IsPlaying) listenTime += dt;
-                // A quiet room counts as silence, so the auto-levelling doesn't blow its hum up into music.
-                heard = microphone.Read(spectrum, Waveform, dt) && microphone.Level > listenSilence;
+                heard = microphone.Read(spectrum, Waveform, dt);
             }
             else
             {
@@ -270,6 +275,7 @@ namespace MusicInYourHands
             float binHz = sampleRate * 0.5f / spectrum.Length;
             float memory = Mathf.Pow(levelMemoryPerSecond, dt);
             float follow = 1f - Mathf.Exp(-bandResponse * dt);
+            float noiseRise = Mathf.Exp(listenNoiseRise * dt);
 
             for (int i = 0; i < BandCount; i++)
             {
@@ -279,7 +285,16 @@ namespace MusicInYourHands
                 for (int k = lo; k < hi; k++) sum += spectrum[k];
                 float raw = sum / (hi - lo);
 
-                bandPeak[i] = Mathf.Max(bandPeak[i] * memory, raw, 0.0001f);
+                // The quietest a band may count as full. Songs use a fixed floor. The raw microphone has no gain, so a
+                // fixed floor would hide normal-volume music; instead each band follows the room's own hum, dropping to
+                // any quieter reading at once and creeping up slowly, and music counts once it rises well above it.
+                float floor = 0.0001f;
+                if (IsListening)
+                {
+                    bandNoise[i] = bandNoise[i] <= 0f || raw < bandNoise[i] ? raw : bandNoise[i] * noiseRise;
+                    floor = Mathf.Max(bandNoise[i] * listenNoiseMargin, 1e-9f);
+                }
+                bandPeak[i] = Mathf.Max(bandPeak[i] * memory, raw, floor);
                 float level = raw / bandPeak[i];
                 Bands[i] = Mathf.Lerp(Bands[i], level * level, follow);
             }
