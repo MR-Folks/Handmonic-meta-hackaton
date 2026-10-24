@@ -14,7 +14,7 @@ namespace MusicInYourHands.EditorTools
     /// Writes Logs/preview-debug.png. Batch mode (needs graphics, so no -nographics):
     /// -executeMethod MusicInYourHands.EditorTools.EditorChecks.RunBatch
     /// </summary>
-    public static class EditorChecks
+    public static partial class EditorChecks
     {
         const string PreviewPath = "Logs/preview-debug.png";
         static readonly string[] JointNames =
