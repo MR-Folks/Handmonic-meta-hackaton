@@ -15,6 +15,8 @@ namespace MusicInYourHands
     {
         public override int MenuIcon => 3;
 
+        public override string Hint => "Touch a string and pull it to pluck";
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.06f, 0.18f, 0.16f, 0.55f),
@@ -85,6 +87,7 @@ namespace MusicInYourHands
         readonly HashSet<float> playedNotes = new HashSet<float>();
         Vector3 origin, right;
         float beatTime = -10f, songTime;
+        MusicFrame frame;
         bool anchored, built;
 
         public override void Build()
@@ -137,15 +140,18 @@ namespace MusicInYourHands
         {
             Build();
             if (view == null) return;
+            if (anchored && ShouldReanchor(view, dt)) anchored = false;
             if (!anchored)
             {
                 // Hang the strings in front of where the player is looking when the world starts.
                 var forward = Effects.FlatForward(view);
                 origin = view.transform.position + forward * distance;
                 right = Vector3.Cross(Vector3.up, forward).normalized;
+                MarkAnchored(view);
                 anchored = true;
             }
             songTime = music.SongTime;
+            frame = music;
             if (music.Beat) beatTime = Now;
 
             var leftOffset = Vector3.zero;
@@ -326,8 +332,7 @@ namespace MusicInYourHands
                 playedNotes.Add(s.NextNote);
                 s.Perfect = 1f;
             }
-            var frequency = 440f * Mathf.Pow(2f, (Tuning[index] - 69) / 12f);
-            voices.Play(Synth.Pluck(frequency), at, onTime ? 1f : 0.8f);
+            Musical.Play(voices, frame, Tuning[index], at, onTime ? 0.8f : 0.6f, pluck: true);
 
             int count = onTime ? 28 : 14;
             for (int k = 0; k < count; k++)

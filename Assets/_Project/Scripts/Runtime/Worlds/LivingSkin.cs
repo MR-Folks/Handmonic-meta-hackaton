@@ -13,6 +13,8 @@ namespace MusicInYourHands
     {
         public override int MenuIcon => 0;
 
+        public override string Hint => "Hold up your hands and spread your fingers";
+
         [Header("Materials")]
         [SerializeField] Material glowMaterial;
         [SerializeField] Material ringMaterial;

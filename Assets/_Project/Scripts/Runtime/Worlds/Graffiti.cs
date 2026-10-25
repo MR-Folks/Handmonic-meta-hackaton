@@ -16,6 +16,10 @@ namespace MusicInYourHands
     {
         public override int MenuIcon => 13;
 
+        public override bool IsLyric => true;
+
+        public override string Hint => "Point at a wall and pinch to spray";
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.1f, 0.09f, 0.12f, 0.55f),
@@ -181,10 +185,12 @@ namespace MusicInYourHands
         {
             Build();
             if (view == null) return;
+            if (anchored && ShouldReanchor(view, dt)) anchored = false;
             if (!anchored)
             {
                 center = view.transform.position;
                 floorY = Effects.FloorY(view);
+                MarkAnchored(view);
                 anchored = true;
             }
 

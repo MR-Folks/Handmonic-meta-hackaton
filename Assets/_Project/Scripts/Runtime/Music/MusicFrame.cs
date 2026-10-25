@@ -19,6 +19,11 @@ namespace MusicInYourHands
         public System.Collections.Generic.List<NoteTrack.Note> Upcoming;
         /// <summary>The song's timed lyrics, and the line and word being sung. May be null (no lyrics).</summary>
         public LyricsTrack Lyrics;
+        /// <summary>The song's melody, for sounds that should fit it. May be null.</summary>
+        public NoteTrack Notes;
+        /// <summary>Seconds since the last beat, and the typical time between beats (0 when unknown).</summary>
+        public float BeatAge;
+        public float BeatInterval;
         public LyricsTrack.State Lyric;
 
         /// <summary>The words of the line being sung, or null.</summary>

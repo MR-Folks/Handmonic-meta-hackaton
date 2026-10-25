@@ -13,6 +13,8 @@ namespace MusicInYourHands
     {
         public override int MenuIcon => 10;
 
+        public override string Hint => "Pop the bubbles with a fingertip";
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.12f, 0.1f, 0.2f, 0.45f),
@@ -75,6 +77,7 @@ namespace MusicInYourHands
         ParticleSystem droplets;
         Vector3 center, right, forward;
         float eyeY, songTime;
+        MusicFrame frame;
         bool anchored, built;
 
         public override void Build()
@@ -123,15 +126,18 @@ namespace MusicInYourHands
         {
             Build();
             if (view == null) return;
+            if (anchored && ShouldReanchor(view, dt)) anchored = false;
             if (!anchored)
             {
                 forward = Effects.FlatForward(view);
                 right = Vector3.Cross(Vector3.up, forward).normalized;
                 center = view.transform.position + forward * distance;
                 eyeY = view.transform.position.y;
+                MarkAnchored(view);
                 anchored = true;
             }
             songTime = music.SongTime;
+            frame = music;
             if (music.Upcoming != null && music.Upcoming.Count > 0) SpawnFromNotes(music);
             else SpawnFromAnalysis(music, dt);
             Float(rig, music, view, dt);
@@ -246,7 +252,7 @@ namespace MusicInYourHands
                     float d = Vector3.Distance(tip, b.Position);
                     if (d < b.Radius * 0.95f && b.Age > 0.25f)
                     {
-                        voices.Play(Synth.Chime(440f * Mathf.Pow(2f, (b.Midi + 12 - 69) / 12f)), tip, 0.45f);
+                        Musical.Play(voices, frame, b.Midi, tip, 0.4f);
                         Burst(b, true);
                         return true;
                     }

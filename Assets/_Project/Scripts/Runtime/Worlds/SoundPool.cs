@@ -14,6 +14,8 @@ namespace MusicInYourHands
     {
         public override int MenuIcon => 8;
 
+        public override string Hint => "Dip your hand into the pool and listen";
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.05f, 0.14f, 0.2f, 0.5f),
@@ -154,6 +156,7 @@ namespace MusicInYourHands
         {
             Build();
             if (view == null) return;
+            if (anchored && ShouldReanchor(view, dt)) anchored = false;
             if (!anchored)
             {
                 var forward = Effects.FlatForward(view);
@@ -161,6 +164,7 @@ namespace MusicInYourHands
                 center.y = Mathf.Max(center.y, Effects.FloorY(view) + 0.45f);
                 surface.SetPositionAndRotation(center, Quaternion.LookRotation(forward, Vector3.up));
                 surface.gameObject.SetActive(true);
+                MarkAnchored(view);
                 anchored = true;
             }
             songTime = music.SongTime;

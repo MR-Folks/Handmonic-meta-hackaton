@@ -176,7 +176,8 @@ namespace MusicInYourHands.EditorTools
                 bands[5] = 0.25f + 0.25f * Mathf.Abs(Mathf.Sin(Time * Mathf.PI / (Beat * 0.5f)));
                 upcoming.Clear();
                 notes.Between(Time, Time + 3f, upcoming);
-                return new MusicFrame { Bands = bands, Kick = k, Beat = beat, SongTime = Time, Upcoming = upcoming, Lyrics = lyrics, Lyric = lyrics.Lookup(Time) };
+                return new MusicFrame { Bands = bands, Kick = k, Beat = beat, SongTime = Time, Upcoming = upcoming, Lyrics = lyrics, Lyric = lyrics.Lookup(Time),
+                    Notes = notes, BeatAge = BeatAge, BeatInterval = Beat };
             }
         }
 

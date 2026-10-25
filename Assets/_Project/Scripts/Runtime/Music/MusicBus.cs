@@ -81,6 +81,8 @@ namespace MusicInYourHands
         /// <summary>1 on each detected beat, decaying towards 0.</summary>
         public float Kick { get; private set; }
         public float TimeSinceBeat { get; private set; } = 99f;
+        /// <summary>The typical time between beats, from the last few (0 until there have been some).</summary>
+        public float BeatInterval { get; private set; }
         public int BeatCount { get; private set; }
 
         public SongAsset CurrentSong { get; private set; }
@@ -369,6 +371,7 @@ namespace MusicInYourHands
 
             if (IsPlaying && rise > beatThreshold && bass > 0.35f && TimeSinceBeat > minBeatInterval)
             {
+                if (TimeSinceBeat < 1.5f) BeatInterval = BeatInterval <= 0f ? TimeSinceBeat : Mathf.Lerp(BeatInterval, TimeSinceBeat, 0.25f);
                 TimeSinceBeat = 0f;
                 BeatCount++;
                 Beat?.Invoke();

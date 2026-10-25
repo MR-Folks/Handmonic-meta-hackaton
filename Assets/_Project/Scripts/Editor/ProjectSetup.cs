@@ -253,6 +253,7 @@ namespace MusicInYourHands.EditorTools
             EnsureWorlds();
             if (Object.FindAnyObjectByType<RuntimeDiagnostics>() == null) new GameObject("RuntimeDiagnostics", typeof(RuntimeDiagnostics));
             if (Object.FindAnyObjectByType<DemoTour>() == null) new GameObject("DemoTour", typeof(DemoTour));
+            if (Object.FindAnyObjectByType<WorldHint>() == null) new GameObject("WorldHint", typeof(WorldHint));
 
             var debugMaterial = EnsureDebugMaterial();
             foreach (var view in Object.FindObjectsByType<MusicDebugView>(FindObjectsInactive.Include, FindObjectsSortMode.None)) SetMaterial(view, debugMaterial);

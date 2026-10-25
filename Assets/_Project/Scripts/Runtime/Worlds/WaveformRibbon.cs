@@ -12,6 +12,8 @@ namespace MusicInYourHands
     {
         public override int MenuIcon => 2;
 
+        public override string Hint => "Pinch with both hands and pull them apart";
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.08f, 0.12f, 0.22f, 0.55f),

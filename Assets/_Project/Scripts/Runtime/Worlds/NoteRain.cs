@@ -15,6 +15,8 @@ namespace MusicInYourHands
     {
         public override int MenuIcon => 4;
 
+        public override string Hint => "Hold out a palm and catch the falling notes";
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.07f, 0.13f, 0.28f, 0.5f),
@@ -90,6 +92,7 @@ namespace MusicInYourHands
         MaterialPropertyBlock block;
         Vector3 center, right, forward;
         float floorY, spawnY, songTime, beatGlow, drizzleDebt;
+        MusicFrame frame;
         bool anchored, built;
 
         public override void Build()
@@ -144,6 +147,7 @@ namespace MusicInYourHands
         {
             Build();
             if (view == null) return;
+            if (anchored && ShouldReanchor(view, dt)) anchored = false;
             if (!anchored)
             {
                 forward = Effects.FlatForward(view);
@@ -151,9 +155,11 @@ namespace MusicInYourHands
                 center = view.transform.position + forward * distance;
                 floorY = Effects.FloorY(view);
                 spawnY = view.transform.position.y + spawnHeight;
+                MarkAnchored(view);
                 anchored = true;
             }
             songTime = music.SongTime;
+            frame = music;
             beatGlow = music.Beat ? 1f : Mathf.MoveTowards(beatGlow, 0f, dt * 2.5f);
 
             bool synced = music.Upcoming != null && music.Upcoming.Count > 0;
@@ -303,7 +309,7 @@ namespace MusicInYourHands
                 AddMark(cup, normal, drop.Color, 0.15f, false);
                 Burst(cup, drop.Color, 10, 0.18f, false);
                 // Soft, so it decorates the sung note rather than competing with it.
-                voices.Play(Synth.Chime(440f * Mathf.Pow(2f, (drop.Midi + 12 - 69) / 12f)), cup, 0.25f);
+                Musical.Play(voices, frame, drop.Midi, cup, 0.3f);
                 Release(drop);
                 return true;
             }

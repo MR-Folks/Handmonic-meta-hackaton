@@ -13,6 +13,8 @@ namespace MusicInYourHands
     {
         public override int MenuIcon => 5;
 
+        public override string Hint => "Hold out an open hand and let the fireflies land";
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.1f, 0.08f, 0.06f, 0.55f),
@@ -136,6 +138,7 @@ namespace MusicInYourHands
             Build();
             if (view == null) return;
             float t = Now;
+            if (anchored && ShouldReanchor(view, dt)) anchored = false;
             if (!anchored)
             {
                 center = view.transform.position + Effects.FlatForward(view) * cloudDistance + Vector3.down * 0.1f;
@@ -146,6 +149,7 @@ namespace MusicInYourHands
                     for (int k = 0; k < TrailPoints; k++) f.History[k] = f.Position;
                     SetVisible(f, true);
                 }
+                MarkAnchored(view);
                 anchored = true;
             }
 

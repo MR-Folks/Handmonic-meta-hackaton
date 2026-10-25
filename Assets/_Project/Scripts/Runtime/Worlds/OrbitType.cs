@@ -14,6 +14,10 @@ namespace MusicInYourHands
     {
         public override int MenuIcon => 12;
 
+        public override bool IsLyric => true;
+
+        public override string Hint => "Push the letters, flick a ring, or make a fist";
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.12f, 0.12f, 0.14f, 0.5f),
@@ -192,12 +196,14 @@ namespace MusicInYourHands
         {
             Build();
             if (view == null) return;
+            if (anchored && ShouldReanchor(view, dt)) anchored = false;
             if (!anchored)
             {
                 var forward = Effects.FlatForward(view);
                 poster.SetPositionAndRotation(view.transform.position + forward * distance + Vector3.up * height,
                     Quaternion.LookRotation(forward, Vector3.up));
                 poster.gameObject.SetActive(true);
+                MarkAnchored(view);
                 anchored = true;
             }
             fade = Mathf.MoveTowards(fade, 1f, dt * 1.5f);

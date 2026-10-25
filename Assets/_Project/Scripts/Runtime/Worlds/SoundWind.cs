@@ -12,6 +12,8 @@ namespace MusicInYourHands
     {
         public override int MenuIcon => 9;
 
+        public override string Hint => "Hold your hand in the wind and spread your fingers";
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.12f, 0.1f, 0.24f, 0.5f),
@@ -130,6 +132,7 @@ namespace MusicInYourHands
         {
             Build();
             if (view == null) return;
+            if (anchored && ShouldReanchor(view, dt)) anchored = false;
             if (!anchored)
             {
                 var head = view.transform.position;
@@ -139,6 +142,7 @@ namespace MusicInYourHands
                 var target = head + right * aim.x + Vector3.up * aim.y + forward * aim.z;
                 flow = (target - source).normalized;
                 SetVentVisible(true);
+                MarkAnchored(view);
                 anchored = true;
             }
             fade = Mathf.MoveTowards(fade, 1f, dt * 1.5f);

@@ -15,6 +15,39 @@ namespace MusicInYourHands
         [SerializeField] Color color = Color.white;
 
         bool beatPending;
+
+        // Re-anchoring: worlds placed in the room move to you when you sit down, stand up, walk elsewhere or
+        // recenter, instead of staying where you were when the world started.
+        static int recenterCount;
+        Vector3 anchorHead;
+        int anchorRecenter;
+        float driftTime;
+
+        /// <summary>Called when the headset recenters (Meta's recenter gesture or button).</summary>
+        public static void NotifyRecentered() => recenterCount++;
+
+        /// <summary>Remember where the head was when the world placed its things in the room.</summary>
+        protected void MarkAnchored(Camera view)
+        {
+            anchorHead = view.transform.position;
+            anchorRecenter = recenterCount;
+            driftTime = 0f;
+        }
+
+        /// <summary>
+        /// True when the world should place itself again: after a recenter, or once the head has stayed more than
+        /// 25 cm higher or lower (sitting down, standing up) or 90 cm away for a moment and a half.
+        /// </summary>
+        protected bool ShouldReanchor(Camera view, float dt)
+        {
+            if (view == null) return false;
+            if (anchorRecenter != recenterCount) return true;
+            var head = view.transform.position;
+            var flat = new Vector2(head.x - anchorHead.x, head.z - anchorHead.z);
+            bool moved = Mathf.Abs(head.y - anchorHead.y) > 0.25f || flat.magnitude > 0.9f;
+            driftTime = moved ? driftTime + dt : 0f;
+            return driftTime > 1.5f;
+        }
         readonly System.Collections.Generic.List<NoteTrack.Note> upcoming = new System.Collections.Generic.List<NoteTrack.Note>();
 
         public string DisplayName => displayName;
@@ -22,6 +55,12 @@ namespace MusicInYourHands
 
         /// <summary>Which emblem the world's menu bubble shows (see the Bubble shader).</summary>
         public virtual int MenuIcon => 0;
+
+        /// <summary>A short line saying what to do here, shown for a few seconds when the world starts.</summary>
+        public virtual string Hint => "";
+
+        /// <summary>True for the worlds built around the song's lyrics; the menu groups them apart.</summary>
+        public virtual bool IsLyric => false;
 
         /// <summary>How the hands look in this world. Applied when the world becomes active.</summary>
         public virtual HandTheme Theme => HandTheme.Veins;
@@ -66,6 +105,9 @@ namespace MusicInYourHands
                 SongTime = bus != null ? bus.SongTime : 0f,
                 Upcoming = upcoming,
                 Lyrics = bus != null ? bus.Lyrics : null,
+                Notes = bus != null ? bus.Notes : null,
+                BeatAge = bus != null ? bus.TimeSinceBeat : 99f,
+                BeatInterval = bus != null ? bus.BeatInterval : 0f,
                 Lyric = bus != null ? bus.Lyric : new LyricsTrack.State(-1, -1)
             };
             beatPending = false;

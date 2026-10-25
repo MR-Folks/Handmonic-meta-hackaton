@@ -13,6 +13,8 @@ namespace MusicInYourHands
     {
         public override int MenuIcon => 11;
 
+        public override string Hint => "Hover a hand over the plate and slide it across";
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.12f, 0.09f, 0.07f, 0.55f),
@@ -145,6 +147,7 @@ namespace MusicInYourHands
         {
             Build();
             if (view == null) return;
+            if (anchored && ShouldReanchor(view, dt)) anchored = false;
             if (!anchored)
             {
                 var forward = Effects.FlatForward(view);
@@ -152,6 +155,7 @@ namespace MusicInYourHands
                 center.y = Mathf.Max(center.y, Effects.FloorY(view) + 0.45f);
                 plate.SetPositionAndRotation(center, Quaternion.LookRotation(forward, Vector3.up));
                 plate.gameObject.SetActive(true);
+                MarkAnchored(view);
                 anchored = true;
             }
             fade = Mathf.MoveTowards(fade, 1f, dt * 2f);

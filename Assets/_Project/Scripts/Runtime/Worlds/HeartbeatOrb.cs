@@ -15,6 +15,8 @@ namespace MusicInYourHands
     {
         public override int MenuIcon => 1;
 
+        public override string Hint => "Hold your palms facing each other, then turn them like a ball";
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.22f, 0.1f, 0.2f, 0.55f),

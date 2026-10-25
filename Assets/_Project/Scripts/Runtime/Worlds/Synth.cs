@@ -65,6 +65,31 @@ namespace MusicInYourHands
             return Store(key, data, rate);
         }
 
+        /// <summary>
+        /// A soft, warm note (like a kalimba tine) for touches that should blend with the song: a sine with a
+        /// short-lived overtone and a gentle tail, nothing bright enough to cut across the mix.
+        /// </summary>
+        public static AudioClip Soft(float frequency)
+        {
+            string key = $"soft {frequency:F1}";
+            if (Cache.TryGetValue(key, out var clip)) return clip;
+
+            int rate = Rate, length = (int)(rate * 1.6f);
+            var data = new float[length];
+            float lowpass = 0f;
+            for (int i = 0; i < length; i++)
+            {
+                float t = i / (float)rate;
+                float env = Mathf.Min(1f, t / 0.006f) * Mathf.Exp(-t * 2.8f);
+                float s = Mathf.Sin(2f * Mathf.PI * frequency * t)
+                          + 0.22f * Mathf.Sin(2f * Mathf.PI * frequency * 2f * t) * Mathf.Exp(-t * 9f)
+                          + 0.06f * Mathf.Sin(2f * Mathf.PI * frequency * 5.4f * t) * Mathf.Exp(-t * 30f);
+                lowpass += (s - lowpass) * 0.35f;
+                data[i] = lowpass * env * 0.3f;
+            }
+            return Store(key, data, rate);
+        }
+
         /// <summary>A spray can's hiss: a second of bright noise that loops seamlessly.</summary>
         public static AudioClip Hiss()
         {
@@ -120,14 +145,22 @@ namespace MusicInYourHands
             }
         }
 
-        public void Play(AudioClip clip, Vector3 position, float volume, float pitch = 1f)
+        /// <summary>Plays a clip at a place, now or after <paramref name="delay"/> seconds (to land on the beat).</summary>
+        public void Play(AudioClip clip, Vector3 position, float volume, float pitch = 1f, float delay = 0f)
         {
             if (!Application.isPlaying || clip == null) return;
             var s = sources[next];
             next = (next + 1) % sources.Length;
             s.transform.position = position;
             s.pitch = pitch;
-            s.PlayOneShot(clip, volume);
+            if (delay <= 0.005f)
+            {
+                s.PlayOneShot(clip, volume);
+                return;
+            }
+            s.clip = clip;
+            s.volume = volume;
+            s.PlayScheduled(AudioSettings.dspTime + delay);
         }
     }
 }

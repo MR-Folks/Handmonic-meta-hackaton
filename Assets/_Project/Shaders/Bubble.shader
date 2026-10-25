@@ -255,7 +255,7 @@ Shader "MusicInYourHands/Bubble"
                 color += gloss;
                 alpha = max(alpha, gloss);
 
-                float e = Emblem(p * 1.5, _Icon, t);
+                float e = Emblem(p * 1.22, _Icon, t);
                 color += lerp(_Color.rgb, 1, 0.35) * e * (1.1 + _Hover * 0.6);
                 alpha = max(alpha, e * 0.95);
 

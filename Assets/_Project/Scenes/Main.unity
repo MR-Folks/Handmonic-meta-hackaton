@@ -561,7 +561,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.DemoTour
   secondsPerWorld: 16
-  hintSeconds: 5
 --- !u!4 &596022185
 Transform:
   m_ObjectHideFlags: 0
@@ -784,10 +783,11 @@ MonoBehaviour:
   bubbleMaterial: {fileID: 2100000, guid: fa89d5024587b4c8e83405b9bccf5a04, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
-  distance: 0.42
-  drop: 0.06
-  spacing: 0.1
-  bubbleSize: 0.088
+  distance: 0.48
+  drop: 0.05
+  spacing: 0.086
+  bubbleSize: 0.078
+  followAngle: 38
   pinchThresholds: {x: 0.85, y: 0.5}
 --- !u!4 &1126936837
 Transform:
@@ -956,6 +956,53 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1512639469}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1289835818
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1289835820}
+  - component: {fileID: 1289835819}
+  m_Layer: 0
+  m_Name: WorldHint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1289835819
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1289835818}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 760aa22e092b84fd593243fb38af6bfe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.WorldHint
+  showSeconds: 4.5
+  distance: 0.65
+  drop: 0.16
+--- !u!4 &1289835820
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1289835818}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1383540393
 GameObject:
@@ -2146,3 +2193,4 @@ SceneRoots:
   - {fileID: 1126936837}
   - {fileID: 1022504059}
   - {fileID: 596022185}
+  - {fileID: 1289835820}
