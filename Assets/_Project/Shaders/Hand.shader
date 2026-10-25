@@ -88,10 +88,12 @@ Shader "MusicInYourHands/Hand"
             if (_Pattern < 2.5)
             {
                 // Oscilloscope: bright scanlines sweep from the wrist to the fingertips.
-                // Hairline traces about 5 mm apart, lit only where the slower sweep passes (and a little on the kick).
+                // Hairline traces about 5 mm apart, lit only in a band that sweeps from the wrist to the fingertips
+                // after each beat and fades on the way; between beats the hand is clear.
                 float scan = pow(saturate(sin(along * 1300 - t * 20) * 0.5 + 0.5), 24);
-                float sweep = pow(saturate(sin(along * 30 - t * 5) * 0.5 + 0.5), 16);
-                float k = scan * (sweep * 1.1 + _Kick * 0.1);
+                float front = _BeatAge * 0.5;
+                float sweep = exp(-pow((along - front) / 0.022, 2)) * exp(-_BeatAge * 2.2);
+                float k = scan * sweep * 1.6;
                 return float4(c * k, k * 0.5);
             }
             if (_Pattern < 3.5)

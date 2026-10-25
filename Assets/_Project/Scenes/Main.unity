@@ -231,12 +231,12 @@ MonoBehaviour:
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
   areaWidth: 0.9
   areaDepth: 0.4
-  distance: 0.62
+  distance: 0.5
   spawnHeight: 0.35
   fallTime: 1.8
   catchRadius: 0.075
-  maxDrops: 72
-  drizzleRate: 9
+  maxDrops: 120
+  drizzleRate: 30
   dropsPerBeat: 3
   onsetRise: 0.16
   onsetLevel: 0.45
@@ -289,8 +289,6 @@ MonoBehaviour:
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   count: 44
-  cloudDistance: 0.6
-  cloudRadius: 0.45
   flySize: 0.016
   startle: 0.4
   waveSpeed: 1.1
@@ -609,6 +607,7 @@ MonoBehaviour:
   color: {r: 1, g: 0.37, b: 0.68, a: 1}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   tipSize: 0.045
   fingerColors:
   - {r: 1, g: 0.83, b: 0.42, a: 1}
@@ -618,9 +617,8 @@ MonoBehaviour:
   - {r: 1, g: 0.56, b: 0.78, a: 1}
   waveRadius: 0.14
   waveLife: 1.1
-  waveColor: {r: 0.62, g: 0.56, b: 1, a: 1}
-  waveBeatColor: {r: 1, g: 0.37, b: 0.68, a: 1}
   maxWaves: 16
+  trailSpeed: {x: 0.35, y: 1.1}
   sparksPerMetre: 70
   sparksPerBeat: 3
 --- !u!4 &689960896
@@ -686,9 +684,11 @@ MonoBehaviour:
   color: {r: 1, g: 0.7, b: 0.42, a: 1}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  silkMaterial: {fileID: 2100000, guid: 6a8303df8baf04a3c8de8da833d88525, type: 2}
   points: 96
   amplitude: 0.07
   strandWidth: 0.007
+  silkHalfWidth: 0.024
   grabPinch: 0.75
   releasePinch: 0.45
   tug: 0.007
@@ -2044,6 +2044,7 @@ MonoBehaviour:
   color: {r: 0.37, g: 0.83, b: 1, a: 1}
   waterMaterial: {fileID: 2100000, guid: 5a8cb478aa2674256bde3519ded63635, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  causticsMaterial: {fileID: 2100000, guid: 630e4af74708d49b4b4e1a22e4c476d3, type: 2}
   size: {x: 0.7, y: 0.48}
   distance: 0.5
   belowEyes: 0.52
@@ -2103,6 +2104,7 @@ MonoBehaviour:
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
+  paintMaterial: {fileID: 2100000, guid: 9527ccac3e9d14c0d948501ee821f887, type: 2}
   wallRadius: 1.6
   tagHeight: 0.2
   holdTime: 4

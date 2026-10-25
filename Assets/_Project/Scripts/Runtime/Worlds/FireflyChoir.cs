@@ -3,11 +3,12 @@ using UnityEngine;
 namespace MusicInYourHands
 {
     /// <summary>
-    /// The Firefly choir world: a swarm of fireflies drifts around you on slow swirling currents, each a bright core
+    /// The Firefly choir world: a swarm of fireflies drifts all around you on slow swirling currents, each a bright core
     /// in a soft halo with a fading trail. They sing in four voices (low to high frequency bands), each voice glowing
     /// with its part of the music, and on every beat a wave of flashes ripples out through the swarm. Hold out an open
-    /// hand and they come to it, resting on your fingertips and circling your palm, while warm specks twinkle in your
-    /// skin. Each kick startles some of them up and away. Close your hand and they swirl around your fist.
+    /// hand and a few of them come to it, resting on your fingertips and circling your palm, while warm specks twinkle
+    /// in your skin; the rest keep filling the room. Each kick startles some of them away. Close your hand and they
+    /// swirl around your fist. Sweep a hand quickly and the fireflies near it are carried along in that direction.
     /// </summary>
     public class FireflyChoir : World
     {
@@ -17,7 +18,7 @@ namespace MusicInYourHands
 
         public override HandTheme Theme => new HandTheme
         {
-            Fill = new Color(0.1f, 0.08f, 0.06f, 0.55f),
+            Fill = new Color(0.3f, 0.24f, 0.17f, 0.42f),
             Edge = new Color(1f, 0.78f, 0.45f),
             Glow = new Color(1f, 0.9f, 0.55f),
             Pattern = HandTheme.Effect.Specks,
@@ -30,8 +31,6 @@ namespace MusicInYourHands
 
         [Header("Swarm")]
         [SerializeField] int count = 44;
-        [SerializeField] float cloudDistance = 0.6f;
-        [SerializeField] float cloudRadius = 0.45f;
         [SerializeField] float flySize = 0.014f;
         [Tooltip("Share of the swarm that a kick startles.")]
         [SerializeField, Range(0f, 1f)] float startle = 0.35f;
@@ -99,7 +98,7 @@ namespace MusicInYourHands
                     Core = Effects.MakeQuad($"Firefly {i}", transform, glowMaterial),
                     Trail = new LineStrip($"Firefly Trail {i}", transform, lineMaterial, DrawPoints),
                     History = new Vector3[TrailPoints],
-                    Home = new Vector3((float)random.NextDouble() * 2 - 1, (float)random.NextDouble() * 2 - 1, (float)random.NextDouble() * 2 - 1),
+                    Home = RoomSpot(random),
                     Phase = (float)random.NextDouble() * 20f,
                     Speed = 0.6f + (float)random.NextDouble() * 0.8f,
                     Voice = i % VoiceColors.Length
@@ -141,10 +140,11 @@ namespace MusicInYourHands
             if (anchored && ShouldReanchor(view, dt)) anchored = false;
             if (!anchored)
             {
-                center = view.transform.position + Effects.FlatForward(view) * cloudDistance + Vector3.down * 0.1f;
+                // The swarm lives around you, centred a little below your eyes.
+                center = view.transform.position + Vector3.down * 0.25f;
                 foreach (var f in flies)
                 {
-                    f.Position = center + f.Home * cloudRadius;
+                    f.Position = center + f.Home;
                     f.Velocity = Vector3.zero;
                     for (int k = 0; k < TrailPoints; k++) f.History[k] = f.Position;
                     SetVisible(f, true);
@@ -182,14 +182,20 @@ namespace MusicInYourHands
                 }
                 f.Startled -= dt;
 
-                int side = calling == 0 ? -1 : calling == 2 ? i % 2 : (open[0] || fist[0] ? 0 : 1);
+                // Only every fourth firefly answers a hand; the rest stay out in the room.
+                int caller = i / 4;
+                int side = calling == 0 || i % 4 != 0 ? -1 : calling == 2 ? caller % 2 : (open[0] || fist[0] ? 0 : 1);
                 var target = Target(rig, f, i, side, t, out float pull);
                 if (side >= 0 && Vector3.Distance(f.Position, target) < 0.02f) landedOn[side] += 1f;
 
                 if (f.Startled > 0f) pull *= 0.15f;
                 f.Velocity += (target - f.Position) * (pull * dt);
                 // Free fireflies ride slow swirling currents rather than heading straight home.
-                if (side < 0) f.Velocity += Current(f.Position, t) * dt;
+                if (side < 0)
+                {
+                    f.Velocity += Current(f.Position, t) * dt;
+                    Gust(rig, f, dt);
+                }
                 f.Velocity *= Mathf.Exp(-dt * (side >= 0 ? 6f : 2f));
                 f.Position += f.Velocity * dt;
                 f.Landed = Mathf.MoveTowards(f.Landed, Vector3.Distance(f.Position, target) < 0.02f ? 1f : 0f, dt * 4f);
@@ -205,7 +211,7 @@ namespace MusicInYourHands
             if (side < 0)
             {
                 pull = 1.2f;
-                return center + f.Home * cloudRadius + Wobble(f, t, 0.1f);
+                return center + f.Home + Wobble(f, t, 0.1f);
             }
             var hand = rig.Get(side == 0);
             var palm = Palm(hand);
@@ -218,7 +224,7 @@ namespace MusicInYourHands
                 return palm + Quaternion.AngleAxis(a * Mathf.Rad2Deg, axis) * (Vector3.up * radius);
             }
             pull = 9f;
-            int slot = i / 2 % 8;
+            int slot = i / 8 % 8;
             if (slot < 5)
             {
                 var tip = hand.TipJoints[slot] != null ? hand.TipJoints[slot].position : hand.Tips[slot];
@@ -249,7 +255,7 @@ namespace MusicInYourHands
             f.Core.SetPropertyBlock(block);
 
             f.Halo.transform.position = f.Position;
-            f.Halo.transform.localScale = Vector3.one * flySize * (3.2f + glow * 1.6f);
+            f.Halo.transform.localScale = Vector3.one * flySize * (1.7f + glow * 0.8f);
             Effects.Face(f.Halo.transform, view);
             block.Clear();
             block.SetColor(ColorId, color);
@@ -321,6 +327,31 @@ namespace MusicInYourHands
                 block.SetColor(ColorId, VoiceColors[1]);
                 block.SetFloat(IntensityId, share * 0.7f);
                 g.SetPropertyBlock(block);
+            }
+        }
+
+        /// <summary>A home for a free firefly: somewhere in a shell around you, from arm's length to across the room.</summary>
+        static Vector3 RoomSpot(System.Random random)
+        {
+            float angle = (float)random.NextDouble() * Mathf.PI * 2f;
+            float reach = Mathf.Lerp(0.5f, 1.8f, Mathf.Sqrt((float)random.NextDouble()));
+            float height = Mathf.Lerp(-0.7f, 0.5f, (float)random.NextDouble());
+            return new Vector3(Mathf.Cos(angle) * reach, height, Mathf.Sin(angle) * reach);
+        }
+
+        /// <summary>A fast-moving hand sweeps nearby free fireflies along with it.</summary>
+        void Gust(HandRig rig, Fly f, float dt)
+        {
+            if (rig == null) return;
+            for (int s = 0; s < 2; s++)
+            {
+                var hand = rig.Get(s == 0);
+                if (!hand.IsTracked) continue;
+                float speed = hand.Velocity.magnitude;
+                if (speed < 0.6f) continue;
+                float d = Vector3.Distance(f.Position, Palm(hand));
+                if (d > 0.5f) continue;
+                f.Velocity += hand.Velocity * ((1f - d / 0.5f) * Mathf.Min(speed - 0.6f, 1.5f) * 3f * dt);
             }
         }
 

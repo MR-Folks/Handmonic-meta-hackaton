@@ -379,7 +379,8 @@ namespace MusicInYourHands.EditorTools
             if (manager == null) manager = new GameObject("Worlds", typeof(WorldManager)).GetComponent<WorldManager>();
 
             var livingSkin = EnsureWorld<LivingSkin>(manager.transform, "LivingSkin", "Living skin", new Color(1f, 0.37f, 0.68f));
-            SetReferences(livingSkin, ("glowMaterial", glow), ("ringMaterial", EnsureMaterial(RingMaterialPath, "MusicInYourHands/Ring")));
+            SetReferences(livingSkin, ("glowMaterial", glow), ("ringMaterial", EnsureMaterial(RingMaterialPath, "MusicInYourHands/Ring")),
+                ("lineMaterial", EnsureMaterial(LineMaterialPath, "MusicInYourHands/Line")));
 
             var orb = EnsureWorld<HeartbeatOrb>(manager.transform, "HeartbeatOrb", "Heartbeat orb", new Color(1f, 0.83f, 0.42f));
             SetReferences(orb, ("glowMaterial", glow), ("orbMaterial", EnsureMaterial(OrbMaterialPath, "MusicInYourHands/Orb")),
@@ -390,7 +391,7 @@ namespace MusicInYourHands.EditorTools
             var ring = EnsureMaterial(RingMaterialPath, "MusicInYourHands/Ring");
 
             var ribbon = EnsureWorld<WaveformRibbon>(manager.transform, "WaveformRibbon", "Waveform ribbon", new Color(1f, 0.7f, 0.42f));
-            SetReferences(ribbon, ("lineMaterial", line), ("glowMaterial", glow));
+            SetReferences(ribbon, ("lineMaterial", line), ("glowMaterial", glow), ("silkMaterial", EnsureMaterial(SilkMaterialPath, "MusicInYourHands/Silk")));
 
             var strings = EnsureWorld<AirStrings>(manager.transform, "AirStrings", "Air strings", new Color(0.49f, 0.95f, 0.79f));
             SetReferences(strings, ("lineMaterial", line), ("glowMaterial", glow), ("ringMaterial", ring));
@@ -402,7 +403,8 @@ namespace MusicInYourHands.EditorTools
             SetReferences(fireflies, ("glowMaterial", glow), ("lineMaterial", line));
 
             var pool = EnsureWorld<SoundPool>(manager.transform, "SoundPool", "Sound pool", new Color(0.37f, 0.83f, 1f));
-            SetReferences(pool, ("waterMaterial", EnsureMaterial(WaterMaterialPath, "MusicInYourHands/Water")), ("glowMaterial", glow));
+            SetReferences(pool, ("waterMaterial", EnsureMaterial(WaterMaterialPath, "MusicInYourHands/Water")), ("glowMaterial", glow),
+                ("causticsMaterial", EnsureMaterial(CausticsMaterialPath, "MusicInYourHands/Caustics")));
 
             var wind = EnsureWorld<SoundWind>(manager.transform, "SoundWind", "Sound wind", new Color(0.49f, 0.95f, 0.79f));
             SetReferences(wind, ("glowMaterial", glow), ("ringMaterial", ring));
@@ -421,7 +423,8 @@ namespace MusicInYourHands.EditorTools
             SetReferences(orbitType, ("letteringMaterial", lettering), ("lineMaterial", line), ("glowMaterial", glow));
 
             var graffiti = EnsureWorld<Graffiti>(manager.transform, "Graffiti", "Graffiti", new Color(1f, 0.7f, 0.42f));
-            SetReferences(graffiti, ("letteringMaterial", lettering), ("lineMaterial", line), ("glowMaterial", glow), ("ringMaterial", ring));
+            SetReferences(graffiti, ("letteringMaterial", lettering), ("lineMaterial", line), ("glowMaterial", glow), ("ringMaterial", ring),
+                ("paintMaterial", EnsureMaterial(PaintMaterialPath, "MusicInYourHands/PaintStroke")));
 
             World[] order = { livingSkin, orb, ribbon, strings, rain, fireflies, pool, wind, bubbles, sand, orbitType, graffiti };
             list.arraySize = order.Length;
@@ -470,6 +473,9 @@ namespace MusicInYourHands.EditorTools
         public const string StreakMaterialPath = Root + "/Materials/Streak.mat";
         public const string GlowMaterialPath = Root + "/Materials/Glow.mat";
         public const string WaterMaterialPath = Root + "/Materials/Water.mat";
+        public const string SilkMaterialPath = Root + "/Materials/Silk.mat";
+        public const string CausticsMaterialPath = Root + "/Materials/Caustics.mat";
+        public const string PaintMaterialPath = Root + "/Materials/PaintStroke.mat";
         public const string PlateMaterialPath = Root + "/Materials/Plate.mat";
         public const string LetteringMaterialPath = Root + "/Materials/Lettering.mat";
         public const string RingMaterialPath = Root + "/Materials/Ring.mat";

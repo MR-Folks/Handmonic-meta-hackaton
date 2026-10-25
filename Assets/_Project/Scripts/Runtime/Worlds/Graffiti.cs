@@ -6,8 +6,7 @@ namespace MusicInYourHands
     /// <summary>
     /// The Graffiti world: the lyrics get sprayed onto the room wherever your hand points. Each sung word lands as a
     /// tag on the wall (or the floor, if you point down), sprayed on from left to right with a speckled overspray.
-    /// While you keep pointing at the same spot, the words of a line follow each other like a written tag, and a new
-    /// line starts below;
+    /// Keep pointing at the same spot and new words pile up over the old ones, as on a real wall;
     /// on walls the paint drips for a moment, then the tag fades away. Pinch to spray paint yourself: a mist streams
     /// from your fingers with a hiss and leaves glowing strokes where you point. Your fingertip gets speckled with
     /// the paint colour. Until the room is scanned, the walls are an invisible ring around you.
@@ -34,6 +33,7 @@ namespace MusicInYourHands
         [SerializeField] Material lineMaterial;
         [SerializeField] Material glowMaterial;
         [SerializeField] Material ringMaterial;
+        [SerializeField] Material paintMaterial;
 
         [Header("Walls")]
         [Tooltip("Radius of the stand-in walls around you until the room is scanned (m).")]
@@ -89,10 +89,6 @@ namespace MusicInYourHands
         Vector3 center;
         float floorY, sprayDebt;
         string lastKey = "";
-        // Where the next word of the line goes, while the aim stays near the last tag.
-        Vector3 writeAt, writeNormal, lineStart;
-        int writeLine = -1;
-        bool writing;
         Stroke current;
         bool wasPinching, anchored, built;
         Color paint = Effects.Orange;
@@ -114,7 +110,7 @@ namespace MusicInYourHands
                 var text = go.AddComponent<TextMesh>();
                 text.font = font;
                 text.fontSize = FontSize;
-                text.fontStyle = FontStyle.Bold;
+                text.fontStyle = FontStyle.BoldAndItalic;
                 text.anchor = TextAnchor.MiddleCenter;
                 text.alignment = TextAlignment.Center;
                 var r = go.GetComponent<MeshRenderer>();
@@ -126,7 +122,7 @@ namespace MusicInYourHands
             }
             for (int i = 0; i < maxStrokes; i++)
             {
-                var stroke = new Stroke { Line = new LineStrip($"Stroke {i}", transform, lineMaterial, StrokePoints) };
+                var stroke = new Stroke { Line = new LineStrip($"Stroke {i}", transform, paintMaterial, StrokePoints) };
                 stroke.Line.SetVisible(false);
                 strokes.Add(stroke);
             }
@@ -287,10 +283,10 @@ namespace MusicInYourHands
             float height = tagHeight * Mathf.Clamp(distance / wallRadius, 0.6f, 1.6f) * Random.Range(0.85f, 1.2f);
             tag.Text.characterSize = height * 10f / FontSize;
             tag.Text.text = word;
-            font.RequestCharactersInTexture(word, FontSize, FontStyle.Bold);
+            font.RequestCharactersInTexture(word, FontSize, FontStyle.BoldAndItalic);
             float width = 0f;
             foreach (char ch in word)
-                if (font.GetCharacterInfo(ch, out var info, FontSize, FontStyle.Bold)) width += info.advance;
+                if (font.GetCharacterInfo(ch, out var info, FontSize, FontStyle.BoldAndItalic)) width += info.advance;
             tag.Width = width * height / FontSize;
             tag.Age = 0f;
             tag.Color = Color.Lerp(paint, Color.white, 0.1f);
@@ -303,17 +299,8 @@ namespace MusicInYourHands
             var right = facing * Vector3.right;
             var down = facing * Vector3.down;
 
-            // Keep writing the line where the last word ended while the aim stays close; a new line goes below.
-            Vector3 at;
-            bool near = writing && Vector3.Distance(aim, lineStart) < 0.45f && Vector3.Dot(normal, writeNormal) > 0.9f;
-            if (near && line == writeLine) at = writeAt + right * (tag.Width * 0.5f);
-            else if (near) at = lineStart + down * (height * 1.35f) + right * (tag.Width * 0.5f - 0.05f);
-            else at = aim;
-            if (!near || line != writeLine) lineStart = at - right * (tag.Width * 0.5f);
-            writing = true;
-            writeLine = line;
-            writeNormal = normal;
-            writeAt = at + right * (tag.Width * 0.5f + height * 0.35f);
+            // Each word lands where you point, right over the last one if you keep still, which is half the fun.
+            var at = aim + right * Random.Range(-0.03f, 0.03f) + down * Random.Range(-0.02f, 0.02f);
 
             var rotation = facing * Quaternion.Euler(0f, 0f, Random.Range(-6f, 6f));
             tag.Text.transform.SetPositionAndRotation(at + down * Random.Range(-0.012f, 0.012f), rotation);
@@ -345,7 +332,7 @@ namespace MusicInYourHands
                     if (current.Points.Count < StrokePoints) current.Points.Add(hit);
                     else current = null;
                 }
-                sprayDebt += 260f * dt;
+                sprayDebt += 110f * dt;
                 int count = (int)sprayDebt;
                 sprayDebt -= count;
                 float travel = Vector3.Distance(nozzle, hit);
@@ -357,8 +344,8 @@ namespace MusicInYourHands
                     {
                         position = nozzle,
                         velocity = (target - nozzle) / life + Random.insideUnitSphere * 0.1f,
-                        startColor = Color.Lerp(paint, Color.white, 0.2f),
-                        startSize = Random.Range(0.004f, 0.009f) * (1f + travel * 0.4f),
+                        startColor = new Color(paint.r, paint.g, paint.b, 0.45f),
+                        startSize = Random.Range(0.002f, 0.005f) * (1f + travel * 0.3f),
                         startLifetime = life
                     }, 1);
                 }
@@ -437,6 +424,8 @@ namespace MusicInYourHands
                 block.SetFloat(RevealId, reveal * 1.1f);
                 block.SetVector(ExtentId, new Vector4(-tag.Width * 0.5f, tag.Width * 0.5f, 0f, 0f));
                 block.SetFloat(SprayId, 1f);
+                block.SetFloat("_Outline", 1f);
+                block.SetColor("_OutlineColor", new Color(0.97f, 0.96f, 0.93f));
                 block.SetFloat(AlphaId, alpha);
                 tag.Renderer.SetPropertyBlock(block);
 
@@ -470,7 +459,7 @@ namespace MusicInYourHands
                 for (int i = 0; i < s.Points.Count; i++) path[i] = s.Points[i];
                 var c = s.Color;
                 c.a = alpha * 0.9f;
-                s.Line.Set(path, s.Points.Count, 0.012f, c, view.transform.position, false);
+                s.Line.Set(path, s.Points.Count, 0.022f, c, view.transform.position, false);
             }
         }
     }

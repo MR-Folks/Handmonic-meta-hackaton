@@ -1,6 +1,7 @@
 // The Sound pool's liquid surface: a see-through teal sheet whose heights come from SoundPool's wave simulation.
-// Slopes catch a soft highlight, a lattice of tiny lights in the liquid brightens where waves run (like the concept
-// page's dotted pool), and the edges fade into a thin glowing lip so the pool sits in the room without a hard box.
+// Slopes catch a soft highlight and the edges fade into a thin glowing lip so the pool sits in the room without a
+// hard box. (The specks of light in the water are real 3D particles, drawn by SoundPool.) It draws before the
+// hands, so a hand in the water always shows through, tinted by its own underwater effect.
 Shader "MusicInYourHands/Water"
 {
     Properties
@@ -15,7 +16,7 @@ Shader "MusicInYourHands/Water"
 
     SubShader
     {
-        Tags { "RenderType" = "Transparent" "Queue" = "Transparent+1" "RenderPipeline" = "UniversalPipeline" "IgnoreProjector" = "True" }
+        Tags { "RenderType" = "Transparent" "Queue" = "Transparent-5" "RenderPipeline" = "UniversalPipeline" "IgnoreProjector" = "True" }
 
         Pass
         {
@@ -87,18 +88,14 @@ Shader "MusicInYourHands/Water"
                 float crest = saturate(abs(input.height) * 140 + slope * 0.4);
                 float3 color = lerp(_Deep.rgb, _Shallow.rgb, saturate(crest * 0.7 + fresnel * 0.4));
 
-                // A lattice of tiny lights, brighter where the liquid moves.
-                float2 cell = frac(input.uv * _Dots.xy) - 0.5;
-                float dots = smoothstep(0.2, 0.05, length(cell)) * (0.04 + crest * 0.9 + _Kick * 0.15);
-
                 // Soft edges with a thin glowing lip.
                 float2 e = min(input.uv, 1 - input.uv);
                 float edge = min(e.x * 1.4, e.y);
                 float inside = smoothstep(0.0, 0.05, edge);
                 float lip = exp(-pow((edge - 0.012) / 0.006, 2)) * (0.7 + _Kick * 0.5);
 
-                color += _Shallow.rgb * dots + spec + _Lip.rgb * lip;
-                float alpha = _Deep.a * 0.5 + fresnel * 0.3 + crest * 0.2 + dots * 0.5 + spec;
+                color += spec + _Lip.rgb * lip;
+                float alpha = _Deep.a * 0.5 + fresnel * 0.3 + crest * 0.25 + spec;
                 alpha = saturate(alpha) * inside + lip;
                 return half4(color, saturate(alpha) * _Alpha);
             }

@@ -120,10 +120,13 @@ Shader "MusicInYourHands/Orb"
 
                 // A soft shimmer that drifts across the surface.
                 float shimmer = sin(dot(input.positionOS, float3(7, 11, 5)) * 2 + _Time.y * 2.2) * 0.5 + 0.5;
-                float3 color = _Tint.rgb * (0.7 + 0.25 * shimmer + 0.6 * fresnel);
-                color = lerp(color, 1, fresnel * (0.2 + _Kick * 0.35));
+                // Hot in the middle (white-gold where the heart faces you), its own colour towards the edges.
+                float3 hot = float3(1.0, 0.9, 0.72);
+                float centre = pow(ndv, 2.5) * (0.75 + _Kick * 0.25);
+                float3 color = lerp(_Tint.rgb * (0.8 + 0.25 * shimmer), hot, centre);
+                color += _Tint.rgb * fresnel * 0.5;
 
-                float alpha = _Opacity * (0.5 + ndv * 0.5) + fresnel * 0.35 * (1 + _Kick * 0.6);
+                float alpha = _Opacity * (0.45 + centre * 1.1) + fresnel * 0.3 * (1 + _Kick * 0.6);
                 return half4(color, saturate(alpha) * _Alpha);
             }
             ENDHLSL

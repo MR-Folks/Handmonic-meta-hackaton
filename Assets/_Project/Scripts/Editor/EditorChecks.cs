@@ -208,6 +208,7 @@ namespace MusicInYourHands.EditorTools
             var so = new SerializedObject(skin);
             so.FindProperty("glowMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow");
             so.FindProperty("ringMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.RingMaterialPath, "MusicInYourHands/Ring");
+            so.FindProperty("lineMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.LineMaterialPath, "MusicInYourHands/Line");
             so.ApplyModifiedPropertiesWithoutUndo();
             skin.Build();
 
@@ -416,7 +417,8 @@ namespace MusicInYourHands.EditorTools
         }
 
         static bool CheckRibbonPreview() => CheckWorldPreview<WaveformRibbon>("Waveform ribbon preview", "Logs/preview-ribbon.png",
-            new[] { ("lineMaterial", ProjectSetup.LineMaterialPath, "MusicInYourHands/Line"), ("glowMaterial", ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow") },
+            new[] { ("lineMaterial", ProjectSetup.LineMaterialPath, "MusicInYourHands/Line"), ("glowMaterial", ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow"),
+                ("silkMaterial", ProjectSetup.SilkMaterialPath, "MusicInYourHands/Silk") },
             (hands, rig, world, camera) => { rig.Left.Pinch = 1f; rig.Right.Pinch = 1f; }, 0.6f);
 
         static bool CheckStringsPreview() => CheckWorldPreview<AirStrings>("Air strings preview", "Logs/preview-strings.png",

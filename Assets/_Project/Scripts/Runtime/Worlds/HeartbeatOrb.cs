@@ -82,9 +82,9 @@ namespace MusicInYourHands
         // Torus knots wound around the shell: (p, q) winding, colour, comet speed (loops per second at rest).
         static readonly (int p, int q, Color color, float speed)[] Knots =
         {
-            (2, 3, Gold, 0.22f),
-            (3, 5, Pink, -0.16f),
-            (2, 5, Blue, 0.19f)
+            (2, 3, new Color(1f, 0.72f, 0.2f), 0.22f),
+            (3, 5, new Color(1f, 0.25f, 0.6f), -0.16f),
+            (2, 5, new Color(0.35f, 0.6f, 1f), 0.19f)
         };
 
         const int DotCount = 1500;
@@ -274,8 +274,8 @@ namespace MusicInYourHands
             core.rotation = halo.rotation;
             core.localScale = Vector3.one * (0.5f + kick * 0.3f + music.Band(1) * 0.1f);
             block.Clear();
-            block.SetColor(ColorId, Color.Lerp(Pink, Gold, 0.35f + kick * 0.4f));
-            block.SetFloat(IntensityId, (0.6f + kick * 0.5f) * ease);
+            block.SetColor(ColorId, Color.Lerp(Gold, Color.white, 0.3f + kick * 0.4f));
+            block.SetFloat(IntensityId, (0.75f + kick * 0.6f) * ease);
             coreRenderer.SetPropertyBlock(block);
             block.Clear();
             block.SetColor(ColorId, Color.Lerp(Violet, Pink, 0.4f + kick * 0.6f));
@@ -318,8 +318,9 @@ namespace MusicInYourHands
                     float behind = Mathf.Repeat(knot.speed >= 0f ? head - u : u - head, 1f);
                     float comet = Mathf.Exp(-behind * 14f);
                     float near = Vector3.Dot((p - center).normalized, toEye) * 0.5f + 0.5f;
-                    var c = Color.Lerp(knot.color, Color.white, comet * comet * comet * 0.7f);
-                    c.a = (0.2f + comet * 0.9f) * Mathf.Lerp(0.3f, 1f, near);
+                    // Keep the knot's own colour; only the comet's very head turns white.
+                    var c = Color.Lerp(knot.color, Color.white, comet * comet * comet * comet * 0.5f);
+                    c.a = (0.35f + comet * 0.8f) * Mathf.Lerp(0.3f, 1f, near);
                     pathColors[i] = c;
                 }
                 line.Set(path, pathColors, KnotPoints, 0.003f + music.Kick * 0.0015f, new Color(1f, 1f, 1f, visibility), eye, false);
@@ -503,6 +504,10 @@ namespace MusicInYourHands
                 knotPhase[i] = i * 0.33f;
                 knots[i] = new LineStrip($"Knot {i}", transform, lineMaterial, KnotPoints);
                 knots[i].SetVisible(false);
+                // A thin coloured core instead of the line's usual white-hot one, so the knots read in colour.
+                var lineBlock = new MaterialPropertyBlock();
+                lineBlock.SetFloat("_Core", 0.08f);
+                knots[i].Renderer.SetPropertyBlock(lineBlock);
             }
 
             tendrils = new LineStrip[10];

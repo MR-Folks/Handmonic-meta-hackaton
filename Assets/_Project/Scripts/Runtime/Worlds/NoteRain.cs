@@ -6,8 +6,9 @@ namespace MusicInYourHands
     /// <summary>
     /// The Note rain world: the melody falls as drops of light. Each sung note is a glowing teardrop that lands on the
     /// floor exactly as the note is sung, placed by pitch from left (low) to right (high), like a piano roll on your
-    /// floor. A fine drizzle of small drops falls with the hi-hats and a few more with every beat, so the air is
-    /// never empty. Landings leave glowing marks that pulse on the beat. Catch drops in your palm instead: each one splashes
+    /// floor; a ring on the floor shows where each one will land, tightening as it arrives. A fine drizzle of small
+    /// drops falls all around you with the hi-hats and a few more with every beat, so the room is never dry.
+    /// Landings leave glowing marks that pulse on the beat, and your palm lights up just before a drop lands in it. Catch drops in your palm instead: each one splashes
     /// with a soft chime and ripples spread across your hand as it fills with light. Songs without a note track rain
     /// on what the analyser hears.
     /// </summary>
@@ -34,15 +35,15 @@ namespace MusicInYourHands
         [Header("Rain")]
         [SerializeField] float areaWidth = 0.9f;
         [SerializeField] float areaDepth = 0.4f;
-        [SerializeField] float distance = 0.62f;
+        [SerializeField] float distance = 0.5f;
         [Tooltip("Where drops appear, relative to the eyes.")]
         [SerializeField] float spawnHeight = 0.35f;
         [Tooltip("Seconds from appearing to landing on the floor.")]
         [SerializeField] float fallTime = 1.8f;
         [SerializeField] float catchRadius = 0.075f;
-        [SerializeField] int maxDrops = 72;
+        [SerializeField] int maxDrops = 120;
         [Tooltip("Small drizzle drops per second at full treble, and extra drops on each beat.")]
-        [SerializeField] float drizzleRate = 14f;
+        [SerializeField] float drizzleRate = 30f;
         [SerializeField] int dropsPerBeat = 4;
         [Tooltip("For songs without notes: how much a band must jump, and how loud it must be, to count as a note.")]
         [SerializeField] float onsetRise = 0.16f;
@@ -59,6 +60,7 @@ namespace MusicInYourHands
         {
             public Renderer Streak;
             public Renderer Head;
+            public Renderer Target;
             public Vector3 Position;
             public float LandTime;
             public bool Synced;
@@ -85,12 +87,14 @@ namespace MusicInYourHands
         readonly float[] lastBands = new float[MusicBus.BandCount];
         readonly float[] cooldown = new float[MusicBus.BandCount];
         readonly float[] charge = new float[2];
+        readonly float[] expect = new float[2];
+        readonly Color[] expectColor = { Effects.Blue, Effects.Blue };
         readonly Color[] chargeColor = { Effects.Blue, Effects.Blue };
         Renderer[] palmGlows;
         AudioPool voices;
         ParticleSystem sparks;
         MaterialPropertyBlock block;
-        Vector3 center, right, forward;
+        Vector3 center, right, forward, head;
         float floorY, spawnY, songTime, beatGlow, drizzleDebt;
         MusicFrame frame;
         bool anchored, built;
@@ -105,10 +109,12 @@ namespace MusicInYourHands
                 var drop = new Drop
                 {
                     Streak = Effects.MakeQuad($"Drop {i}", transform, streakMaterial),
-                    Head = Effects.MakeQuad($"Drop Head {i}", transform, glowMaterial)
+                    Head = Effects.MakeQuad($"Drop Head {i}", transform, glowMaterial),
+                    Target = Effects.MakeQuad($"Drop Target {i}", transform, ringMaterial)
                 };
                 drop.Streak.gameObject.SetActive(false);
                 drop.Head.gameObject.SetActive(false);
+                drop.Target.gameObject.SetActive(false);
                 drops.Add(drop);
             }
             for (int i = 0; i < 40; i++)
@@ -153,6 +159,7 @@ namespace MusicInYourHands
                 forward = Effects.FlatForward(view);
                 right = Vector3.Cross(Vector3.up, forward).normalized;
                 center = view.transform.position + forward * distance;
+                head = view.transform.position;
                 floorY = Effects.FloorY(view);
                 spawnY = view.transform.position.y + spawnHeight;
                 MarkAnchored(view);
@@ -217,12 +224,17 @@ namespace MusicInYourHands
             if (music.Beat) count += dropsPerBeat;
             for (int i = 0; i < count; i++)
             {
-                var drop = Spawn(84 + Random.Range(0, 12), new Vector2(Random.Range(-1.1f, 1.1f), Random.Range(-1f, 1.2f)), true);
+                // All around you, from arm's length to the far side of the room, never straight through your face.
+                float angle = Random.value * Mathf.PI * 2f;
+                float reach = Mathf.Sqrt(Random.Range(0.35f * 0.35f, 2.2f * 2.2f));
+                var at = head + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * reach;
+                at.y = spawnY + 0.3f;
+                var drop = Spawn(84 + Random.Range(0, 12), Vector2.zero, true, at);
                 if (drop != null) drop.LandTime = songTime + fallTime * 0.6f;
             }
         }
 
-        Drop Spawn(int midi, Vector2 spot, bool drizzle = false)
+        Drop Spawn(int midi, Vector2 spot, bool drizzle = false, Vector3? at = null)
         {
             Drop drop = null;
             foreach (var d in drops)
@@ -236,17 +248,20 @@ namespace MusicInYourHands
             drop.Midi = midi;
             drop.Position = center + right * (spot.x * areaWidth * 0.5f) + forward * (spot.y * areaDepth * 0.5f);
             drop.Position.y = spawnY;
+            if (at.HasValue) drop.Position = at.Value;
             drop.Color = PitchColors[Mathf.Abs(midi) % PitchColors.Length];
             drop.Size = drizzle ? Random.Range(0.007f, 0.011f) : 0.026f + Mathf.Clamp01((72f - midi) / 12f) * 0.01f;
             if (drizzle) drop.Color = Color.Lerp(Effects.Blue, Color.white, Random.Range(0.1f, 0.35f));
             drop.Streak.gameObject.SetActive(true);
             drop.Head.gameObject.SetActive(true);
+            drop.Target.gameObject.SetActive(!drizzle);
             return drop;
         }
 
         void UpdateDrops(HandRig rig, Camera view, float dt)
         {
             float speed = (spawnY - floorY) / fallTime;
+            expect[0] = expect[1] = 0f;
             foreach (var drop in drops)
             {
                 if (!drop.Active) continue;
@@ -255,6 +270,11 @@ namespace MusicInYourHands
                 else drop.Position.y -= speed * (drop.Drizzle ? 1.7f : 1f) * dt;
 
                 if (TryCatch(rig, drop)) continue;
+                if (!drop.Drizzle)
+                {
+                    Anticipate(rig, drop);
+                    DrawTarget(drop);
+                }
 
                 if (drop.Position.y <= floorY + 0.003f)
                 {
@@ -280,6 +300,40 @@ namespace MusicInYourHands
                 block.SetColor(ColorId, drop.Color);
                 block.SetFloat(IntensityId, drop.Drizzle ? 0.5f : 1.1f);
                 drop.Head.SetPropertyBlock(block);
+            }
+        }
+
+        /// <summary>A ring on the floor where a melody drop will land: wide and faint at first, tight and bright as it arrives.</summary>
+        void DrawTarget(Drop drop)
+        {
+            float due = drop.Synced ? 1f - Mathf.Clamp01((drop.LandTime - songTime) / fallTime) : 1f - Mathf.Clamp01((drop.Position.y - floorY) / Mathf.Max(spawnY - floorY, 0.01f));
+            drop.Target.transform.SetPositionAndRotation(new Vector3(drop.Position.x, floorY + 0.003f, drop.Position.z), Quaternion.Euler(90f, 0f, 0f));
+            drop.Target.transform.localScale = Vector3.one * Mathf.Lerp(0.2f, 0.07f, due * due);
+            block.Clear();
+            block.SetColor(ColorId, drop.Color);
+            block.SetFloat(RadiusId, 0.75f);
+            block.SetFloat(ThicknessId, Mathf.Lerp(0.02f, 0.05f, due));
+            block.SetFloat(AlphaId, due * 0.85f);
+            drop.Target.SetPropertyBlock(block);
+        }
+
+        /// <summary>A palm under a falling melody drop glows in its colour, brighter the closer it gets.</summary>
+        void Anticipate(HandRig rig, Drop drop)
+        {
+            for (int side = 0; side < 2; side++)
+            {
+                var hand = rig.Get(side == 0);
+                if (!hand.IsTracked) continue;
+                var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
+                var flat = Vector3.ProjectOnPlane(drop.Position - palm, Vector3.up);
+                float height = drop.Position.y - palm.y;
+                if (flat.magnitude > catchRadius * 1.3f || height < 0f || height > 0.45f) continue;
+                float near = 1f - height / 0.45f;
+                if (near > expect[side])
+                {
+                    expect[side] = near;
+                    expectColor[side] = drop.Color;
+                }
             }
         }
 
@@ -337,6 +391,7 @@ namespace MusicInYourHands
             drop.Active = false;
             drop.Streak.gameObject.SetActive(false);
             drop.Head.gameObject.SetActive(false);
+            drop.Target.gameObject.SetActive(false);
         }
 
         void AddMark(Vector3 at, Vector3 normal, Color color, float size, bool onFloor)
@@ -403,16 +458,17 @@ namespace MusicInYourHands
                 var glow = palmGlows[side];
                 charge[side] = Mathf.MoveTowards(charge[side], 0f, dt * 0.12f);
                 HandSkin.Charge[side] = Mathf.Clamp01(charge[side]);
-                bool show = hand.IsTracked && charge[side] > 0.01f;
+                bool show = hand.IsTracked && (charge[side] > 0.01f || expect[side] > 0.01f);
                 if (glow.gameObject.activeSelf != show) glow.gameObject.SetActive(show);
                 if (!show) continue;
                 var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
                 glow.transform.position = palm + hand.PalmNormal * 0.015f;
-                glow.transform.localScale = Vector3.one * (0.06f + charge[side] * 0.05f) * (1f + music.Kick * 0.15f);
+                float ready = expect[side] * expect[side];
+                glow.transform.localScale = Vector3.one * (0.06f + charge[side] * 0.05f + ready * 0.04f) * (1f + music.Kick * 0.15f);
                 Effects.Face(glow.transform, view);
                 block.Clear();
-                block.SetColor(ColorId, chargeColor[side]);
-                block.SetFloat(IntensityId, charge[side] * (0.7f + music.Kick * 0.4f));
+                block.SetColor(ColorId, Color.Lerp(chargeColor[side], expectColor[side], ready / Mathf.Max(ready + charge[side], 1e-3f)));
+                block.SetFloat(IntensityId, charge[side] * (0.7f + music.Kick * 0.4f) + ready * 0.9f);
                 glow.SetPropertyBlock(block);
             }
         }

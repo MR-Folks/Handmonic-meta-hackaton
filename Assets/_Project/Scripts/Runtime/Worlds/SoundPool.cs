@@ -6,9 +6,11 @@ namespace MusicInYourHands
     /// <summary>
     /// The Sound pool world: a liquid surface at table height in front of you. The bass rolls slow swells across it,
     /// each kick drops a ring in the middle, and every melody note falls in as a glowing droplet exactly when it is
-    /// sung, placed by pitch from left (low) to right (high). Dip your hand in and the liquid parts around your
-    /// fingers and ripples out as you move, and the music bends around it: the deeper your hand, the more muffled the
-    /// song sounds, as if you were hearing it under water. Your hand glistens below the waterline.
+    /// sung, placed by pitch from left (low) to right (high). Specks of light float in the water and ride its waves,
+    /// and the stirred water throws shifting light on the floor below. Dip your hand in and the liquid parts around
+    /// your fingers and ripples out as you move, and the music bends around it: the deeper your hand, the more muffled
+    /// the song sounds, as if you were hearing it under water. Your hand glistens below the waterline. Pinch above the
+    /// pool and a stream of droplets pours from your fingers, rippling the water where it lands.
     /// </summary>
     public class SoundPool : World
     {
@@ -28,6 +30,7 @@ namespace MusicInYourHands
         [Header("Materials")]
         [SerializeField] Material waterMaterial;
         [SerializeField] Material glowMaterial;
+        [SerializeField] Material causticsMaterial;
 
         [Header("Pool")]
         [SerializeField] Vector2 size = new Vector2(0.7f, 0.48f);
@@ -57,7 +60,15 @@ namespace MusicInYourHands
         MeshRenderer surfaceRenderer;
         Vector3[] vertices, normals;
         float[] height, previous, next, sponge;
-        ParticleSystem splashes;
+        ParticleSystem splashes, specks, stream;
+        Renderer caustics;
+        ParticleSystem.Particle[] speckOut, streamOut;
+        Vector3[] speckSeed;
+        readonly List<(Vector3 position, Vector3 velocity, Color color)> drips = new List<(Vector3, Vector3, Color)>();
+        readonly float[] streamDebt = new float[2];
+        float stir;
+        const int SpeckCount = 420;
+        const int MaxDrips = 260;
         MaterialPropertyBlock block;
         AudioLowPassFilter lowPass;
         readonly HashSet<float> spawned = new HashSet<float>();
@@ -126,6 +137,45 @@ namespace MusicInYourHands
             splashes = Effects.MakeSparkSystem("Splashes", transform, glowMaterial);
             var main = splashes.main;
             main.gravityModifier = 0.5f;
+
+            caustics = Effects.MakeQuad("Water Light", transform, causticsMaterial);
+            caustics.gameObject.SetActive(false);
+
+            // Specks floating at different depths in the water, each at a fixed spot across the pool.
+            var random = new System.Random(4);
+            speckSeed = new Vector3[SpeckCount];
+            for (int i = 0; i < SpeckCount; i++)
+                speckSeed[i] = new Vector3((float)random.NextDouble() * 0.9f + 0.05f, -(float)System.Math.Pow(random.NextDouble(), 1.6) * 0.06f + 0.003f,
+                    (float)random.NextDouble() * 0.9f + 0.05f);
+            speckOut = new ParticleSystem.Particle[SpeckCount];
+            specks = MakeManualSystem("Specks", SpeckCount, false);
+            streamOut = new ParticleSystem.Particle[MaxDrips];
+            stream = MakeManualSystem("Stream", MaxDrips, true);
+        }
+
+        /// <summary>A particle system whose particles this world places itself every frame.</summary>
+        ParticleSystem MakeManualSystem(string name, int max, bool stretch)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(transform, false);
+            var ps = go.AddComponent<ParticleSystem>();
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main = ps.main;
+            main.playOnAwake = false;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.maxParticles = max;
+            var emission = ps.emission;
+            emission.enabled = false;
+            var shape = ps.shape;
+            shape.enabled = false;
+            var r = go.GetComponent<ParticleSystemRenderer>();
+            r.sharedMaterial = glowMaterial;
+            r.renderMode = stretch ? ParticleSystemRenderMode.Stretch : ParticleSystemRenderMode.Billboard;
+            r.velocityScale = 0.025f;
+            r.lengthScale = 1.2f;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            r.receiveShadows = false;
+            return ps;
         }
 
         protected override void OnEnable()
@@ -147,6 +197,10 @@ namespace MusicInYourHands
         {
             base.OnDisable();
             if (surface != null) surface.gameObject.SetActive(false);
+            if (caustics != null) caustics.gameObject.SetActive(false);
+            drips.Clear();
+            if (specks != null) specks.Clear();
+            if (stream != null) stream.Clear();
             cutoff = 22000f;
             if (lowPass != null) lowPass.enabled = false;
             if (splashes != null) splashes.Clear();
@@ -164,6 +218,11 @@ namespace MusicInYourHands
                 center.y = Mathf.Max(center.y, Effects.FloorY(view) + 0.45f);
                 surface.SetPositionAndRotation(center, Quaternion.LookRotation(forward, Vector3.up));
                 surface.gameObject.SetActive(true);
+                // The water's light falls on the floor right below it.
+                caustics.transform.SetPositionAndRotation(new Vector3(center.x, Effects.FloorY(view) + 0.004f, center.z),
+                    Quaternion.LookRotation(Vector3.down, forward));
+                caustics.transform.localScale = new Vector3(size.x * 1.4f, size.y * 1.4f, 1f);
+                caustics.gameObject.SetActive(true);
                 MarkAnchored(view);
                 anchored = true;
             }
@@ -178,9 +237,17 @@ namespace MusicInYourHands
             LandDroplets();
 
             float dip = TouchWithHands(rig, dt);
+            Pour(rig, dt);
             Simulate(dt);
             UpdateMesh(music);
             Muffle(music.Bus, dip, dt);
+            DrawSpecks(music);
+
+            stir *= Mathf.Exp(-dt * 1.5f);
+            block.Clear();
+            block.SetFloat("_Strength", (0.25f + music.Band(1) * 0.35f + Mathf.Min(stir, 1f) * 0.6f) * fade);
+            block.SetFloat("_Clock", Now);
+            caustics.SetPropertyBlock(block);
 
             block.Clear();
             block.SetFloat(KickId, music.Kick);
@@ -301,9 +368,100 @@ namespace MusicInYourHands
             return dip;
         }
 
+        /// <summary>
+        /// Pinching pours a stream of droplets from between thumb and index; they fall under gravity and ripple the
+        /// water where they land (or vanish on the floor beside it).
+        /// </summary>
+        void Pour(HandRig rig, float dt)
+        {
+            if (rig != null)
+            {
+                for (int side = 0; side < 2; side++)
+                {
+                    var hand = rig.Get(side == 0);
+                    bool pouring = hand.IsTracked && hand.Pinch > 0.8f && !hand.InSystemGesture;
+                    if (!pouring) { streamDebt[side] = 0f; continue; }
+                    var thumb = hand.TipJoints[0] != null ? hand.TipJoints[0].position : hand.Tips[0];
+                    var index = hand.TipJoints[1] != null ? hand.TipJoints[1].position : hand.Tips[1];
+                    var from = (thumb + index) * 0.5f;
+                    streamDebt[side] += 55f * dt;
+                    while (streamDebt[side] >= 1f && drips.Count < MaxDrips)
+                    {
+                        streamDebt[side] -= 1f;
+                        var v = hand.Velocity * 0.4f + Random.insideUnitSphere * 0.03f + Vector3.down * 0.15f;
+                        drips.Add((from + Random.insideUnitSphere * 0.004f, v, Color.Lerp(Effects.Blue, Color.white, Random.Range(0.2f, 0.6f))));
+                    }
+                }
+            }
+
+            float floor = surface.position.y - 2f;
+            int n = 0;
+            for (int i = drips.Count - 1; i >= 0; i--)
+            {
+                var (p, v, c) = drips[i];
+                v += Physics.gravity * dt;
+                p += v * dt;
+                var local = surface.InverseTransformPoint(p);
+                var spot = new Vector2(local.x / size.x + 0.5f, local.z / size.y + 0.5f);
+                bool over = spot.x > 0f && spot.x < 1f && spot.y > 0f && spot.y < 1f;
+                if (over && local.y <= HeightAt(spot))
+                {
+                    Disturb(spot, 0.01f, -0.0022f);
+                    if (Random.value < 0.25f) Splash(p, c, 2, 0.12f);
+                    drips.RemoveAt(i);
+                    continue;
+                }
+                if (p.y < floor || local.y < -0.6f) { drips.RemoveAt(i); continue; }
+                drips[i] = (p, v, c);
+                if (n < MaxDrips)
+                    streamOut[n++] = new ParticleSystem.Particle
+                    {
+                        position = p, velocity = v, startColor = c, startSize = 0.0045f,
+                        startLifetime = 5f, remainingLifetime = 5f
+                    };
+            }
+            stream.SetParticles(streamOut, n);
+        }
+
+        float HeightAt(Vector2 spot)
+        {
+            int x = Mathf.Clamp(Mathf.RoundToInt(spot.x * (columns - 1)), 0, columns - 1);
+            int z = Mathf.Clamp(Mathf.RoundToInt(spot.y * (rows - 1)), 0, rows - 1);
+            return vertices[z * columns + x].y;
+        }
+
+        /// <summary>Specks of light suspended in the water, bobbing with the surface; brighter near it and in waves.</summary>
+        void DrawSpecks(MusicFrame music)
+        {
+            float t = Now;
+            for (int i = 0; i < SpeckCount; i++)
+            {
+                var seed = speckSeed[i];
+                var spot = new Vector2(seed.x, seed.z);
+                float h = HeightAt(spot);
+                float wave = Mathf.Abs(h) * 120f;
+                float bob = Mathf.Sin(t * 1.3f + i * 0.37f) * 0.003f;
+                float depth = Mathf.Clamp01(-seed.y / 0.06f);
+                // Specks near the top ride the waves fully; deeper ones move less.
+                var local = new Vector3((seed.x - 0.5f) * size.x, h * (1f - depth * 0.6f) + seed.y + bob, (seed.z - 0.5f) * size.y);
+                var c = Color.Lerp(new Color(0.75f, 0.95f, 1f), new Color(0.3f, 0.6f, 1f), depth);
+                c.a = Mathf.Clamp01((0.55f - depth * 0.35f + wave * 0.6f + music.Kick * 0.15f) * fade);
+                speckOut[i] = new ParticleSystem.Particle
+                {
+                    position = surface.TransformPoint(local),
+                    startColor = c,
+                    startSize = Mathf.Lerp(0.006f, 0.0035f, depth) * (1f + wave * 0.5f),
+                    startLifetime = 5f,
+                    remainingLifetime = 5f
+                };
+            }
+            specks.SetParticles(speckOut, SpeckCount);
+        }
+
         /// <summary>Pushes the surface down (negative) or up around a spot (0-1 across the pool).</summary>
         void Disturb(Vector2 spot, float radius, float amount)
         {
+            stir += Mathf.Abs(amount) * 25f;
             float cx = spot.x * (columns - 1), cz = spot.y * (rows - 1);
             float rx = radius / size.x * (columns - 1), rz = radius / size.y * (rows - 1);
             int x0 = Mathf.Max(1, Mathf.FloorToInt(cx - rx * 2)), x1 = Mathf.Min(columns - 2, Mathf.CeilToInt(cx + rx * 2));

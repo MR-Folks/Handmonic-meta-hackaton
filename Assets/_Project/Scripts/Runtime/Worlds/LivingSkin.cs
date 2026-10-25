@@ -5,7 +5,8 @@ namespace MusicInYourHands
 {
     /// <summary>
     /// The Living skin world: your hands are made of the music. Each fingertip carries a soft light tuned to one
-    /// frequency band, every beat sends a wave out of each palm, and sparks drift off the fingertips as they move.
+    /// frequency band, every beat sends a wave out of each palm in the colour of one of the fingers, sparks drift off
+    /// the fingertips as they move, and quick finger movements leave short trails of light in the air.
     /// The pulse that runs through the hand itself lives in the hand shader (see HandSkin).
     /// </summary>
     [DefaultExecutionOrder(150)]
@@ -18,6 +19,7 @@ namespace MusicInYourHands
         [Header("Materials")]
         [SerializeField] Material glowMaterial;
         [SerializeField] Material ringMaterial;
+        [SerializeField] Material lineMaterial;
 
         [Header("Fingertip lights")]
         [SerializeField] float tipSize = 0.045f;
@@ -31,9 +33,11 @@ namespace MusicInYourHands
         [Header("Palm waves")]
         [SerializeField] float waveRadius = 0.14f;
         [SerializeField] float waveLife = 1.1f;
-        [SerializeField] Color waveColor = new Color(0.62f, 0.56f, 1f);
-        [SerializeField] Color waveBeatColor = new Color(1f, 0.37f, 0.68f);
         [SerializeField] int maxWaves = 16;
+
+        [Header("Trails")]
+        [Tooltip("Fingertip speed (m/s) where trails start to show, and where they are fully lit.")]
+        [SerializeField] Vector2 trailSpeed = new Vector2(0.35f, 1.1f);
 
         [Header("Sparks")]
         [SerializeField] float sparksPerMetre = 70f;
@@ -51,6 +55,7 @@ namespace MusicInYourHands
             public Renderer Renderer;
             public float Age;
             public float Strength;
+            public Color Color;
         }
 
         readonly List<Wave> waves = new List<Wave>();
@@ -59,6 +64,14 @@ namespace MusicInYourHands
         readonly Vector3[] lastTips = new Vector3[10];
         readonly bool[] hadTip = new bool[10];
         readonly float[] sparkDebt = new float[10];
+        const int TrailPoints = 22;
+        const float TrailStep = 0.018f;
+        readonly LineStrip[] trails = new LineStrip[10];
+        readonly Vector3[][] trailHistory = new Vector3[10][];
+        readonly float[] trailClock = new float[10];
+        readonly float[] trailStrength = new float[10];
+        readonly Color[] trailColors = new Color[TrailPoints];
+        int waveHue;
         ParticleSystem sparks;
         MaterialPropertyBlock block;
         bool built;
@@ -75,6 +88,8 @@ namespace MusicInYourHands
                 hadTip[i] = false;
             }
             foreach (var wave in waves) wave.Transform.gameObject.SetActive(false);
+            foreach (var trail in trails) trail?.SetVisible(false);
+            System.Array.Clear(trailStrength, 0, trailStrength.Length);
             if (sparks != null) sparks.Clear();
         }
 
@@ -110,6 +125,13 @@ namespace MusicInYourHands
                 waves.Add(new Wave { Transform = quad.transform, Renderer = quad.GetComponent<Renderer>(), Age = -1f });
             }
 
+            for (int i = 0; i < trails.Length; i++)
+            {
+                trails[i] = new LineStrip($"Trail {i}", transform, lineMaterial, TrailPoints);
+                trails[i].SetVisible(false);
+                trailHistory[i] = new Vector3[TrailPoints];
+            }
+
             sparks = Effects.MakeSparkSystem("Sparks", transform, glowMaterial);
         }
 
@@ -120,6 +142,7 @@ namespace MusicInYourHands
             UpdateHand(rig.Right, 1, music.Bands, music.Kick, view, dt, music.Beat);
             if (music.Beat)
             {
+                waveHue = (waveHue + 1) % fingerColors.Length;
                 float strength = 0.6f + 0.4f * music.Kick;
                 if (rig.Left.IsTracked) SpawnWaves(rig.Left, strength);
                 if (rig.Right.IsTracked) SpawnWaves(rig.Right, strength);
@@ -138,6 +161,8 @@ namespace MusicInYourHands
                 if (!show)
                 {
                     hadTip[i] = false;
+                    trailStrength[i] = 0f;
+                    trails[i].SetVisible(false);
                     continue;
                 }
 
@@ -165,8 +190,47 @@ namespace MusicInYourHands
                 block.SetFloat(IntensityId, 0.45f + level * 1.1f + kick * 0.4f);
                 tipRenderers[i].SetPropertyBlock(block);
 
+                DrawTrail(i, f, tip, level, view, dt);
                 EmitSparks(i, f, tip, beat);
             }
+        }
+
+        /// <summary>
+        /// A short ribbon of light behind a fingertip that moves quickly: it fades in with speed, tapers to nothing at
+        /// its tail and fades away again when the finger slows down.
+        /// </summary>
+        void DrawTrail(int i, int finger, Vector3 tip, float level, Camera view, float dt)
+        {
+            var history = trailHistory[i];
+            if (!hadTip[i])
+            {
+                for (int k = 0; k < TrailPoints; k++) history[k] = tip;
+                trailClock[i] = 0f;
+            }
+            float speed = hadTip[i] && dt > 0f ? Vector3.Distance(tip, lastTips[i]) / dt : 0f;
+            float target = Mathf.InverseLerp(trailSpeed.x, trailSpeed.y, speed);
+            trailStrength[i] = Mathf.Lerp(trailStrength[i], target, 1f - Mathf.Exp(-(target > trailStrength[i] ? 14f : 3f) * dt));
+
+            trailClock[i] += dt;
+            while (trailClock[i] >= TrailStep)
+            {
+                trailClock[i] -= TrailStep;
+                for (int k = TrailPoints - 1; k > 0; k--) history[k] = history[k - 1];
+            }
+            history[0] = tip;
+
+            bool show = trailStrength[i] > 0.02f && view != null;
+            trails[i].SetVisible(show);
+            if (!show) return;
+            var color = fingerColors[finger];
+            for (int k = 0; k < TrailPoints; k++)
+            {
+                float u = k / (float)(TrailPoints - 1);
+                var c = Color.Lerp(Color.white, color, Mathf.Min(1f, u * 3f));
+                c.a = (1f - u) * (1f - u) * trailStrength[i];
+                trailColors[k] = c;
+            }
+            trails[i].Set(history, trailColors, TrailPoints, 0.006f * (1f + level * 0.6f), Color.white, view.transform.position, false);
         }
 
         void EmitSparks(int i, int finger, Vector3 tip, bool beat)
@@ -220,6 +284,7 @@ namespace MusicInYourHands
             wave.Transform.localScale = Vector3.one * waveRadius * 2f;
             wave.Age = age;
             wave.Strength = strength;
+            wave.Color = fingerColors[waveHue];
             wave.Transform.gameObject.SetActive(true);
             ApplyWave(wave);
         }
@@ -245,10 +310,11 @@ namespace MusicInYourHands
             bool started = wave.Age >= 0f;
             float eased = 1f - Mathf.Pow(1f - u, 3f);
             block.Clear();
-            block.SetColor(ColorId, Color.Lerp(waveBeatColor, waveColor, Mathf.SmoothStep(0f, 1f, u * 1.6f)));
+            // Each beat's wave takes the next finger's colour, starting bright and thin and fading as it spreads.
+            block.SetColor(ColorId, Color.Lerp(Color.Lerp(wave.Color, Color.white, 0.35f), wave.Color, Mathf.SmoothStep(0f, 1f, u * 2f)));
             block.SetFloat(RadiusId, Mathf.Lerp(0.04f, 0.85f, eased));
-            block.SetFloat(ThicknessId, Mathf.Lerp(0.012f, 0.03f, u));
-            block.SetFloat(AlphaId, started ? Mathf.Pow(1f - u, 2.2f) * wave.Strength : 0f);
+            block.SetFloat(ThicknessId, Mathf.Lerp(0.01f, 0.022f, u));
+            block.SetFloat(AlphaId, started ? Mathf.Pow(1f - u, 3f) * wave.Strength * 1.2f : 0f);
             wave.Renderer.SetPropertyBlock(block);
         }
 

@@ -38,13 +38,19 @@ namespace MusicInYourHands
         [SerializeField] int maxBubbles = 36;
 
         static readonly int ColorId = Shader.PropertyToID("_Color");
+        static readonly int IntensityId = Shader.PropertyToID("_Intensity");
         static readonly int IconId = Shader.PropertyToID("_Icon");
         static readonly int HoverId = Shader.PropertyToID("_Hover");
         static readonly int SelectedId = Shader.PropertyToID("_Selected");
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
         static readonly int RadiusId = Shader.PropertyToID("_Radius");
         static readonly int ThicknessId = Shader.PropertyToID("_Thickness");
-        static readonly Color[] PitchColors = { Effects.Pink, Effects.Orange, Effects.Gold, Effects.Mint, Effects.Blue, Effects.Violet };
+        // Saturated soap-film colours, one per pitch.
+        static readonly Color[] PitchColors =
+        {
+            new Color(1f, 0.3f, 0.62f), new Color(1f, 0.6f, 0.25f), new Color(1f, 0.85f, 0.3f),
+            new Color(0.35f, 1f, 0.75f), new Color(0.35f, 0.65f, 1f), new Color(0.72f, 0.45f, 1f)
+        };
 
         sealed class Bubble
         {
@@ -62,9 +68,11 @@ namespace MusicInYourHands
         sealed class Pop
         {
             public Renderer Ring;
+            public Renderer Flash;
             public float Age = -1f;
             public float Size;
             public Color Color;
+            public bool ByHand;
         }
 
         readonly List<Bubble> bubbles = new List<Bubble>();
@@ -93,8 +101,9 @@ namespace MusicInYourHands
             }
             for (int i = 0; i < 10; i++)
             {
-                var p = new Pop { Ring = Effects.MakeQuad($"Pop {i}", transform, ringMaterial) };
+                var p = new Pop { Ring = Effects.MakeQuad($"Pop {i}", transform, ringMaterial), Flash = Effects.MakeQuad($"Pop Flash {i}", transform, glowMaterial) };
                 p.Ring.gameObject.SetActive(false);
+                p.Flash.gameObject.SetActive(false);
                 pops.Add(p);
             }
             voices = new AudioPool(transform, 6);
@@ -118,6 +127,7 @@ namespace MusicInYourHands
             {
                 p.Age = -1f;
                 p.Ring.gameObject.SetActive(false);
+                p.Flash.gameObject.SetActive(false);
             }
             if (droplets != null) droplets.Clear();
         }
@@ -231,8 +241,9 @@ namespace MusicInYourHands
                 block.Clear();
                 block.SetColor(ColorId, PitchColors[Mathf.Abs(b.Midi) % PitchColors.Length]);
                 block.SetFloat(IconId, -1f);
-                block.SetFloat(HoverId, 0.35f + b.Near * 0.65f);
-                block.SetFloat(SelectedId, 0f);
+                // Brighter than a menu bubble: a lit rim and a stronger sheen, more so as a finger comes close.
+                block.SetFloat(HoverId, 0.6f + b.Near * 0.4f);
+                block.SetFloat(SelectedId, 0.55f);
                 block.SetFloat(AlphaId, appear);
                 b.Renderer.SetPropertyBlock(block);
             }
@@ -283,18 +294,21 @@ namespace MusicInYourHands
             pop.Color = color;
             pop.Ring.transform.position = b.Position;
             pop.Ring.gameObject.SetActive(true);
+            pop.Flash.transform.position = b.Position;
+            pop.Flash.gameObject.SetActive(byHand);
+            pop.ByHand = byHand;
 
-            int count = byHand ? 12 : 6;
+            int count = byHand ? 22 : 6;
             for (int i = 0; i < count; i++)
             {
                 var dir = Random.onUnitSphere;
                 droplets.Emit(new ParticleSystem.EmitParams
                 {
                     position = b.Position + dir * b.Radius,
-                    velocity = dir * Random.Range(0.15f, byHand ? 0.4f : 0.2f),
-                    startColor = Color.Lerp(color, Color.white, 0.4f),
-                    startSize = Random.Range(0.004f, 0.008f),
-                    startLifetime = Random.Range(0.3f, 0.6f)
+                    velocity = dir * Random.Range(0.2f, byHand ? 0.55f : 0.2f),
+                    startColor = Color.Lerp(color, Color.white, Random.Range(0.2f, 0.6f)),
+                    startSize = Random.Range(0.004f, byHand ? 0.011f : 0.008f),
+                    startLifetime = Random.Range(0.35f, 0.7f)
                 }, 1);
             }
             Release(b);
@@ -306,21 +320,33 @@ namespace MusicInYourHands
             {
                 if (p.Age < 0f) continue;
                 p.Age += dt;
-                float u = p.Age / 0.45f;
+                float u = p.Age / 0.5f;
                 if (u >= 1f)
                 {
                     p.Age = -1f;
                     p.Ring.gameObject.SetActive(false);
+                    p.Flash.gameObject.SetActive(false);
                     continue;
                 }
-                p.Ring.transform.localScale = Vector3.one * p.Size * (1f + u * 1.4f);
+                // A ring that bursts outwards, and (for a pop by hand) a quick flash of light.
+                float grow = 1f - (1f - u) * (1f - u);
+                p.Ring.transform.localScale = Vector3.one * p.Size * (1f + grow * (p.ByHand ? 2.6f : 1.4f));
                 Effects.Face(p.Ring.transform, view);
                 block.Clear();
-                block.SetColor(ColorId, p.Color);
+                block.SetColor(ColorId, Color.Lerp(Color.white, p.Color, u));
                 block.SetFloat(RadiusId, 0.8f);
-                block.SetFloat(ThicknessId, 0.05f * (1f - u) + 0.01f);
-                block.SetFloat(AlphaId, (1f - u) * (1f - u));
+                block.SetFloat(ThicknessId, 0.07f * (1f - u) + 0.012f);
+                block.SetFloat(AlphaId, (1f - u) * (1f - u) * (p.ByHand ? 1.3f : 0.8f));
                 p.Ring.SetPropertyBlock(block);
+
+                if (!p.ByHand) continue;
+                float flash = Mathf.Exp(-p.Age * 14f);
+                p.Flash.transform.localScale = Vector3.one * p.Size * (1.6f + grow * 1.5f);
+                Effects.Face(p.Flash.transform, view);
+                block.Clear();
+                block.SetColor(ColorId, Color.Lerp(Color.white, p.Color, 0.4f));
+                block.SetFloat(IntensityId, flash * 1.4f);
+                p.Flash.SetPropertyBlock(block);
             }
         }
 

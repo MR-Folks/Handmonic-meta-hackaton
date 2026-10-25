@@ -2,6 +2,7 @@
 // - _Frame crops the text softly to a rectangle in a "frame" space (_FrameMatrix: world to frame), so giant
 //   letters can run off the edge like a cropped poster (Orbit type).
 // - _Spray turns the glyphs into spray paint: a speckled overspray halo and a slightly rough edge (Graffiti).
+// - _Outline draws a solid outline in _OutlineColor around the letters, as graffiti pieces have.
 // - _Reveal sprays the word on from left to right, across the text's object-space width (_Extent: min x, max x).
 Shader "MusicInYourHands/Lettering"
 {
@@ -14,6 +15,8 @@ Shader "MusicInYourHands/Lettering"
         _Reveal ("Reveal 0-1", Float) = 1
         _Extent ("Text extent in object space (min x, max x)", Vector) = (-1, 1, 0, 0)
         _Frame ("Crop frame (half width, half height, softness; 0 = none)", Vector) = (0, 0, 0.05, 0)
+        _Outline ("Outline 0-1", Float) = 0
+        _OutlineColor ("Outline colour", Color) = (1, 1, 1, 1)
         _Alpha ("Fade", Float) = 1
     }
 
@@ -47,6 +50,8 @@ Shader "MusicInYourHands/Lettering"
                 float4 _Extent;
                 float4 _Frame;
                 float4x4 _FrameMatrix;
+                float _Outline;
+                float4 _OutlineColor;
                 float _Alpha;
             CBUFFER_END
 
@@ -113,6 +118,24 @@ Shader "MusicInYourHands/Lettering"
                     // A slightly rough paint edge.
                     ink *= step(0.12, grain * 0.4 + ink * 0.9);
                     alpha = lerp(alpha, max(ink, speckle * 0.75), _Spray);
+                }
+
+                if (_Outline > 0.001)
+                {
+                    // Grow the letters by a few texels in eight directions; the rim around the ink is the outline.
+                    float2 o = _MainTex_TexelSize.xy * 3.5;
+                    float grown = a;
+                    grown = max(grown, SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv + float2(o.x, 0)).a);
+                    grown = max(grown, SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv - float2(o.x, 0)).a);
+                    grown = max(grown, SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv + float2(0, o.y)).a);
+                    grown = max(grown, SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv - float2(0, o.y)).a);
+                    grown = max(grown, SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv + o * 0.7).a);
+                    grown = max(grown, SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv - o * 0.7).a);
+                    grown = max(grown, SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv + float2(o.x, -o.y) * 0.7).a);
+                    grown = max(grown, SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv + float2(-o.x, o.y) * 0.7).a);
+                    float rim = saturate(smoothstep(0.3, 0.6, grown) - ink) * _Outline;
+                    color = lerp(color, _OutlineColor.rgb, rim);
+                    alpha = max(alpha, rim);
                 }
 
                 // Spray on from left to right.
