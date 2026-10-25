@@ -341,16 +341,13 @@ MonoBehaviour:
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
-  span: 1.1
+  stringCount: 8
   distance: 0.42
-  lowest: -0.42
-  spacing: 0.062
+  width: 0.62
+  heights: {x: -0.68, y: -0.12}
+  curve: 0.1
   points: 72
-  grabRadius: 0.018
-  releaseDistance: 0.05
-  resistance: 0.35
-  lead: 1.6
-  window: 0.2
+  reach: 0.035
 --- !u!4 &179923060
 Transform:
   m_ObjectHideFlags: 0
@@ -886,16 +883,13 @@ MonoBehaviour:
   displayName: Sound wind
   color: {r: 0.49, g: 0.95, b: 0.79, a: 1}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
-  ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
-  vent: {x: -0.35, y: -0.15, z: 1.3}
-  aim: {x: 0.15, y: -0.35, z: 0.25}
-  maxParticles: 1400
-  baseRate: 90
-  speed: 0.8
-  lifetime: 3.2
+  count: 360
+  orbit: 0.72
+  thickness: 0.22
+  height: -0.38
+  cruise: 0.32
   tipRadius: 0.016
   palmRadius: 0.04
-  fistRadius: 0.065
 --- !u!4 &1153605163
 Transform:
   m_ObjectHideFlags: 0
@@ -1327,11 +1321,19 @@ MonoBehaviour:
   letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
-  distance: 1.15
-  height: -0.05
-  frame: {x: 0.62, y: 0.42}
-  letterHeight: 0.56
-  drift: 0.035
+  distance: 0.95
+  height: -0.08
+  letterHeight: 0.24
+  orbitLetterHeight: 0.075
+  depth: 0.16
+  ringRadii:
+  - 0.95
+  - 1.2
+  - 1.45
+  ringTilts:
+  - 12
+  - -18
+  - 26
   pushRadius: 0.14
   pullRadius: 0.7
 --- !u!4 &1456184138
@@ -2159,12 +2161,12 @@ MonoBehaviour:
   color: {r: 1, g: 0.86, b: 0.68, a: 1}
   plateMaterial: {fileID: 2100000, guid: 8a2b5c99e3f8449c2968547889d421aa, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
-  plateSize: 0.46
-  distance: 0.48
+  plateSize: 0.5
+  distance: 0.46
   belowEyes: 0.52
-  grains: 2400
+  grains: 3200
   grainSize: 0.0045
-  hoverHeight: 0.3
+  hoverHeight: 0.25
 --- !u!4 &2137090335
 Transform:
   m_ObjectHideFlags: 0

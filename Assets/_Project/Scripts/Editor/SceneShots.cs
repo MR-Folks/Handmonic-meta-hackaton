@@ -42,15 +42,15 @@ namespace MusicInYourHands.EditorTools
             // The right hand dips into the pool; the left rests above it.
             Shot<SoundPool>("8-sound-pool", HandPose.PalmsDown, 38f, closeUp: rig => rig.Right.Palm.position + Vector3.down * 0.04f,
                 handOffset: side => side == "R" ? new Vector3(-0.03f, -0.27f, 0.12f) : new Vector3(0f, -0.12f, 0.1f));
-            Shot<SoundWind>("9-sound-wind", HandPose.PalmsToFace, 14f, closeUp: rig => rig.Left.Palm.position,
+            Shot<SoundWind>("9-sound-wind", HandPose.PalmsToFace, 22f, closeUp: rig => rig.Left.Palm.position,
                 handOffset: side => side == "L" ? new Vector3(-0.05f, 0f, 0.15f) : new Vector3(0.05f, -0.1f, 0f));
             Shot<BubbleNotes>("10-bubble-notes", HandPose.BacksToFace, 4f, closeUp: rig => rig.Right.Tips[1] + new Vector3(-0.08f, 0.12f, 0.12f), lead: 8f);
             Shot<OrbitType>("12-orbit-type", HandPose.PalmsToFace, 2f, closeUp: rig => rig.Right.Palm.position + new Vector3(-0.2f, 0.05f, 0.7f),
                 handOffset: side => side == "R" ? new Vector3(0.05f, 0.05f, 0.2f) : new Vector3(0f, -0.1f, 0f));
             Shot<Graffiti>("13-graffiti", HandPose.BacksToFace, 6f, rig => rig.Right.Pinch = 1f, closeUp: rig => new Vector3(0.3f, 1.45f, 1.55f),
                 handOffset: side => side == "R" ? new Vector3(0.02f, 0.08f, 0.12f) : new Vector3(0f, -0.15f, 0f), lead: 6f);
-            Shot<SandTable>("11-sand-table", HandPose.PalmsDown, 40f, closeUp: rig => rig.Right.Palm.position + Vector3.down * 0.15f,
-                handOffset: side => side == "R" ? new Vector3(0.02f, -0.15f, 0.12f) : new Vector3(-0.05f, -0.2f, 0f));
+            Shot<SandTable>("11-sand-table", HandPose.PalmsDown, 40f, closeUp: rig => rig.Right.Palm.position + Vector3.down * 0.08f,
+                handOffset: side => side == "R" ? new Vector3(0.02f, -0.24f, 0.12f) : new Vector3(-0.05f, -0.12f, 0.06f));
             MenuShot();
             Debug.Log($"[Shots] Saved screenshots to {ShotFolder}.");
             return true;

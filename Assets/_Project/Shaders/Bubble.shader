@@ -100,11 +100,12 @@ Shader "MusicInYourHands/Bubble"
                 }
                 else if (icon < 3.5)
                 {
-                    // Air strings: four strings, one ringing.
-                    [unroll] for (int k = 0; k < 4; k++)
+                    // Air strings: a small harp, one string ringing.
+                    [unroll] for (int k = 0; k < 5; k++)
                     {
-                        float y = -0.36 + k * 0.24 + (k == 1 ? 0.06 * sin(p.x * 9 + t * 14) * (1 - p.x * p.x) : 0);
-                        e += Line(abs(p.y - y), 0.035) * step(abs(p.x), 0.72);
+                        float x = -0.44 + k * 0.22 + (k == 2 ? 0.05 * sin(p.y * 9 + t * 14) * (1 - p.y * p.y) : 0);
+                        float top = 0.62 - abs(k - 2) * 0.08;
+                        e += Line(abs(p.x - x), 0.03) * step(p.y, top) * step(-0.62, p.y);
                     }
                 }
                 else if (icon < 4.5)
@@ -162,16 +163,17 @@ Shader "MusicInYourHands/Bubble"
                 }
                 else if (icon < 9.5)
                 {
-                    // Sound wind: streams of particles flowing around a small obstacle.
-                    [unroll] for (int k = 0; k < 5; k++)
+                    // Sound wind: a school of small fish swimming in a ring.
+                    [unroll] for (int k = 0; k < 9; k++)
                     {
-                        float lane = -0.48 + k * 0.24;
-                        float bend = 0.16 * exp(-p.x * p.x * 9) * sign(lane) * step(0.01, abs(lane));
-                        float y = lane + bend;
-                        float dash = pow(saturate(sin(p.x * 14 - t * 6 + k * 1.7) * 0.5 + 0.5), 3);
-                        e += Line(abs(p.y - y), 0.03) * dash * step(abs(p.x), 0.8);
+                        float a = k * 0.698 + t * 0.9;
+                        float r = 0.42 + 0.08 * sin(k * 2.3);
+                        float2 c = float2(cos(a), sin(a) * 0.75) * r;
+                        float2 dir = normalize(float2(-sin(a), cos(a) * 0.75));
+                        float2 q = p - c;
+                        float along = dot(q, dir), across = dot(q, float2(-dir.y, dir.x));
+                        e += smoothstep(0.03, 0.0, abs(across) - 0.012 * (1 - abs(along) / 0.09)) * step(abs(along), 0.09);
                     }
-                    e += smoothstep(0.1, 0.06, length(p)) * 0.8;
                 }
                 else if (icon < 10.5)
                 {
@@ -185,11 +187,12 @@ Shader "MusicInYourHands/Bubble"
                 }
                 else if (icon < 11.5)
                 {
-                    // Sand table: a Chladni figure, the sand lying on the plate's still lines.
-                    float2 q = (p * 0.75 + 1) * 1.5708;
-                    float n = 2 + floor(frac(t * 0.08) * 3), m = n + 2;
-                    float f = cos(n * q.x) * cos(m * q.y) - cos(m * q.x) * cos(n * q.y);
-                    e = smoothstep(0.22, 0.0, abs(f)) * step(max(abs(p.x), abs(p.y)), 0.62);
+                    // Sand table: a Chladni figure (mode 3:5), the sand lying on the plate's still lines, in a plate.
+                    float2 q = (p / 0.6 + 1) * 1.5708;
+                    float f = cos(3 * q.x) * cos(5 * q.y) - cos(5 * q.x) * cos(3 * q.y);
+                    float inPlate = step(max(abs(p.x), abs(p.y)), 0.6);
+                    e = smoothstep(0.35, 0.0, abs(f)) * inPlate * (0.75 + 0.25 * sin(t * 2));
+                    e += Line(abs(max(abs(p.x), abs(p.y)) - 0.62), 0.03) * 0.7;
                 }
                 else if (icon < 12.5)
                 {

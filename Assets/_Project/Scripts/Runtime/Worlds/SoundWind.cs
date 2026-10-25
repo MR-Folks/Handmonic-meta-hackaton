@@ -3,16 +3,18 @@ using UnityEngine;
 namespace MusicInYourHands
 {
     /// <summary>
-    /// The Sound wind world: the music blows out of a glowing vent across the room as a wind of light, each streak
-    /// coloured by the band it came from, gusting with the kick. It flows towards you and past you. Hold your hand in
-    /// it and it streams around your fingers: spread them and it pours through the gaps, close your hand and it parts
-    /// around your fist. Streaks touching your hand flare up, and light streams over your skin in the wind.
+    /// The Sound wind world: the music swims around you as a school of light. Hundreds of small glowing fish circle
+    /// you at chest height in a loose, living ring, flocking like real fish: each keeps a little space from its
+    /// neighbours, matches their heading and stays with the group. The louder the song, the faster they swim; on each
+    /// beat a flash runs through the school and it surges forward. Put your hand in their way and the school splits
+    /// around your fingers and palm and pours through the gaps, then closes up again behind you. Light streams over
+    /// your skin with them.
     /// </summary>
     public class SoundWind : World
     {
         public override int MenuIcon => 9;
 
-        public override string Hint => "Hold your hand in the wind and spread your fingers";
+        public override string Hint => "Put your hand in the school and spread your fingers";
 
         public override HandTheme Theme => new HandTheme
         {
@@ -25,107 +27,94 @@ namespace MusicInYourHands
 
         [Header("Materials")]
         [SerializeField] Material glowMaterial;
-        [SerializeField] Material ringMaterial;
 
-        [Header("Wind")]
-        [Tooltip("Where the wind comes from, relative to the eyes: right, up, forward (m).")]
-        [SerializeField] Vector3 vent = new Vector3(-0.35f, -0.15f, 1.3f);
-        [Tooltip("Where it blows towards, relative to the eyes: right, up, forward (m).")]
-        [SerializeField] Vector3 aim = new Vector3(0.15f, -0.35f, 0.25f);
-        [SerializeField] int maxParticles = 1400;
-        [SerializeField] float baseRate = 90f;
-        [SerializeField] float speed = 0.8f;
-        [SerializeField] float lifetime = 3.2f;
+        [Header("School")]
+        [SerializeField] int count = 420;
+        [Tooltip("Radius of the ring the school swims around you (m), and how thick the ring is.")]
+        [SerializeField] float orbit = 0.46f;
+        [SerializeField] float thickness = 0.2f;
+        [Tooltip("Height of the ring relative to the eyes (m).")]
+        [SerializeField] float height = -0.32f;
+        [SerializeField] float cruise = 0.32f;
 
         [Header("Hands")]
-        [SerializeField] float tipRadius = 0.016f;
-        [SerializeField] float palmRadius = 0.04f;
-        [SerializeField] float fistRadius = 0.065f;
+        [SerializeField] float tipRadius = 0.022f;
+        [SerializeField] float palmRadius = 0.05f;
 
-        static readonly int ColorId = Shader.PropertyToID("_Color");
-        static readonly int IntensityId = Shader.PropertyToID("_Intensity");
-        static readonly int RadiusId = Shader.PropertyToID("_Radius");
-        static readonly int AlphaId = Shader.PropertyToID("_Alpha");
-        static readonly int ThicknessId = Shader.PropertyToID("_Thickness");
-        static readonly Color[] BandColors = { Effects.Pink, Effects.Orange, Effects.Gold, Effects.Mint, Effects.Blue, Effects.Violet };
+        const float Neighbourhood = 0.09f;
+        const int Cells = 2048;
+        static readonly Color[] Shades =
+        {
+            Effects.Mint, new Color(0.45f, 0.85f, 0.95f), Effects.Blue, Effects.Violet, Effects.Pink, Effects.Gold
+        };
 
         Vector3[] position, velocity;
-        float[] age;
-        byte[] band;
-        float[] heat;
-        int alive;
-        ParticleSystem.Particle[] output;
+        float[] lane, lift, phase;
+        byte[] shade;
+        int[] head, next;
         ParticleSystem system;
-        Renderer ventGlow, ventRing, ventRing2;
-        MaterialPropertyBlock block;
+        ParticleSystem.Particle[] output;
         readonly Vector3[] obstacles = new Vector3[12];
         readonly float[] radii = new float[12];
-        Vector3 source, flow, right;
-        float emitDebt, fade, ringAge = 9f;
+        Vector3 centre;
+        float surge, flashTime = -10f, fade;
         bool anchored, built;
 
         public override void Build()
         {
             if (built) return;
             built = true;
-            block = new MaterialPropertyBlock();
-            position = new Vector3[maxParticles];
-            velocity = new Vector3[maxParticles];
-            age = new float[maxParticles];
-            band = new byte[maxParticles];
-            heat = new float[maxParticles];
-            output = new ParticleSystem.Particle[maxParticles];
+            position = new Vector3[count];
+            velocity = new Vector3[count];
+            lane = new float[count];
+            lift = new float[count];
+            phase = new float[count];
+            shade = new byte[count];
+            head = new int[Cells];
+            next = new int[count];
+            output = new ParticleSystem.Particle[count];
+            var random = new System.Random(8);
+            for (int i = 0; i < count; i++)
+            {
+                lane[i] = ((float)random.NextDouble() * 2f - 1f) * 0.5f;
+                lift[i] = ((float)random.NextDouble() * 2f - 1f) * 0.5f;
+                phase[i] = (float)random.NextDouble() * 6.28f;
+                shade[i] = (byte)random.Next(Shades.Length);
+            }
 
-            var go = new GameObject("Wind");
+            var go = new GameObject("School");
             go.transform.SetParent(transform, false);
             system = go.AddComponent<ParticleSystem>();
             system.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             var main = system.main;
             main.playOnAwake = false;
-            main.loop = true;
             main.simulationSpace = ParticleSystemSimulationSpace.World;
-            main.maxParticles = maxParticles;
-            main.startSpeed = 0f;
+            main.maxParticles = count;
             var emission = system.emission;
             emission.enabled = false;
             var shape = system.shape;
             shape.enabled = false;
             var renderer = go.GetComponent<ParticleSystemRenderer>();
             renderer.sharedMaterial = glowMaterial;
-            // Stretched along their motion, so each particle reads as a streak of wind.
+            // Stretched along their heading, so each fish reads as a slim body with a tail.
             renderer.renderMode = ParticleSystemRenderMode.Stretch;
-            renderer.velocityScale = 0.08f;
-            renderer.lengthScale = 1.5f;
+            renderer.velocityScale = 0.06f;
+            renderer.lengthScale = 2.2f;
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             renderer.receiveShadows = false;
-
-            ventGlow = Effects.MakeQuad("Vent Glow", transform, glowMaterial);
-            ventRing = Effects.MakeQuad("Vent Ring", transform, ringMaterial);
-            ventRing2 = Effects.MakeQuad("Vent Pulse", transform, ringMaterial);
-            SetVentVisible(false);
-        }
-
-        void SetVentVisible(bool visible)
-        {
-            ventGlow.gameObject.SetActive(visible);
-            ventRing.gameObject.SetActive(visible);
-            ventRing2.gameObject.SetActive(visible);
         }
 
         protected override void OnEnable()
         {
             base.OnEnable();
             anchored = false;
-            alive = 0;
             fade = 0f;
         }
 
         protected override void OnDisable()
         {
             base.OnDisable();
-            alive = 0;
             if (system != null) system.Clear();
-            if (ventGlow != null) SetVentVisible(false);
         }
 
         public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
@@ -135,178 +124,170 @@ namespace MusicInYourHands
             if (anchored && ShouldReanchor(view, dt)) anchored = false;
             if (!anchored)
             {
-                var head = view.transform.position;
-                var forward = Effects.FlatForward(view);
-                right = Vector3.Cross(Vector3.up, forward).normalized;
-                source = head + right * vent.x + Vector3.up * vent.y + forward * vent.z;
-                var target = head + right * aim.x + Vector3.up * aim.y + forward * aim.z;
-                flow = (target - source).normalized;
-                SetVentVisible(true);
+                centre = view.transform.position + Vector3.up * height;
+                Scatter();
                 MarkAnchored(view);
                 anchored = true;
             }
-            fade = Mathf.MoveTowards(fade, 1f, dt * 1.5f);
-            HandSkin.FocusPosition = source;
-            HandSkin.FocusStrength = fade;
+            fade = Mathf.MoveTowards(fade, 1f, dt * 1.2f);
+            HandSkin.FocusPosition = centre;
+            HandSkin.FocusStrength = 0.7f * fade;
+
+            if (music.Beat)
+            {
+                surge = 1f;
+                flashTime = Now;
+            }
+            surge *= Mathf.Exp(-dt * 2.5f);
 
             CollectObstacles(rig);
-            Emit(music, dt);
-            Move(music, dt);
-            Draw();
-            DrawVent(music, view, dt);
+            Swim(music, Mathf.Min(dt, 0.05f));
+            Draw(music);
         }
 
-        /// <summary>Fingertips and palms the wind has to flow around; a closed hand is one bigger lump.</summary>
+        /// <summary>Starts the school spread around the ring, each fish already swimming its way.</summary>
+        void Scatter()
+        {
+            for (int i = 0; i < count; i++)
+            {
+                float a = i / (float)count * Mathf.PI * 2f;
+                float r = orbit + lane[i] * thickness;
+                position[i] = centre + new Vector3(Mathf.Cos(a) * r, lift[i] * thickness, Mathf.Sin(a) * r);
+                velocity[i] = new Vector3(-Mathf.Sin(a), 0f, Mathf.Cos(a)) * cruise;
+            }
+        }
+
         void CollectObstacles(HandRig rig)
         {
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig != null ? rig.Get(side == 0) : null;
                 bool tracked = hand != null && hand.IsTracked;
-                bool fist = tracked && hand.Fist > 0.6f;
                 for (int k = 0; k < 6; k++)
                 {
                     int i = side * 6 + k;
-                    if (!tracked || (fist && k < 5)) { radii[i] = 0f; continue; }
-                    if (k < 5)
-                    {
-                        obstacles[i] = hand.TipJoints[k] != null ? hand.TipJoints[k].position : hand.Tips[k];
-                        radii[i] = tipRadius;
-                    }
-                    else
-                    {
-                        obstacles[i] = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
-                        radii[i] = fist ? fistRadius : palmRadius;
-                    }
+                    radii[i] = tracked ? (k < 5 ? tipRadius : palmRadius) : 0f;
+                    if (!tracked) continue;
+                    obstacles[i] = k < 5
+                        ? hand.TipJoints[k] != null ? hand.TipJoints[k].position : hand.Tips[k]
+                        : hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
                 }
             }
         }
 
-        /// <summary>New streaks leave the vent with the music: steady with the bass, in gusts on each kick.</summary>
-        void Emit(MusicFrame music, float dt)
+        static int Hash(int x, int y, int z) => ((x * 73856093) ^ (y * 19349663) ^ (z * 83492791)) & (Cells - 1);
+
+        /// <summary>
+        /// One step of the flock: separation, alignment and cohesion with neighbours found through a small spatial
+        /// hash, a pull along the ring around you, and quick swerves around the hands.
+        /// </summary>
+        void Swim(MusicFrame music, float dt)
         {
-            float level = (music.Band(1) + music.Band(2) + music.Band(3) + music.Band(4)) * 0.25f;
-            emitDebt += (baseRate * (0.4f + level * 1.4f) + music.Kick * 450f) * dt * fade;
-            int count = (int)emitDebt;
-            emitDebt -= count;
-            var up = Vector3.Cross(flow, right).normalized;
-            for (int n = 0; n < count && alive < maxParticles; n++)
+            for (int c = 0; c < Cells; c++) head[c] = -1;
+            for (int i = 0; i < count; i++)
             {
-                int b = Random.Range(1, MusicBus.BandCount);
-                float a = Random.value * Mathf.PI * 2f, r = Mathf.Sqrt(Random.value) * 0.07f;
-                int i = alive++;
-                position[i] = source + (right * Mathf.Cos(a) + up * Mathf.Sin(a)) * r;
-                float s = speed * (0.7f + music.Band(b) * 0.6f + music.Kick * 0.4f);
-                velocity[i] = (flow + (right * Mathf.Cos(a) + up * Mathf.Sin(a)) * 0.12f + Random.insideUnitSphere * 0.05f) * s;
-                age[i] = 0f;
-                band[i] = (byte)b;
-                heat[i] = 0f;
+                var q = position[i];
+                int c = Hash(Mathf.FloorToInt(q.x / Neighbourhood), Mathf.FloorToInt(q.y / Neighbourhood), Mathf.FloorToInt(q.z / Neighbourhood));
+                next[i] = head[c];
+                head[c] = i;
             }
-        }
 
-        void Move(MusicFrame music, float dt)
-        {
+            float loud = (music.Band(1) + music.Band(2) + music.Band(3)) / 3f;
+            float speed = cruise * (0.8f + loud * 0.9f) * (1f + surge * 0.9f);
+            float n2 = Neighbourhood * Neighbourhood;
             float t = Now;
-            for (int i = 0; i < alive; i++)
+            for (int i = 0; i < count; i++)
             {
-                age[i] += dt;
                 var p = position[i];
-                // Slowly back towards the main stream, plus a lazy swirl so it reads as air rather than rays.
                 var v = velocity[i];
-                float s = v.magnitude;
-                var wanted = flow * Mathf.Max(s, speed * 0.6f);
-                v = Vector3.Lerp(v, wanted, dt * 0.6f);
-                v += new Vector3(Mathf.Sin(p.y * 7f + t * 1.3f), Mathf.Sin(p.z * 6f - t * 1.1f) * 0.6f, Mathf.Sin(p.x * 8f + t * 0.9f)) * (0.12f * dt);
+                Vector3 separate = Vector3.zero, align = Vector3.zero, gather = Vector3.zero;
+                int neighbours = 0;
+                int cx = Mathf.FloorToInt(p.x / Neighbourhood), cy = Mathf.FloorToInt(p.y / Neighbourhood), cz = Mathf.FloorToInt(p.z / Neighbourhood);
+                for (int dx = -1; dx <= 1; dx++)
+                for (int dy = -1; dy <= 1; dy++)
+                for (int dz = -1; dz <= 1; dz++)
+                {
+                    for (int j = head[Hash(cx + dx, cy + dy, cz + dz)]; j >= 0 && neighbours < 14; j = next[j])
+                    {
+                        if (j == i) continue;
+                        var d = p - position[j];
+                        float sq = d.sqrMagnitude;
+                        if (sq > n2 || sq < 1e-10f) continue;
+                        neighbours++;
+                        separate += d / sq;
+                        align += velocity[j];
+                        gather += position[j];
+                    }
+                }
 
-                // Flow around the hands: lose the part of the motion heading into an obstacle and slip past it.
-                float hot = heat[i] * Mathf.Exp(-dt * 4f);
+                var steer = Vector3.zero;
+                if (neighbours > 0)
+                {
+                    steer += separate * 0.0009f;
+                    steer += (align / neighbours - v) * 1.4f;
+                    steer += (gather / neighbours - p) * 2.2f;
+                }
+
+                // Swim around you: along the ring, back towards this fish's own lane in it.
+                var flat = new Vector3(p.x - centre.x, 0f, p.z - centre.z);
+                float r = flat.magnitude + 1e-4f;
+                var outward = flat / r;
+                var along = new Vector3(-outward.z, 0f, outward.x);
+                float wantR = orbit + lane[i] * thickness + Mathf.Sin(t * 0.4f + phase[i]) * 0.05f;
+                float wantY = centre.y + lift[i] * thickness + Mathf.Sin(t * 0.7f + phase[i] * 2f) * 0.04f;
+                steer += along * (speed * 1.2f) - v * 0.6f;
+                steer += outward * ((wantR - r) * 3f) + Vector3.up * ((wantY - p.y) * 3f);
+
+                // Swerve around the hands: push out of their way, strongest right at the skin.
                 for (int k = 0; k < obstacles.Length; k++)
                 {
                     float R = radii[k];
                     if (R <= 0f) continue;
                     var d = p - obstacles[k];
-                    float reach = R * 2.6f;
+                    float reach = R + 0.07f;
                     float sq = d.sqrMagnitude;
                     if (sq > reach * reach) continue;
-                    float dist = Mathf.Sqrt(sq) + 1e-5f;
-                    var nrm = d / dist;
-                    float into = Vector3.Dot(v, nrm);
-                    float closeness = 1f - dist / reach;
-                    if (into < 0f) v -= nrm * into * Mathf.Min(1f, closeness * 1.6f);
-                    if (dist < R) p = obstacles[k] + nrm * R;
-                    hot = Mathf.Max(hot, closeness);
+                    float dist = Mathf.Sqrt(sq) + 1e-4f;
+                    var away = d / dist;
+                    steer += away * ((reach - dist) / reach) * 22f;
+                    if (dist < R) p = obstacles[k] + away * R;
                 }
-                heat[i] = hot;
+
+                v += steer * dt;
+                float s = v.magnitude;
+                float max = speed * 1.8f, min = speed * 0.5f;
+                if (s > max) v *= max / s;
+                else if (s < min && s > 1e-5f) v *= min / s;
                 velocity[i] = v;
                 position[i] = p + v * dt;
-
-                if (age[i] > lifetime)
-                {
-                    // Recycle: move the last particle into this slot.
-                    alive--;
-                    position[i] = position[alive];
-                    velocity[i] = velocity[alive];
-                    age[i] = age[alive];
-                    band[i] = band[alive];
-                    heat[i] = heat[alive];
-                    i--;
-                }
             }
         }
 
-        void Draw()
+        void Draw(MusicFrame music)
         {
-            for (int i = 0; i < alive; i++)
+            float age = Now - flashTime;
+            float t = Now;
+            for (int i = 0; i < count; i++)
             {
-                float life = age[i] / lifetime;
-                float alpha = Mathf.Clamp01(age[i] / 0.25f) * (1f - life * life) * (0.55f + heat[i] * 0.6f) * fade;
-                var c = Color.Lerp(BandColors[band[i]], Color.white, heat[i] * 0.45f);
-                c.a = Mathf.Clamp01(alpha);
+                // The beat's flash runs round the ring.
+                var flat = new Vector3(position[i].x - centre.x, 0f, position[i].z - centre.z);
+                float angle = Mathf.Atan2(flat.z, flat.x) + Mathf.PI;
+                float front = Mathf.Repeat(angle - age * 5f, Mathf.PI * 2f);
+                float flash = Mathf.Exp(-front * front * 6f) * Mathf.Exp(-age * 1.5f);
+                var c = Color.Lerp(Shades[shade[i]], Color.white, flash * 0.7f);
+                c.a = Mathf.Clamp01((0.75f + flash * 0.4f + music.Band(1 + shade[i] % 5) * 0.25f) * fade);
+                float wiggle = 1f + Mathf.Sin(t * 14f + phase[i]) * 0.12f;
                 output[i] = new ParticleSystem.Particle
                 {
                     position = position[i],
                     velocity = velocity[i],
                     startColor = c,
-                    startSize = 0.0035f + heat[i] * 0.005f,
-                    startLifetime = lifetime,
-                    remainingLifetime = Mathf.Max(0.01f, lifetime - age[i])
+                    startSize = 0.0085f * wiggle * (1f + flash * 0.4f),
+                    startLifetime = 10f,
+                    remainingLifetime = 10f
                 };
             }
-            system.SetParticles(output, alive);
-        }
-
-        /// <summary>The vent: a soft glow with a ring that breathes with the bass and a pulse ring on each kick.</summary>
-        void DrawVent(MusicFrame music, Camera view, float dt)
-        {
-            if (music.Beat) ringAge = 0f;
-            ringAge += dt;
-            var facing = Quaternion.LookRotation(flow, Vector3.up);
-            ventGlow.transform.position = source;
-            ventGlow.transform.localScale = Vector3.one * (0.22f + music.Kick * 0.08f);
-            Effects.Face(ventGlow.transform, view);
-            block.Clear();
-            block.SetColor(ColorId, Color.Lerp(Effects.Violet, Effects.Mint, music.Band(1)));
-            block.SetFloat(IntensityId, (0.4f + music.Kick * 0.5f) * fade);
-            ventGlow.SetPropertyBlock(block);
-
-            ventRing.transform.SetPositionAndRotation(source, facing);
-            ventRing.transform.localScale = Vector3.one * (0.17f + music.Band(1) * 0.03f);
-            block.Clear();
-            block.SetColor(ColorId, Effects.Mint);
-            block.SetFloat(RadiusId, 0.8f);
-            block.SetFloat(ThicknessId, 0.04f);
-            block.SetFloat(AlphaId, (0.5f + music.Kick * 0.4f) * fade);
-            ventRing.SetPropertyBlock(block);
-
-            float u = Mathf.Clamp01(ringAge / 0.7f);
-            ventRing2.transform.SetPositionAndRotation(source + flow * (u * 0.12f), facing);
-            ventRing2.transform.localScale = Vector3.one * (0.17f + u * 0.2f);
-            block.Clear();
-            block.SetColor(ColorId, Effects.Violet);
-            block.SetFloat(RadiusId, 0.8f);
-            block.SetFloat(ThicknessId, 0.03f);
-            block.SetFloat(AlphaId, (1f - u) * (1f - u) * fade);
-            ventRing2.SetPropertyBlock(block);
+            system.SetParticles(output, count);
         }
     }
 }

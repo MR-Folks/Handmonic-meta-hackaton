@@ -407,7 +407,7 @@ namespace MusicInYourHands.EditorTools
                 ("causticsMaterial", EnsureMaterial(CausticsMaterialPath, "MusicInYourHands/Caustics")));
 
             var wind = EnsureWorld<SoundWind>(manager.transform, "SoundWind", "Sound wind", new Color(0.49f, 0.95f, 0.79f));
-            SetReferences(wind, ("glowMaterial", glow), ("ringMaterial", ring));
+            SetReferences(wind, ("glowMaterial", glow));
 
             var bubbles = EnsureWorld<BubbleNotes>(manager.transform, "BubbleNotes", "Bubble notes", new Color(1f, 0.6f, 0.85f));
             SetReferences(bubbles, ("bubbleMaterial", EnsureMaterial(BubbleMaterialPath, "MusicInYourHands/Bubble")), ("ringMaterial", ring),

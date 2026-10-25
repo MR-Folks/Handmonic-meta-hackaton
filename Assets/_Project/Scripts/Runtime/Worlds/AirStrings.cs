@@ -1,21 +1,20 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace MusicInYourHands
 {
     /// <summary>
-    /// The Air strings world: six glowing strings across the space in front of you, tuned to the notes of the song's
-    /// melody. They wave with their frequency bands, and each beat sends a pulse running along them. A glowing bead
-    /// slides along the string of each coming melody note and reaches the middle exactly when it is sung: pluck that
-    /// string then and you play the melody with the song (a golden burst says you were on time). Push a fingertip in
-    /// and the string bends with it while your visible hand is held back and trembles (fake resistance); pull away
-    /// and it twangs with its note, a ringing wave and sparks.
+    /// The Air strings world: a harp of light. Eight glowing strings stand in a gentle arc in front of you, low notes
+    /// on the left and high on the right. Brush a finger across a string and it rings; sweep your hand across them all
+    /// and you strum a glissando. Whatever you play fits the song: each string retunes itself to the notes being sung
+    /// right now, and its sound lands on the beat. The string that carries the sung note shimmers on its own, so you
+    /// can follow the melody if you like, but nothing is scored and nothing is wrong. Plucks ring along the string,
+    /// throw off sparks and a few notes of light that float up, and give your fingertip a little shiver.
     /// </summary>
     public class AirStrings : World
     {
         public override int MenuIcon => 3;
 
-        public override string Hint => "Touch a string and pull it to pluck";
+        public override string Hint => "Brush your fingers across the strings";
 
         public override HandTheme Theme => new HandTheme
         {
@@ -31,62 +30,57 @@ namespace MusicInYourHands
         [SerializeField] Material glowMaterial;
         [SerializeField] Material ringMaterial;
 
-        [Header("Layout")]
-        [SerializeField] float span = 1.1f;
-        [SerializeField] float distance = 0.42f;
-        [Tooltip("Height of the lowest string relative to the eyes, in metres.")]
-        [SerializeField] float lowest = -0.42f;
-        [SerializeField] float spacing = 0.062f;
-        [SerializeField] int points = 72;
+        [Header("Harp")]
+        [SerializeField] int stringCount = 8;
+        [Tooltip("How far in front of the eyes the middle string stands (m).")]
+        [SerializeField] float distance = 0.4f;
+        [Tooltip("Width of the arc from the first string to the last (m).")]
+        [SerializeField] float width = 0.62f;
+        [Tooltip("Bottom and top of the strings relative to the eyes (m).")]
+        [SerializeField] Vector2 heights = new Vector2(-0.68f, -0.12f);
+        [Tooltip("How much the arc curves towards you at its ends (m).")]
+        [SerializeField] float curve = 0.1f;
+        [SerializeField] int points = 48;
 
         [Header("Touch")]
-        [SerializeField] float grabRadius = 0.018f;
-        [Tooltip("How far a string can be pulled before it slips off the finger and twangs.")]
-        [SerializeField] float releaseDistance = 0.05f;
-        [SerializeField] float resistance = 0.35f;
-
-        [Header("Melody guide")]
-        [Tooltip("How many seconds ahead a note's bead appears on its string.")]
-        [SerializeField] float lead = 1.6f;
-        [Tooltip("How close to the note a pluck must be to count as on time, in seconds.")]
-        [SerializeField] float window = 0.2f;
+        [Tooltip("How close (m) to a string's line a fingertip must pass for it to pluck.")]
+        [SerializeField] float reach = 0.035f;
 
         static readonly int ColorId = Shader.PropertyToID("_Color");
         static readonly int IntensityId = Shader.PropertyToID("_Intensity");
         static readonly int RadiusId = Shader.PropertyToID("_Radius");
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
         static readonly int ThicknessId = Shader.PropertyToID("_Thickness");
-        static readonly Color[] Colors = { Effects.Pink, Effects.Orange, Effects.Gold, Effects.Mint, Effects.Blue, Effects.Violet };
-        // The melody's notes, lowest string first: E4 G4 A4 C5 D5 E5 (A minor pentatonic).
-        static readonly int[] Tuning = { 64, 67, 69, 72, 74, 76 };
-        const int Beads = 10;
+        static readonly Color[] Colors =
+        {
+            Effects.Pink, new Color(1f, 0.52f, 0.5f), Effects.Orange, Effects.Gold, Effects.Mint, new Color(0.45f, 0.85f, 0.95f), Effects.Blue, Effects.Violet
+        };
 
-        sealed class GuitarString
+        sealed class HarpString
         {
             public LineStrip Line;
-            public Renderer[] Posts;
-            public Renderer Target;
+            public Renderer[] Ends;
+            public Renderer Ripple;
+            public Vector3 Bottom, Top, Normal;
             public float Ring;
-            public Vector3 RingDirection = Vector3.up;
-            public bool Held;
-            public bool HeldLeft;
-            public int HeldFinger;
-            public float HeldU;
-            public Vector3 Pull;
+            public float RingAge = 9f;
+            public float PluckHeight = 0.5f;
             public float Glow;
-            public float Perfect;
-            public float NextNote = -1f;
+            public float Hum;
+            public float Cooldown;
+            public float RippleAge = -1f;
+            public int Midi;
         }
 
-        GuitarString[] strings;
-        Renderer[] beads;
+        HarpString[] strings;
         Vector3[] path;
         AudioPool voices;
-        ParticleSystem sparks;
+        ParticleSystem sparks, notes;
         MaterialPropertyBlock block;
-        readonly HashSet<float> playedNotes = new HashSet<float>();
-        Vector3 origin, right;
-        float beatTime = -10f, songTime;
+        readonly float[,] lastSide = new float[10, 8];
+        readonly bool[,] hadSide = new bool[10, 8];
+        readonly float[] shiver = new float[2];
+        float beatTime = -10f;
         MusicFrame frame;
         bool anchored, built;
 
@@ -96,27 +90,29 @@ namespace MusicInYourHands
             built = true;
             block = new MaterialPropertyBlock();
             path = new Vector3[points];
-            strings = new GuitarString[Colors.Length];
-            for (int i = 0; i < strings.Length; i++)
+            strings = new HarpString[stringCount];
+            for (int i = 0; i < stringCount; i++)
             {
-                strings[i] = new GuitarString
+                strings[i] = new HarpString
                 {
                     Line = new LineStrip($"String {i}", transform, lineMaterial, points),
-                    Posts = new[] { Effects.MakeQuad($"Post {i}a", transform, glowMaterial), Effects.MakeQuad($"Post {i}b", transform, glowMaterial) },
-                    Target = Effects.MakeQuad($"Target {i}", transform, ringMaterial)
+                    Ends = new[] { Effects.MakeQuad($"Foot {i}", transform, glowMaterial), Effects.MakeQuad($"Head {i}", transform, glowMaterial) },
+                    Ripple = Effects.MakeQuad($"Pluck Ring {i}", transform, ringMaterial)
                 };
+                strings[i].Ripple.gameObject.SetActive(false);
             }
-            beads = new Renderer[Beads];
-            for (int i = 0; i < Beads; i++) beads[i] = Effects.MakeQuad($"Note Bead {i}", transform, glowMaterial);
-            voices = new AudioPool(transform, 6);
+            voices = new AudioPool(transform, 8);
             sparks = Effects.MakeSparkSystem("Sparks", transform, glowMaterial);
+            notes = Effects.MakeSparkSystem("Notes", transform, glowMaterial);
+            var main = notes.main;
+            main.gravityModifier = -0.02f;
         }
 
         protected override void OnEnable()
         {
             base.OnEnable();
             anchored = false;
-            playedNotes.Clear();
+            System.Array.Clear(hadSide, 0, hadSide.Length);
         }
 
         protected override void OnDisable()
@@ -127,13 +123,25 @@ namespace MusicInYourHands
                 Effects.OffsetHand(HandRig.Instance.Left, Vector3.zero);
                 Effects.OffsetHand(HandRig.Instance.Right, Vector3.zero);
             }
-            if (strings != null) foreach (var s in strings) s.Held = false;
         }
 
-        Vector3 End(int i, bool right0)
+        /// <summary>Stands the strings in an arc in front of where you look, curving towards you at the ends.</summary>
+        void Place(Camera view)
         {
-            var up = Vector3.up * (lowest + i * spacing);
-            return origin + right * (span * (right0 ? 0.5f : -0.5f)) + up;
+            var forward = Effects.FlatForward(view);
+            var side = Vector3.Cross(Vector3.up, forward).normalized;
+            var eye = view.transform.position;
+            for (int i = 0; i < stringCount; i++)
+            {
+                float x = stringCount > 1 ? i / (float)(stringCount - 1) * 2f - 1f : 0f;
+                var foot = eye + forward * (distance - curve * x * x) + side * (x * width * 0.5f);
+                var s = strings[i];
+                s.Bottom = foot + Vector3.up * heights.x;
+                s.Top = foot + Vector3.up * heights.y;
+                // The plane a finger crosses to pluck: facing along the arc.
+                var tangent = side + forward * (2f * curve * x / Mathf.Max(width * 0.5f, 0.01f));
+                s.Normal = tangent.normalized;
+            }
         }
 
         public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
@@ -143,218 +151,206 @@ namespace MusicInYourHands
             if (anchored && ShouldReanchor(view, dt)) anchored = false;
             if (!anchored)
             {
-                // Hang the strings in front of where the player is looking when the world starts.
-                var forward = Effects.FlatForward(view);
-                origin = view.transform.position + forward * distance;
-                right = Vector3.Cross(Vector3.up, forward).normalized;
+                Place(view);
                 MarkAnchored(view);
                 anchored = true;
             }
-            songTime = music.SongTime;
             frame = music;
             if (music.Beat) beatTime = Now;
-
-            var leftOffset = Vector3.zero;
-            var rightOffset = Vector3.zero;
             float t = Now;
             float pulseAge = t - beatTime;
-            foreach (var s in strings) s.NextNote = -1f;
-            UpdateGuide(music, view);
 
-            for (int i = 0; i < strings.Length; i++)
+            Retune(music);
+            if (rig != null) Strum(rig, dt);
+
+            for (int i = 0; i < stringCount; i++)
             {
                 var s = strings[i];
-                var p0 = End(i, false);
-                var p1 = End(i, true);
-                Touch(rig, s, i, p0, p1);
-
-                if (s.Held)
-                {
-                    // The finger is held back by the string and trembles with it.
-                    var tremble = Random.insideUnitSphere * (0.0015f + s.Pull.magnitude * 0.03f);
-                    var offset = -s.Pull * resistance + tremble;
-                    if (s.HeldLeft) leftOffset += offset; else rightOffset += offset;
-                    if (!rig.Get(s.HeldLeft).IsTracked) s.Held = false;
-                }
-
-                s.Ring *= Mathf.Exp(-dt * 2.4f);
-                s.Glow = Mathf.MoveTowards(s.Glow, 0f, dt * 1.5f);
-                s.Perfect = Mathf.MoveTowards(s.Perfect, 0f, dt * 1.2f);
-                float band = music.Band(i);
-                // Standing waves that grow with the string's band, like the concept page.
-                float wave = 0.003f + band * 0.012f;
-                for (int j = 0; j < points; j++)
-                {
-                    float u = j / (float)(points - 1);
-                    float envelope = Mathf.Sin(Mathf.PI * u);
-                    var p = Vector3.Lerp(p0, p1, u);
-                    p += Vector3.up * (Mathf.Sin(Mathf.PI * u * (i % 3 + 1)) * Mathf.Sin(t * (6f + i * 1.3f)) * wave * envelope);
-                    // Each beat sends a pulse running along every string, slightly staggered.
-                    float front = (pulseAge - i * 0.04f) * 1.8f;
-                    p += Vector3.up * (Mathf.Exp(-(u - front) * (u - front) / 0.004f) * 0.012f * Mathf.Exp(-pulseAge * 1.6f) * envelope);
-                    p += s.RingDirection * (envelope * s.Ring * Mathf.Sin(t * (38f + i * 9f)));
-                    if (s.Held)
-                    {
-                        float bend = u < s.HeldU ? u / Mathf.Max(s.HeldU, 1e-3f) : (1f - u) / Mathf.Max(1f - s.HeldU, 1e-3f);
-                        p += s.Pull * bend;
-                    }
-                    path[j] = p;
-                }
-
-                var color = Color.Lerp(Colors[i], Color.white, s.Perfect * 0.5f);
-                color.a = 0.75f + band * 0.35f + s.Glow * 0.5f;
-                s.Line.Set(path, points, 0.008f * (1f + band * 0.8f + s.Glow * 1.5f + s.Ring * 20f + s.Perfect), color, view.transform.position, false);
-
-                for (int k = 0; k < 2; k++)
-                {
-                    var post = s.Posts[k];
-                    post.transform.position = k == 0 ? p0 : p1;
-                    post.transform.localScale = Vector3.one * 0.022f;
-                    Effects.Face(post.transform, view);
-                    block.Clear();
-                    block.SetColor(ColorId, Colors[i]);
-                    block.SetFloat(IntensityId, 0.5f + band * 0.4f);
-                    post.SetPropertyBlock(block);
-                }
-
-                // A soft ring marks where to pluck, brightening as this string's next note arrives.
-                float due = s.NextNote < 0f ? 0f : 1f - Mathf.Clamp01((s.NextNote - songTime) / lead);
-                bool showTarget = due > 0f;
-                if (s.Target.gameObject.activeSelf != showTarget) s.Target.gameObject.SetActive(showTarget);
-                if (showTarget)
-                {
-                    s.Target.transform.position = Vector3.Lerp(p0, p1, 0.5f);
-                    s.Target.transform.localScale = Vector3.one * Mathf.Lerp(0.09f, 0.05f, due);
-                    Effects.Face(s.Target.transform, view);
-                    block.Clear();
-                    block.SetColor(ColorId, Colors[i]);
-                    block.SetFloat(RadiusId, 0.7f);
-                    block.SetFloat(ThicknessId, 0.05f);
-                    block.SetFloat(AlphaId, due * due);
-                    s.Target.SetPropertyBlock(block);
-                }
+                s.Cooldown -= dt;
+                s.RingAge += dt;
+                s.Ring *= Mathf.Exp(-dt * 2.2f);
+                s.Glow = Mathf.MoveTowards(s.Glow, 0f, dt * 1.4f);
+                float band = music.Band(1 + i * 5 / Mathf.Max(stringCount, 1));
+                DrawString(s, i, band, t, pulseAge, view);
+                DrawRipple(s, view, dt);
             }
 
-            Effects.OffsetHand(rig.Left, leftOffset);
-            Effects.OffsetHand(rig.Right, rightOffset);
-        }
-
-        static int StringFor(int midi)
-        {
-            int best = 0;
-            for (int i = 1; i < Tuning.Length; i++)
-                if (Mathf.Abs(Tuning[i] - midi) < Mathf.Abs(Tuning[best] - midi)) best = i;
-            return best;
-        }
-
-        /// <summary>Beads slide in from the right along the string of each coming note, reaching the middle on time.</summary>
-        void UpdateGuide(MusicFrame music, Camera view)
-        {
-            int used = 0;
-            if (music.Upcoming != null)
+            // A plucked fingertip shivers for a moment.
+            for (int side = 0; side < 2; side++)
             {
-                foreach (var note in music.Upcoming)
-                {
-                    float ahead = note.Time - songTime;
-                    if (ahead < -0.15f || ahead > lead || used >= beads.Length) continue;
-                    int i = StringFor(note.Midi);
-                    var s = strings[i];
-                    if (s.NextNote < 0f || note.Time < s.NextNote) s.NextNote = note.Time;
-                    if (playedNotes.Contains(note.Time)) continue;
-
-                    float u = 0.5f + 0.47f * Mathf.Clamp01(ahead / lead);
-                    var bead = beads[used++];
-                    bead.gameObject.SetActive(true);
-                    bead.transform.position = Vector3.Lerp(End(i, false), End(i, true), u);
-                    float close = 1f - Mathf.Clamp01(Mathf.Abs(ahead) / lead);
-                    bead.transform.localScale = Vector3.one * (0.03f + close * 0.025f);
-                    Effects.Face(bead.transform, view);
-                    block.Clear();
-                    block.SetColor(ColorId, Colors[i]);
-                    block.SetFloat(IntensityId, 0.6f + close * 1.2f);
-                    bead.SetPropertyBlock(block);
-                }
+                shiver[side] = Mathf.MoveTowards(shiver[side], 0f, dt * 6f);
+                var hand = rig != null ? rig.Get(side == 0) : null;
+                if (hand != null) Effects.OffsetHand(hand, Random.insideUnitSphere * (0.0025f * shiver[side]));
             }
-            for (int k = used; k < beads.Length; k++)
-                if (beads[k].gameObject.activeSelf) beads[k].gameObject.SetActive(false);
         }
 
-        void Touch(HandRig rig, GuitarString s, int index, Vector3 p0, Vector3 p1)
+        /// <summary>
+        /// Each string's note is fitted to the music right now (low strings low, high strings high), and the string
+        /// whose note is being sung hums softly on its own.
+        /// </summary>
+        void Retune(MusicFrame music)
         {
-            var dir = p1 - p0;
-            float length = dir.magnitude;
-            dir /= length;
-
-            if (s.Held)
+            int sung = -1;
+            if (music.Notes != null)
             {
-                var hand = rig.Get(s.HeldLeft);
-                var tip = hand.TipJoints[s.HeldFinger] != null ? hand.TipJoints[s.HeldFinger].position : hand.Tips[s.HeldFinger];
-                var rest = p0 + dir * (s.HeldU * length);
-                var pull = Vector3.ProjectOnPlane(tip - rest, dir);
-                s.Pull = Vector3.Lerp(s.Pull, pull, 0.6f);
-                if (pull.magnitude > releaseDistance || !hand.IsTracked) Pluck(s, index, rest, pull);
-                return;
+                foreach (var note in music.Notes.Notes)
+                {
+                    if (note.Time > music.SongTime) break;
+                    if (music.SongTime < note.Time + note.Length) sung = note.Midi;
+                }
             }
+            for (int i = 0; i < stringCount; i++)
+            {
+                var s = strings[i];
+                s.Midi = Musical.Pitch(music, 59 + i * 3);
+                bool carries = sung >= 0 && ((s.Midi - sung) % 12 + 12) % 12 == 0;
+                s.Hum = Mathf.MoveTowards(s.Hum, carries ? 1f : 0f, Time.deltaTime * 4f);
+            }
+        }
 
+        /// <summary>A fingertip passing through a string's plane, close to the string, plucks it.</summary>
+        void Strum(HandRig rig, float dt)
+        {
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                if (!hand.IsTracked) continue;
-                for (int f = 1; f < 5; f++)
+                for (int f = 0; f < 5; f++)
                 {
+                    int finger = side * 5 + f;
+                    if (!hand.IsTracked)
+                    {
+                        for (int i = 0; i < stringCount; i++) hadSide[finger, i] = false;
+                        continue;
+                    }
                     var tip = hand.TipJoints[f] != null ? hand.TipJoints[f].position : hand.Tips[f];
-                    float u = Vector3.Dot(tip - p0, dir) / length;
-                    if (u < 0.04f || u > 0.96f) continue;
-                    var closest = p0 + dir * (u * length);
-                    if (Vector3.Distance(tip, closest) > grabRadius) continue;
-                    s.Held = true;
-                    s.HeldLeft = side == 0;
-                    s.HeldFinger = f;
-                    s.HeldU = u;
-                    s.Pull = Vector3.zero;
-                    return;
+                    for (int i = 0; i < stringCount; i++)
+                    {
+                        var s = strings[i];
+                        var axis = s.Top - s.Bottom;
+                        float along = Vector3.Dot(tip - s.Bottom, axis) / axis.sqrMagnitude;
+                        float sideOf = Vector3.Dot(tip - s.Bottom, s.Normal);
+                        var closest = s.Bottom + axis * Mathf.Clamp01(along);
+                        // Close to the string within its plane, and not far in front of or behind it.
+                        var lateral = (tip - closest) - s.Normal * sideOf;
+                        bool near = along > 0.02f && along < 0.98f && lateral.magnitude < reach && Mathf.Abs(sideOf) < 0.06f;
+                        if (hadSide[finger, i] && near && Mathf.Sign(sideOf) != Mathf.Sign(lastSide[finger, i]) && s.Cooldown <= 0f)
+                        {
+                            float speed = dt > 0f ? Mathf.Abs(sideOf - lastSide[finger, i]) / dt : 0f;
+                            Pluck(s, i, closest, along, Mathf.Clamp01(0.35f + speed * 0.6f));
+                            shiver[side] = 1f;
+                        }
+                        lastSide[finger, i] = sideOf;
+                        hadSide[finger, i] = true;
+                    }
                 }
             }
         }
 
-        void Pluck(GuitarString s, int index, Vector3 at, Vector3 pull)
+        void Pluck(HarpString s, int index, Vector3 at, float along, float strength)
         {
-            s.Held = false;
-            s.Ring = Mathf.Clamp(pull.magnitude * 0.5f, 0.006f, 0.025f);
-            s.RingDirection = pull.sqrMagnitude > 1e-8f ? pull.normalized : Vector3.up;
+            s.Cooldown = 0.09f;
+            s.Ring = 0.012f * (0.5f + strength);
+            s.RingAge = 0f;
+            s.PluckHeight = along;
             s.Glow = 1f;
-            s.Pull = Vector3.zero;
+            s.RippleAge = 0f;
+            s.Ripple.transform.position = at;
+            Musical.Play(voices, frame, s.Midi, at, 0.35f + strength * 0.4f, pluck: true);
 
-            // On time with the melody? Then it is that note, played with the song.
-            bool onTime = s.NextNote >= 0f && Mathf.Abs(s.NextNote - songTime) < window;
-            if (onTime)
+            var color = Colors[index % Colors.Length];
+            for (int k = 0; k < 10; k++)
             {
-                playedNotes.Add(s.NextNote);
-                s.Perfect = 1f;
-            }
-            Musical.Play(voices, frame, Tuning[index], at, onTime ? 0.8f : 0.6f, pluck: true);
-
-            int count = onTime ? 28 : 14;
-            for (int k = 0; k < count; k++)
-            {
-                var emit = new ParticleSystem.EmitParams
+                sparks.Emit(new ParticleSystem.EmitParams
                 {
                     position = at,
-                    velocity = (Random.insideUnitSphere + s.RingDirection * 0.6f) * (onTime ? 0.2f : 0.12f),
-                    startColor = onTime && k % 2 == 0 ? Effects.Gold : Colors[index],
-                    startSize = Random.Range(0.005f, onTime ? 0.016f : 0.012f),
-                    startLifetime = Random.Range(0.5f, 1.2f)
-                };
-                sparks.Emit(emit, 1);
+                    velocity = Random.insideUnitSphere * 0.12f + s.Normal * Random.Range(-0.08f, 0.08f),
+                    startColor = color,
+                    startSize = Random.Range(0.004f, 0.01f),
+                    startLifetime = Random.Range(0.4f, 0.9f)
+                }, 1);
             }
+            // A few notes of light drift up from the string.
+            for (int k = 0; k < 2; k++)
+            {
+                notes.Emit(new ParticleSystem.EmitParams
+                {
+                    position = at + Random.insideUnitSphere * 0.01f,
+                    velocity = Vector3.up * Random.Range(0.05f, 0.1f) + Random.insideUnitSphere * 0.02f,
+                    startColor = Color.Lerp(color, Color.white, 0.3f),
+                    startSize = Random.Range(0.012f, 0.02f),
+                    startLifetime = Random.Range(1.4f, 2.2f)
+                }, 1);
+            }
+        }
+
+        void DrawString(HarpString s, int index, float band, float t, float pulseAge, Camera view)
+        {
+            var color = Colors[index % Colors.Length];
+            for (int j = 0; j < points; j++)
+            {
+                float u = j / (float)(points - 1);
+                float envelope = Mathf.Sin(Mathf.PI * u);
+                var p = Vector3.Lerp(s.Bottom, s.Top, u);
+                // Its own quiet sway with its band, a hum when it carries the sung note, and a pulse up the string on
+                // each beat.
+                float sway = Mathf.Sin(Mathf.PI * u * 2f) * Mathf.Sin(t * (3f + index * 0.4f)) * (0.002f + band * 0.004f);
+                float hum = Mathf.Sin(t * 30f + u * 9f) * 0.003f * s.Hum;
+                float front = (pulseAge - index * 0.03f) * 1.6f;
+                float pulse = Mathf.Exp(-(u - front) * (u - front) / 0.004f) * 0.008f * Mathf.Exp(-pulseAge * 1.6f);
+                // The pluck: a vibration strongest where it was plucked, with a bright wave running both ways.
+                float shape = u < s.PluckHeight ? u / Mathf.Max(s.PluckHeight, 1e-3f) : (1f - u) / Mathf.Max(1f - s.PluckHeight, 1e-3f);
+                float ring = s.Ring * shape * Mathf.Sin(t * (55f + index * 6f));
+                p += s.Normal * (sway + hum + ring) + Vector3.Cross(s.Normal, Vector3.up) * pulse * envelope;
+                path[j] = p;
+            }
+            var c = Color.Lerp(color, Color.white, s.Glow * 0.4f + s.Hum * 0.15f);
+            c.a = 0.55f + band * 0.25f + s.Glow * 0.5f + s.Hum * 0.3f;
+            s.Line.Set(path, points, 0.006f * (1f + s.Glow * 1.2f + s.Hum * 0.5f), c, view.transform.position, false);
+
+            for (int k = 0; k < 2; k++)
+            {
+                var end = s.Ends[k];
+                end.transform.position = k == 0 ? s.Bottom : s.Top;
+                end.transform.localScale = Vector3.one * (0.02f + s.Glow * 0.015f);
+                Effects.Face(end.transform, view);
+                block.Clear();
+                block.SetColor(ColorId, color);
+                block.SetFloat(IntensityId, 0.45f + band * 0.3f + s.Glow * 0.6f + s.Hum * 0.4f);
+                end.SetPropertyBlock(block);
+            }
+        }
+
+        void DrawRipple(HarpString s, Camera view, float dt)
+        {
+            bool show = s.RippleAge >= 0f;
+            if (s.Ripple.gameObject.activeSelf != show) s.Ripple.gameObject.SetActive(show);
+            if (!show) return;
+            s.RippleAge += dt;
+            float u = s.RippleAge / 0.45f;
+            if (u >= 1f)
+            {
+                s.RippleAge = -1f;
+                s.Ripple.gameObject.SetActive(false);
+                return;
+            }
+            s.Ripple.transform.localScale = Vector3.one * (0.03f + u * 0.09f);
+            Effects.Face(s.Ripple.transform, view);
+            block.Clear();
+            block.SetColor(ColorId, Color.white);
+            block.SetFloat(RadiusId, 0.8f);
+            block.SetFloat(ThicknessId, 0.06f * (1f - u) + 0.01f);
+            block.SetFloat(AlphaId, (1f - u) * (1f - u));
+            s.Ripple.SetPropertyBlock(block);
         }
 
         /// <summary>For previews: rings a string as if it had just been plucked.</summary>
         public void PreviewPluck(int index, float amount)
         {
             Build();
-            strings[index].Ring = amount;
-            strings[index].Glow = 1f;
+            var s = strings[Mathf.Clamp(index, 0, strings.Length - 1)];
+            s.Ring = amount;
+            s.Glow = 1f;
+            s.PluckHeight = 0.5f;
         }
     }
 }

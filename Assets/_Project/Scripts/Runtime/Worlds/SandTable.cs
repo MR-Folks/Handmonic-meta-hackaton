@@ -3,17 +3,18 @@ using UnityEngine;
 namespace MusicInYourHands
 {
     /// <summary>
-    /// The Sand table world: a dark glass plate at table height becomes a vibrating Chladni plate. Sand on it is
-    /// shaken where the plate moves and comes to rest on the lines that stay still, so it gathers into the true
-    /// shapes of sound: cos(n x) cos(m y) - cos(m x) cos(n y) for vibration mode n, m. The music shakes it harder on
-    /// each kick and moves to a new mode every eight bars of beats; hover a hand over the plate and sliding it from
-    /// left to right picks the mode yourself, lower is stronger. The plate lights your hand from below.
+    /// The Sand table world: a dark glass plate at table height covered in sand that you can play with. The music
+    /// shakes the plate like a Chladni plate: sand is jostled where the plate moves and comes to rest on the lines that
+    /// stay still, gathering into the true shapes of sound, cos(n x) cos(m y) - cos(m x) cos(n y) for vibration mode
+    /// n, m, and it jumps on every kick. Touch the plate and your fingers plough grooves through the sand; hold a hand
+    /// just above it and the sand blows away from under your palm; slide a hovering hand from left to right to change
+    /// the pattern; pinch above the plate to pour a stream of sand where you like. The plate lights your hand from below.
     /// </summary>
     public class SandTable : World
     {
         public override int MenuIcon => 11;
 
-        public override string Hint => "Hover a hand over the plate and slide it across";
+        public override string Hint => "Touch the sand, hover to change the pattern, pinch to pour";
 
         public override HandTheme Theme => new HandTheme
         {
@@ -29,15 +30,15 @@ namespace MusicInYourHands
         [SerializeField] Material glowMaterial;
 
         [Header("Plate")]
-        [SerializeField] float plateSize = 0.46f;
-        [SerializeField] float distance = 0.48f;
+        [SerializeField] float plateSize = 0.5f;
+        [SerializeField] float distance = 0.46f;
         [SerializeField] float belowEyes = 0.52f;
-        [SerializeField] int grains = 2400;
-        [SerializeField] float grainSize = 0.0045f;
+        [SerializeField] int grains = 3200;
+        [SerializeField] float grainSize = 0.004f;
         [Tooltip("How high above the plate (m) a hand still counts as hovering over it.")]
-        [SerializeField] float hoverHeight = 0.3f;
+        [SerializeField] float hoverHeight = 0.25f;
 
-        // Vibration modes from simple to busy, as on the concept page.
+        // Vibration modes from simple to busy.
         static readonly Vector2Int[] Modes =
         {
             new Vector2Int(1, 2), new Vector2Int(1, 3), new Vector2Int(2, 3), new Vector2Int(1, 4),
@@ -56,12 +57,18 @@ namespace MusicInYourHands
         ParticleSystem sand;
         ParticleSystem.Particle[] output;
         Vector2[] grain;
-        float[] hop;
-        float[] tone;
+        float[] hop, tone;
+        // Grains in the air, poured from a pinch: their world position and velocity; NaN x when resting on the plate.
+        Vector3[] airPos, airVel;
+        readonly Vector2[,] lastContact = new Vector2[2, 6];
+        readonly bool[,] hadContact = new bool[2, 6];
+        readonly float[] pourDebt = new float[2];
         MaterialPropertyBlock block;
         System.Random random;
-        int mode = -1, beats;
-        float shake, fade;
+        AudioPool voices;
+        MusicFrame frame;
+        int mode = -1, beats, pourNext;
+        float shake, fade, half;
         bool anchored, built;
 
         public override void Build()
@@ -73,6 +80,8 @@ namespace MusicInYourHands
             grain = new Vector2[grains];
             hop = new float[grains];
             tone = new float[grains];
+            airPos = new Vector3[grains];
+            airVel = new Vector3[grains];
             output = new ParticleSystem.Particle[grains];
             ScatterSand();
 
@@ -89,10 +98,10 @@ namespace MusicInYourHands
             label = labelGo.AddComponent<TextMesh>();
             label.font = font;
             labelGo.GetComponent<MeshRenderer>().sharedMaterial = font.material;
-            label.fontSize = 40;
-            label.characterSize = 0.0012f;
-            label.anchor = TextAnchor.MiddleLeft;
-            labelGo.transform.localPosition = new Vector3(-plateSize * 0.42f, 0.002f, -plateSize * 0.42f);
+            label.fontSize = 48;
+            label.characterSize = 0.0022f;
+            label.anchor = TextAnchor.UpperLeft;
+            labelGo.transform.localPosition = new Vector3(-plateSize * 0.5f, 0.002f, -plateSize * 0.53f);
             labelGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
 
             var go = new GameObject("Sand");
@@ -115,6 +124,7 @@ namespace MusicInYourHands
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             renderer.receiveShadows = false;
 
+            voices = new AudioPool(transform, 3);
             plate.gameObject.SetActive(false);
         }
 
@@ -122,8 +132,9 @@ namespace MusicInYourHands
         {
             for (int i = 0; i < grains; i++)
             {
-                grain[i] = new Vector2((float)random.NextDouble() * 2f - 1f, (float)random.NextDouble() * 2f - 1f);
+                grain[i] = new Vector2((float)random.NextDouble() * 2f - 1f, (float)random.NextDouble() * 2f - 1f) * 0.95f;
                 tone[i] = (float)random.NextDouble();
+                airPos[i].x = float.NaN;
             }
         }
 
@@ -133,6 +144,7 @@ namespace MusicInYourHands
             anchored = false;
             fade = 0f;
             mode = -1;
+            System.Array.Clear(hadContact, 0, hadContact.Length);
             if (grain != null) ScatterSand();
         }
 
@@ -158,6 +170,8 @@ namespace MusicInYourHands
                 MarkAnchored(view);
                 anchored = true;
             }
+            frame = music;
+            half = plateSize * 0.5f * 0.95f;
             fade = Mathf.MoveTowards(fade, 1f, dt * 2f);
 
             // A hovering hand picks the mode by where it is across the plate; otherwise the music moves it on.
@@ -168,15 +182,25 @@ namespace MusicInYourHands
                 : (beats / 8) % Modes.Length;
             if (wanted != mode)
             {
-                if (mode >= 0) shake = 1f;
+                if (mode >= 0)
+                {
+                    shake = 1f;
+                    if (press > 0f) Musical.Play(voices, music, 57 + wanted * 3, plate.position, 0.3f, pluck: true);
+                }
                 mode = wanted;
             }
             shake *= Mathf.Exp(-dt * 1.8f);
             HandSkin.FocusPosition = plate.position;
             HandSkin.FocusStrength = Mathf.Max(press, 0.25f) * fade;
 
-            float amp = 0.02f + music.Kick * 0.06f + music.Band(1) * 0.04f + shake * 0.06f + press * 0.04f;
+            float amp = 0.018f + music.Kick * 0.06f + music.Band(1) * 0.04f + shake * 0.06f;
             Shake(Modes[mode], amp, dt);
+            if (rig != null)
+            {
+                Touch(rig, dt);
+                Pour(rig, dt);
+            }
+            Fall(dt);
             Draw(music, amp);
 
             block.Clear();
@@ -186,7 +210,7 @@ namespace MusicInYourHands
             block.SetFloat(AlphaId, fade);
             plateRenderer.SetPropertyBlock(block);
             label.text = $"mode {Modes[mode].x}:{Modes[mode].y}";
-            label.color = new Color(Sand.r, Sand.g, Sand.b, 0.45f * fade);
+            label.color = new Color(Sand.r, Sand.g, Sand.b, 0.55f * fade);
         }
 
         /// <summary>How strongly a hand hovers over the plate (0-1, lower is stronger), and where across it (-1..1).</summary>
@@ -198,16 +222,14 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                if (!hand.IsTracked) continue;
-                var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
-                var local = plate.InverseTransformPoint(palm) / (plateSize * 0.5f);
-                float height = plate.InverseTransformPoint(palm).y;
-                if (Mathf.Abs(local.x) > 1.1f || Mathf.Abs(local.z) > 1.1f || height < -0.05f || height > hoverHeight) continue;
-                float strength = 1f - Mathf.Clamp01(height / hoverHeight);
+                if (!hand.IsTracked || hand.Pinch > 0.8f) continue;
+                var local = plate.InverseTransformPoint(Palm(hand));
+                if (Mathf.Abs(local.x) > half * 1.15f || Mathf.Abs(local.z) > half * 1.15f || local.y < 0.03f || local.y > hoverHeight) continue;
+                float strength = 1f - Mathf.Clamp01(local.y / hoverHeight);
                 if (strength > best)
                 {
                     best = strength;
-                    across = Mathf.Clamp(local.x, -1f, 1f);
+                    across = Mathf.Clamp(local.x / half, -1f, 1f);
                 }
             }
             return best;
@@ -223,31 +245,134 @@ namespace MusicInYourHands
             const float halfPi = Mathf.PI * 0.5f;
             for (int i = 0; i < grains; i++)
             {
+                if (!float.IsNaN(airPos[i].x)) continue;
                 var p = grain[i];
                 float x = (p.x + 1f) * halfPi, y = (p.y + 1f) * halfPi;
                 float f = Mathf.Cos(m.x * x) * Mathf.Cos(m.y * y) - Mathf.Cos(m.y * x) * Mathf.Cos(m.x * y);
                 float jolt = (Mathf.Abs(f) + 0.015f) * amp * frames;
-                p.x = Mathf.Clamp(p.x + ((float)random.NextDouble() - 0.5f) * jolt, -0.95f, 0.95f);
-                p.y = Mathf.Clamp(p.y + ((float)random.NextDouble() - 0.5f) * jolt, -0.95f, 0.95f);
+                p.x = Mathf.Clamp(p.x + ((float)random.NextDouble() - 0.5f) * jolt, -0.98f, 0.98f);
+                p.y = Mathf.Clamp(p.y + ((float)random.NextDouble() - 0.5f) * jolt, -0.98f, 0.98f);
                 grain[i] = p;
                 hop[i] = Mathf.Lerp(hop[i], Mathf.Abs(f) * amp, 0.5f);
             }
         }
 
-        void Draw(MusicFrame music, float amp)
+        /// <summary>
+        /// Fingertips and palms on the plate plough the sand aside along their path; a palm held just above the plate
+        /// blows the sand away from under it.
+        /// </summary>
+        void Touch(HandRig rig, float dt)
         {
-            float half = plateSize * 0.5f * 0.94f;
+            for (int side = 0; side < 2; side++)
+            {
+                var hand = rig.Get(side == 0);
+                for (int k = 0; k < 6; k++)
+                {
+                    if (!hand.IsTracked) { hadContact[side, k] = false; continue; }
+                    var point = k < 5 ? (hand.TipJoints[k] != null ? hand.TipJoints[k].position : hand.Tips[k]) : Palm(hand);
+                    var local = plate.InverseTransformPoint(point);
+                    var c = new Vector2(local.x, local.z) / half;
+                    bool over = Mathf.Abs(c.x) < 1.1f && Mathf.Abs(c.y) < 1.1f;
+                    bool touching = over && local.y < 0.032f && local.y > -0.06f;
+                    float blow = k == 5 && over && !touching ? 1f - Mathf.Clamp01((local.y - 0.02f) / 0.14f) : 0f;
+                    var motion = hadContact[side, k] ? c - lastContact[side, k] : Vector2.zero;
+                    lastContact[side, k] = c;
+                    hadContact[side, k] = touching;
+                    if (!touching && blow <= 0f) continue;
+
+                    float radius = (touching ? (k < 5 ? 0.022f : 0.05f) : 0.1f) / half;
+                    float r2 = radius * radius;
+                    for (int i = 0; i < grains; i++)
+                    {
+                        if (!float.IsNaN(airPos[i].x)) continue;
+                        var d = grain[i] - c;
+                        float sq = d.sqrMagnitude;
+                        if (sq > r2) continue;
+                        float dist = Mathf.Sqrt(sq) + 1e-5f;
+                        var outward = d / dist;
+                        if (touching)
+                        {
+                            // Pushed to the edge of the furrow, and a little along with the finger.
+                            grain[i] = c + outward * (radius * (1f + (float)random.NextDouble() * 0.15f)) + motion * 0.35f;
+                            hop[i] = 0.02f;
+                        }
+                        else grain[i] += outward * (blow * 0.25f * dt * (1f - dist / radius) * 4f);
+                        grain[i] = new Vector2(Mathf.Clamp(grain[i].x, -0.98f, 0.98f), Mathf.Clamp(grain[i].y, -0.98f, 0.98f));
+                    }
+                }
+            }
+        }
+
+        /// <summary>Pinching above the plate pours a stream of sand: grains taken from the far edges fall from your fingers.</summary>
+        void Pour(HandRig rig, float dt)
+        {
+            for (int side = 0; side < 2; side++)
+            {
+                var hand = rig.Get(side == 0);
+                bool pouring = hand.IsTracked && hand.Pinch > 0.8f && !hand.InSystemGesture;
+                if (!pouring) { pourDebt[side] = 0f; continue; }
+                var thumb = hand.TipJoints[0] != null ? hand.TipJoints[0].position : hand.Tips[0];
+                var index = hand.TipJoints[1] != null ? hand.TipJoints[1].position : hand.Tips[1];
+                var from = (thumb + index) * 0.5f;
+                var local = plate.InverseTransformPoint(from);
+                if (Mathf.Abs(local.x) > half * 1.2f || Mathf.Abs(local.z) > half * 1.2f || local.y < 0.02f || local.y > 0.6f) continue;
+                pourDebt[side] += 120f * dt;
+                while (pourDebt[side] >= 1f)
+                {
+                    pourDebt[side] -= 1f;
+                    int i = pourNext;
+                    pourNext = (pourNext + 7) % grains;
+                    airPos[i] = from + Random.insideUnitSphere * 0.003f;
+                    airVel[i] = hand.Velocity * 0.3f + Random.insideUnitSphere * 0.02f;
+                }
+            }
+        }
+
+        /// <summary>Poured grains fall and land as sand where they hit the plate.</summary>
+        void Fall(float dt)
+        {
             for (int i = 0; i < grains; i++)
             {
-                // Grains on the moving parts hop off the plate a little; settled ones glint.
-                float lift = 0.0015f + hop[i] * 0.12f * (0.5f + tone[i]);
-                var local = new Vector3(grain[i].x * half, lift, grain[i].y * half);
-                float settled = 1f - Mathf.Clamp01(hop[i] / Mathf.Max(amp, 1e-4f) * 2f);
+                if (float.IsNaN(airPos[i].x)) continue;
+                airVel[i] += Physics.gravity * dt;
+                airPos[i] += airVel[i] * dt;
+                var local = plate.InverseTransformPoint(airPos[i]);
+                if (local.y > 0.002f) continue;
+                var c = new Vector2(local.x, local.z) / half;
+                if (Mathf.Abs(c.x) <= 1f && Mathf.Abs(c.y) <= 1f)
+                {
+                    grain[i] = c + Random.insideUnitCircle * 0.02f;
+                    hop[i] = 0.01f;
+                }
+                // Grains that miss the plate return somewhere random on it, out of sight under the others.
+                else grain[i] = new Vector2((float)random.NextDouble() * 2f - 1f, (float)random.NextDouble() * 2f - 1f) * 0.95f;
+                airPos[i].x = float.NaN;
+            }
+        }
+
+        void Draw(MusicFrame music, float amp)
+        {
+            for (int i = 0; i < grains; i++)
+            {
+                Vector3 world;
+                float settled;
+                if (!float.IsNaN(airPos[i].x))
+                {
+                    world = airPos[i];
+                    settled = 0.6f;
+                }
+                else
+                {
+                    // Grains on the moving parts hop off the plate a little; settled ones glint.
+                    float lift = 0.0015f + hop[i] * 0.12f * (0.5f + tone[i]);
+                    world = plate.TransformPoint(new Vector3(grain[i].x * half, lift, grain[i].y * half));
+                    settled = 1f - Mathf.Clamp01(hop[i] / Mathf.Max(amp, 1e-4f) * 2f);
+                }
                 var c = Color.Lerp(Sand * 0.75f, Color.Lerp(Sand, Color.white, 0.35f), tone[i] * 0.5f + settled * 0.5f);
                 c.a = (0.55f + settled * 0.4f + music.Kick * 0.1f) * fade;
                 output[i] = new ParticleSystem.Particle
                 {
-                    position = plate.TransformPoint(local),
+                    position = world,
                     startColor = c,
                     startSize = grainSize * (0.75f + tone[i] * 0.5f),
                     startLifetime = 10f,
@@ -256,5 +381,7 @@ namespace MusicInYourHands
             }
             sand.SetParticles(output, grains);
         }
+
+        static Vector3 Palm(HandRig.Hand hand) => hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
     }
 }

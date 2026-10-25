@@ -4,11 +4,12 @@ using UnityEngine;
 namespace MusicInYourHands
 {
     /// <summary>
-    /// The Orbit type world: poster-style motion graphics floating in your room, in white and soft grey. The word being
-    /// sung fills the poster in giant letters that run off its edges and drift slowly sideways; the whole line sits
-    /// small above it with the sung word lit. Thin orbit lines and rings of dots turn to the music, and soft discs
-    /// breathe with the bass. Push the letters with your fingers, flick a dotted ring to spin it, or make a fist to pull
-    /// the word towards your hand. Your hands are printed in halftone dots.
+    /// The Orbit type world: the lyrics as solid 3D type in your room, in white and soft grey. The word being sung
+    /// arrives in front of you in big letters with real depth, each letter flying in from the orbits with a spin and
+    /// pulsing on the kick. When the next word comes, the last one shrinks and joins an orbit around you, so the line
+    /// builds up circling your head like planets, and when the line ends its words dissolve. Three tilted orbit rings
+    /// with turning beads circle the room. Push the letters with your fingers, flick a ring to spin it, or make a fist
+    /// to pull the word towards your hand. Your hands are printed in halftone dots.
     /// </summary>
     public class OrbitType : World
     {
@@ -32,74 +33,70 @@ namespace MusicInYourHands
         [SerializeField] Material lineMaterial;
         [SerializeField] Material glowMaterial;
 
-        [Header("Poster")]
-        [SerializeField] float distance = 1.15f;
-        [Tooltip("Height of the poster's centre relative to the eyes (m).")]
-        [SerializeField] float height = -0.05f;
-        [Tooltip("Half width and half height of the poster frame the letters are cropped to (m).")]
-        [SerializeField] Vector2 frame = new Vector2(0.62f, 0.42f);
-        [Tooltip("Height of the giant letters (m).")]
-        [SerializeField] float letterHeight = 0.56f;
-        [SerializeField] float drift = 0.035f;
+        [Header("Type")]
+        [Tooltip("How far in front of the eyes the sung word stands (m), and its height relative to the eyes.")]
+        [SerializeField] float distance = 0.95f;
+        [SerializeField] float height = -0.08f;
+        [Tooltip("Letter height of the sung word, and of words in orbit (m).")]
+        [SerializeField] float letterHeight = 0.24f;
+        [SerializeField] float orbitLetterHeight = 0.075f;
+        [Tooltip("Depth of the letters as a share of their height.")]
+        [SerializeField] float depth = 0.16f;
+
+        [Header("Orbits")]
+        [SerializeField] float[] ringRadii = { 0.95f, 1.2f, 1.45f };
+        [SerializeField] float[] ringTilts = { 12f, -18f, 26f };
 
         [Header("Touch")]
-        [SerializeField] float pushRadius = 0.14f;
-        [SerializeField] float pullRadius = 0.7f;
+        [SerializeField] float pushRadius = 0.13f;
+        [SerializeField] float pullRadius = 0.8f;
 
-        static readonly Color Ink = new Color(0.95f, 0.95f, 0.97f);
-        static readonly Color Soft = new Color(0.86f, 0.87f, 0.92f);
+        static readonly Color Ink = new Color(0.97f, 0.97f, 0.99f);
+        static readonly Color Shadow = new Color(0.32f, 0.31f, 0.38f);
         static readonly Color Touch = new Color(0.79f, 0.61f, 1f);
-        static readonly int ColorId = Shader.PropertyToID("_Color");
-        static readonly int IntensityId = Shader.PropertyToID("_Intensity");
-        static readonly int SoftnessId = Shader.PropertyToID("_Softness");
-        static readonly int CoreId = Shader.PropertyToID("_Core");
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
-        static readonly int FrameId = Shader.PropertyToID("_Frame");
-        static readonly int FrameMatrixId = Shader.PropertyToID("_FrameMatrix");
+        static readonly int ColorId = Shader.PropertyToID("_Color");
 
-        const int MaxLetters = 14;
-        const int FontSize = 160;
-        const int DotsPerRing = 30;
-        const int Scatter = 30;
+        const int FontSize = 128;
+        const int Layers = 6;
+        const int Pool = 96;
+        const int BeadsPerRing = 36;
 
-        // Dotted rings in poster space: centre, radius (m), turning direction.
-        static readonly (Vector2 center, float radius, float dir)[] Rings =
-        {
-            (new Vector2(0.14f, 0.08f), 0.11f, 1f),
-            (new Vector2(0.3f, -0.2f), 0.1f, -1f),
-            (new Vector2(-0.26f, -0.24f), 0.07f, 1f)
-        };
+        enum Role { Hidden, Main, Orbit, Gone }
 
         sealed class Letter
         {
-            public TextMesh Text;
             public MeshRenderer Renderer;
-            public float X;
+            public Mesh Mesh;
+            public char Char;
+            public Role Role;
+            public int Word;
+            public float Offset;
             public float Width;
-            public Vector2 Offset;
+            public float Age;
+            public float Delay;
+            public float Size;
+            public float Alpha;
+            public Vector3 Position;
+            public Vector3 Push;
+            public Quaternion Rotation = Quaternion.identity;
+            public float Spin;
         }
 
-        Transform poster;
+        readonly List<Letter> letters = new List<Letter>();
+        readonly Vector3[,] lastTips = new Vector3[2, 5];
         Font font;
         Material material;
-        readonly List<Letter> letters = new List<Letter>();
-        TextMesh line;
-        MeshRenderer lineRenderer;
-        LineStrip[] orbits;
-        Vector3[] path;
-        Renderer[] discs;
-        ParticleSystem dots;
-        ParticleSystem.Particle[] dotOut;
-        Vector2[] scatter;
-        int[] scatterBand;
-        readonly float[] spin = new float[3];
-        readonly float[] spinVelocity = new float[3];
-        readonly float[] ringTouch = new float[3];
-        readonly Vector3[,] lastTips = new Vector3[2, 5];
         MaterialPropertyBlock block;
-        string word = "", lineKey = "";
-        float wordTime, fade, clock;
-        int fallbackIndex = -1;
+        LineStrip[] rings;
+        Vector3[] ringPath;
+        ParticleSystem beads;
+        ParticleSystem.Particle[] beadOut;
+        float[] ringSpin, ringSpinVelocity, ringTouch;
+        Vector3 head, forward, right;
+        string word = "", wordKey = "";
+        int wordCount, line = -1, fallbackIndex = -1;
+        float clock, fade;
         bool anchored, built;
 
         public override void Build()
@@ -110,68 +107,43 @@ namespace MusicInYourHands
             font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             material = new Material(letteringMaterial) { name = "Orbit Lettering", mainTexture = font.material.mainTexture };
             Font.textureRebuilt += OnFontRebuilt;
-
-            poster = new GameObject("Poster").transform;
-            poster.SetParent(transform, false);
-
-            for (int i = 0; i < MaxLetters; i++)
+            for (int i = 0; i < Pool; i++)
             {
-                var text = MakeText($"Letter {i}", FontSize, letterHeight, TextAnchor.LowerCenter, FontStyle.Bold);
-                letters.Add(new Letter { Text = text, Renderer = text.GetComponent<MeshRenderer>() });
+                var letter = new Letter();
+                letter.Renderer = Glyphs.MakeLetter($"Letter {i}", transform, material, out letter.Mesh);
+                letter.Renderer.gameObject.SetActive(false);
+                letters.Add(letter);
             }
-            line = MakeText("Line", 64, 0.032f, TextAnchor.MiddleLeft, FontStyle.Normal);
-            line.richText = true;
-            lineRenderer = line.GetComponent<MeshRenderer>();
+            int ringCount = ringRadii.Length;
+            rings = new LineStrip[ringCount];
+            ringPath = new Vector3[129];
+            for (int r = 0; r < ringCount; r++) rings[r] = new LineStrip($"Orbit {r}", transform, lineMaterial, ringPath.Length);
+            ringSpin = new float[ringCount];
+            ringSpinVelocity = new float[ringCount];
+            ringTouch = new float[ringCount];
 
-            discs = new[] { Effects.MakeQuad("Disc Big", poster, glowMaterial), Effects.MakeQuad("Disc Small", poster, glowMaterial) };
-            orbits = new LineStrip[3];
-            path = new Vector3[97];
-            for (int i = 0; i < orbits.Length; i++) orbits[i] = new LineStrip($"Orbit {i}", poster, lineMaterial, path.Length);
-
-            var go = new GameObject("Dots");
+            var go = new GameObject("Beads");
             go.transform.SetParent(transform, false);
-            dots = go.AddComponent<ParticleSystem>();
-            dots.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-            var main = dots.main;
+            beads = go.AddComponent<ParticleSystem>();
+            beads.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main = beads.main;
             main.playOnAwake = false;
             main.simulationSpace = ParticleSystemSimulationSpace.World;
-            main.maxParticles = Rings.Length * DotsPerRing + Scatter;
-            var emission = dots.emission;
+            main.maxParticles = ringCount * BeadsPerRing;
+            var emission = beads.emission;
             emission.enabled = false;
             var renderer = go.GetComponent<ParticleSystemRenderer>();
             renderer.sharedMaterial = glowMaterial;
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            dotOut = new ParticleSystem.Particle[Rings.Length * DotsPerRing + Scatter];
-            var random = new System.Random(3);
-            scatter = new Vector2[Scatter];
-            scatterBand = new int[Scatter];
-            for (int i = 0; i < Scatter; i++)
-            {
-                scatter[i] = new Vector2(((float)random.NextDouble() * 2f - 1f) * 0.84f, ((float)random.NextDouble() * 2f - 1f) * 0.8f);
-                scatterBand[i] = random.Next(1, 6);
-            }
-            poster.gameObject.SetActive(false);
-        }
-
-        TextMesh MakeText(string objectName, int fontSize, float height, TextAnchor anchor, FontStyle style)
-        {
-            var go = new GameObject(objectName);
-            go.transform.SetParent(poster, false);
-            var text = go.AddComponent<TextMesh>();
-            text.font = font;
-            text.fontSize = fontSize;
-            text.fontStyle = style;
-            // TextMesh glyphs are fontSize * characterSize / 10 units tall.
-            text.characterSize = height * 10f / fontSize;
-            text.anchor = anchor;
-            text.alignment = TextAlignment.Left;
-            go.GetComponent<MeshRenderer>().sharedMaterial = material;
-            return text;
+            beadOut = new ParticleSystem.Particle[ringCount * BeadsPerRing];
         }
 
         void OnFontRebuilt(Font rebuilt)
         {
-            if (rebuilt == font && material != null) material.mainTexture = font.material.mainTexture;
+            if (rebuilt != font || material == null) return;
+            material.mainTexture = font.material.mainTexture;
+            // The atlas moved its glyphs: rebuild every letter on show.
+            foreach (var l in letters) if (l.Role != Role.Hidden) Rebuild(l);
         }
 
         void OnDestroy() => Font.textureRebuilt -= OnFontRebuilt;
@@ -181,15 +153,26 @@ namespace MusicInYourHands
             base.OnEnable();
             anchored = false;
             fade = 0f;
-            word = "";
-            lineKey = "";
+            word = wordKey = "";
+            line = -1;
+            if (built) foreach (var l in letters) Hide(l);
         }
 
         protected override void OnDisable()
         {
             base.OnDisable();
-            if (poster != null) poster.gameObject.SetActive(false);
-            if (dots != null) dots.Clear();
+            if (built)
+            {
+                foreach (var l in letters) Hide(l);
+                foreach (var r in rings) r.SetVisible(false);
+                beads.Clear();
+            }
+        }
+
+        static void Hide(Letter l)
+        {
+            l.Role = Role.Hidden;
+            l.Renderer.gameObject.SetActive(false);
         }
 
         public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
@@ -199,203 +182,202 @@ namespace MusicInYourHands
             if (anchored && ShouldReanchor(view, dt)) anchored = false;
             if (!anchored)
             {
-                var forward = Effects.FlatForward(view);
-                poster.SetPositionAndRotation(view.transform.position + forward * distance + Vector3.up * height,
-                    Quaternion.LookRotation(forward, Vector3.up));
-                poster.gameObject.SetActive(true);
+                head = view.transform.position;
+                forward = Effects.FlatForward(view);
+                right = Vector3.Cross(Vector3.up, forward).normalized;
                 MarkAnchored(view);
                 anchored = true;
             }
-            fade = Mathf.MoveTowards(fade, 1f, dt * 1.5f);
             clock += dt;
+            fade = Mathf.MoveTowards(fade, 1f, dt * 1.5f);
 
             UpdateWord(music);
-            float age = clock - wordTime;
-            LayoutLetters(rig, age, dt);
-            DrawLine(music);
-            DrawOrbits(music);
-            DrawDiscs(music);
             SpinRings(rig, dt);
-            DrawDots(music);
-
-            material.SetVector(FrameId, new Vector4(frame.x, frame.y, 0.08f, 0f));
-            material.SetMatrix(FrameMatrixId, poster.worldToLocalMatrix);
+            DrawRings(music, view);
+            PlaceLetters(rig, music, view, dt);
             material.SetFloat(AlphaId, fade);
         }
 
-        /// <summary>The sung word in capitals; without lyrics, the song's title words change every four beats.</summary>
+        /// <summary>The sung word in capitals; without lyrics, the song title's words change every four beats.</summary>
         void UpdateWord(MusicFrame music)
         {
             string next = music.Word;
+            string key = $"{music.Lyric.Line}:{music.Lyric.Word}";
             if (string.IsNullOrEmpty(next))
             {
+                if (music.LineWords != null) return;
                 var title = music.Bus != null ? music.Bus.Title : "Music";
                 var parts = title.Split(' ');
                 int beat = music.Bus != null ? music.Bus.BeatCount / 4 : 0;
-                if (music.LineWords == null)
-                {
-                    if (beat != fallbackIndex)
-                    {
-                        fallbackIndex = beat;
-                        next = parts[beat % parts.Length];
-                    }
-                    else next = word;
-                }
-                else next = word;
+                if (beat == fallbackIndex) return;
+                fallbackIndex = beat;
+                next = parts[beat % parts.Length];
+                key = "title:" + beat;
             }
-            next = next.ToUpperInvariant();
-            if (next == word) return;
-            word = next;
-            wordTime = clock;
+            if (key == wordKey) return;
+            wordKey = key;
 
-            font.RequestCharactersInTexture(word, FontSize, FontStyle.Bold);
-            float scale = letterHeight / FontSize;
-            float x = 0f;
-            for (int i = 0; i < letters.Count; i++)
+            // A new line: the words in orbit from the last one dissolve.
+            if (music.Lyric.Line != line)
             {
-                var letter = letters[i];
-                bool used = i < word.Length;
-                letter.Text.gameObject.SetActive(used);
-                if (!used) continue;
-                char ch = word[i];
-                letter.Text.text = ch.ToString();
-                font.GetCharacterInfo(ch, out var info, FontSize, FontStyle.Bold);
-                letter.Width = info.advance * scale;
-                letter.X = x + letter.Width * 0.5f;
-                letter.Offset = Vector2.zero;
-                x += letter.Width;
+                line = music.Lyric.Line;
+                foreach (var l in letters) if (l.Role == Role.Orbit) { l.Role = Role.Gone; l.Age = 0f; }
             }
+            // The word on show goes into orbit.
+            foreach (var l in letters) if (l.Role == Role.Main) { l.Role = Role.Orbit; l.Age = 0f; }
+
+            word = next.ToUpperInvariant();
+            wordCount++;
+            float x = 0f;
+            var chosen = new List<Letter>();
+            foreach (char ch in word)
+            {
+                var l = Free();
+                if (l == null) break;
+                l.Char = ch;
+                l.Size = letterHeight;
+                l.Role = Role.Main;
+                l.Word = wordCount;
+                l.Age = 0f;
+                l.Delay = chosen.Count * 0.045f;
+                l.Alpha = 0f;
+                l.Push = Vector3.zero;
+                l.Spin = 180f + Random.Range(-60f, 60f);
+                // Fly in from somewhere on the middle orbit.
+                float a = Random.value * Mathf.PI * 2f;
+                l.Position = head + new Vector3(Mathf.Cos(a), 0.2f, Mathf.Sin(a)) * ringRadii[Mathf.Min(1, ringRadii.Length - 1)];
+                Rebuild(l);
+                l.Offset = x + l.Width * 0.5f;
+                x += l.Width;
+                l.Renderer.gameObject.SetActive(true);
+                chosen.Add(l);
+            }
+            foreach (var l in chosen) l.Offset -= x * 0.5f;
+        }
+
+        Letter Free()
+        {
+            foreach (var l in letters) if (l.Role == Role.Hidden) return l;
+            // Out of letters: take the oldest one in orbit.
+            Letter oldest = null;
+            foreach (var l in letters) if (l.Role != Role.Main && (oldest == null || l.Word < oldest.Word)) oldest = l;
+            return oldest;
+        }
+
+        void Rebuild(Letter l)
+        {
+            l.Width = Glyphs.Build(l.Mesh, font, l.Char, FontSize, FontStyle.Bold, 1f, Layers, depth, Ink, Shadow);
         }
 
         /// <summary>
-        /// Giant letters along the poster's bottom, drifting left and cropped by the frame. Fingers push them aside;
-        /// a fist pulls them towards the hand. Each letter springs back on its own.
+        /// Puts each letter where its role wants it: the sung word in front of you, earlier words of the line on the
+        /// rings around you, dissolving words drifting off. Letters ease there, so every change is a motion.
         /// </summary>
-        void LayoutLetters(HandRig rig, float age, float dt)
+        void PlaceLetters(HandRig rig, MusicFrame music, Camera view, float dt)
         {
-            float enter = Mathf.Clamp01(age * 5f);
-            float start = -frame.x * 0.92f - age * drift + (1f - enter) * 0.24f;
-            // Low enough that the frame crops the bottom of the letters, like a poster.
-            float baseline = -frame.y * 1.14f;
-            bool touched = false;
-            for (int i = 0; i < word.Length && i < letters.Count; i++)
+            var eye = view.transform.position;
+            var front = head + forward * distance + Vector3.up * height;
+            bool fistPull = false;
+            Vector3 pullTo = Vector3.zero;
+            if (rig != null)
             {
-                var letter = letters[i];
-                var home = new Vector2(start + letter.X, baseline + letterHeight * 0.35f);
-                var target = Vector2.zero;
-                if (rig != null)
+                for (int side = 0; side < 2; side++)
                 {
-                    for (int side = 0; side < 2; side++)
-                    {
-                        var hand = rig.Get(side == 0);
-                        if (!hand.IsTracked) continue;
-                        var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
-                        var palmLocal = poster.InverseTransformPoint(palm);
-                        if (hand.Fist > 0.6f)
-                        {
-                            var toHand = (Vector2)palmLocal - home;
-                            if (toHand.magnitude < pullRadius) target += toHand * 0.35f;
-                            continue;
-                        }
-                        for (int k = 0; k < 6; k++)
-                        {
-                            var point = k < 5 ? (hand.TipJoints[k] != null ? hand.TipJoints[k].position : hand.Tips[k]) : palm;
-                            var local = poster.InverseTransformPoint(point);
-                            if (Mathf.Abs(local.z) > 0.2f) continue;
-                            var away = home - (Vector2)local;
-                            float d = away.magnitude;
-                            float reach = k < 5 ? pushRadius : pushRadius * 1.4f;
-                            if (d >= reach) continue;
-                            target += away / Mathf.Max(d, 0.01f) * (reach - d) * 0.8f;
-                            touched = true;
-                        }
-                    }
+                    var hand = rig.Get(side == 0);
+                    if (!hand.IsTracked || hand.Fist < 0.6f) continue;
+                    var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
+                    if (Vector3.Distance(palm, front) < pullRadius) { fistPull = true; pullTo = palm; }
                 }
-                letter.Offset = Vector2.Lerp(letter.Offset, target, 1f - Mathf.Exp(-12f * dt));
-                var p = home + letter.Offset;
-                letter.Text.transform.localPosition = new Vector3(p.x, p.y - letterHeight * 0.35f, 0f);
-                letter.Text.color = new Color(Ink.r, Ink.g, Ink.b, enter);
             }
-            HandSkin.FocusStrength = touched ? 1f : 0f;
-        }
 
-        /// <summary>The whole line, small, above the giant word, with the sung word lit.</summary>
-        void DrawLine(MusicFrame music)
-        {
-            var words = music.LineWords;
-            string key = words == null ? "" : $"{music.Lyric.Line}:{music.Lyric.Word}";
-            if (key != lineKey)
+            foreach (var l in letters)
             {
-                lineKey = key;
-                if (words == null) line.text = "";
+                if (l.Role == Role.Hidden) continue;
+                l.Age += dt;
+                Vector3 target;
+                float size;
+                float alpha = 1f;
+                if (l.Role == Role.Main)
+                {
+                    float t = Mathf.Clamp01((l.Age - l.Delay) / 0.4f);
+                    target = front + right * l.Offset * letterHeight;
+                    if (fistPull) target = Vector3.Lerp(target, pullTo + right * l.Offset * letterHeight * 0.5f, 0.6f);
+                    size = letterHeight * (1f + music.Kick * 0.08f);
+                    alpha = t;
+                    l.Spin = Mathf.Lerp(l.Spin, 0f, 1f - Mathf.Exp(-9f * dt * (t > 0f ? 1f : 0f)));
+                }
                 else
                 {
-                    var sb = new System.Text.StringBuilder();
-                    for (int i = 0; i < words.Length; i++)
+                    // Words in orbit sit on the rings, each word on its own ring and angle, turning slowly.
+                    int ring = l.Word % rings.Length;
+                    float angle = l.Word * 1.3f + ringSpin[ring] + l.Offset * letterHeight / ringRadii[ring] * (orbitLetterHeight / letterHeight);
+                    target = RingPoint(ring, angle);
+                    size = orbitLetterHeight;
+                    l.Spin = Mathf.Lerp(l.Spin, 0f, 1f - Mathf.Exp(-4f * dt));
+                    if (l.Role == Role.Gone)
                     {
-                        if (i > 0) sb.Append(' ');
-                        if (i == music.Lyric.Word) sb.Append("<color=#ffffff>").Append(words[i].Text).Append("</color>");
-                        else sb.Append("<color=#ffffff66>").Append(words[i].Text).Append("</color>");
+                        alpha = 1f - Mathf.Clamp01(l.Age / 1.2f);
+                        target += Vector3.up * l.Age * 0.12f;
+                        if (alpha <= 0f) { Hide(l); continue; }
                     }
-                    line.text = sb.ToString();
                 }
-            }
-            line.transform.localPosition = new Vector3(-frame.x * 0.84f + 0.05f, frame.y * 0.12f, -0.01f);
-            line.color = new Color(1f, 1f, 1f, fade);
-        }
 
-        /// <summary>Thin orbit lines: two circles high on the right and a wide arc low across the poster.</summary>
-        void DrawOrbits(MusicFrame music)
-        {
-            var eye = Camera.main != null ? Camera.main.transform.position : poster.position - poster.forward;
-            float t = clock;
-            for (int o = 0; o < orbits.Length; o++)
-            {
-                Vector2 center;
-                Vector2 radius;
-                float from = 0f, to = Mathf.PI * 2f, tilt = 0f;
-                if (o == 0) { center = new Vector2(0.16f, 0.36f); radius = Vector2.one * 0.24f * (1f + music.Kick * 0.04f); }
-                else if (o == 1) { center = new Vector2(0.32f, 0.4f); radius = Vector2.one * 0.14f; }
-                else { center = new Vector2(0.1f, -0.66f); radius = new Vector2(0.62f, 0.46f); from = 0.55f; to = 2.95f; tilt = 0.12f; }
-                for (int i = 0; i < path.Length; i++)
-                {
-                    float a = Mathf.Lerp(from, to, i / (float)(path.Length - 1)) + (o == 2 ? 0f : t * 0.05f);
-                    var local = new Vector2(Mathf.Cos(a) * radius.x, Mathf.Sin(a) * radius.y);
-                    local = new Vector2(local.x * Mathf.Cos(tilt) - local.y * Mathf.Sin(tilt), local.x * Mathf.Sin(tilt) + local.y * Mathf.Cos(tilt));
-                    path[i] = poster.TransformPoint(new Vector3(center.x + local.x, center.y + local.y, 0.03f));
-                }
-                var c = Soft;
-                c.a = (o == 2 ? 0.55f : 0.4f + music.Kick * 0.2f) * fade;
-                orbits[o].Set(path, path.Length, o == 2 ? 0.0028f : 0.0022f, c, eye, o == 2);
-            }
-        }
+                l.Push = Vector3.Lerp(l.Push, PushFrom(rig, l.Position, size), 1f - Mathf.Exp(-12f * dt));
+                l.Position = Vector3.Lerp(l.Position, target, 1f - Mathf.Exp(-(l.Role == Role.Main ? 7f : 3f) * dt));
+                l.Size = Mathf.Lerp(l.Size, size, 1f - Mathf.Exp(-6f * dt));
+                l.Alpha = alpha;
 
-        /// <summary>Two soft grey discs behind everything, breathing with the bass and the kick.</summary>
-        void DrawDiscs(MusicFrame music)
-        {
-            for (int i = 0; i < discs.Length; i++)
-            {
-                var d = discs[i];
-                d.transform.localPosition = i == 0 ? new Vector3(-0.12f, -0.04f, 0.05f) : new Vector3(0.24f, 0.16f, 0.05f);
-                d.transform.localRotation = Quaternion.identity;
-                float r = i == 0 ? 0.2f * (1f + music.Band(1) * 0.08f) : 0.09f * (1f + music.Kick * 0.12f);
-                d.transform.localScale = Vector3.one * r * 2.2f;
+                var p = l.Position + l.Push;
+                var look = p - eye;
+                var rotation = look.sqrMagnitude > 1e-6f ? Quaternion.LookRotation(look, Vector3.up) : Quaternion.identity;
+                l.Renderer.transform.SetPositionAndRotation(p, rotation * Quaternion.Euler(0f, l.Spin, 0f));
+                l.Renderer.transform.localScale = Vector3.one * l.Size;
+                bool touched = l.Push.sqrMagnitude > 0.0001f;
                 block.Clear();
-                block.SetColor(ColorId, new Color(0.78f, 0.8f, 0.84f));
-                block.SetFloat(IntensityId, (i == 0 ? 0.16f : 0.12f) * fade);
-                block.SetFloat(SoftnessId, 0.35f);
-                block.SetFloat(CoreId, 0f);
-                d.SetPropertyBlock(block);
+                block.SetColor(ColorId, touched ? Color.Lerp(Color.white, Touch, 0.6f) : Color.white);
+                block.SetFloat(AlphaId, l.Alpha * fade);
+                l.Renderer.SetPropertyBlock(block);
             }
         }
 
-        /// <summary>A fingertip moving along a dotted ring spins it that way; the spin eases back to a slow turn.</summary>
+        /// <summary>Fingertips and palms close to a letter push it away; it springs back when they leave.</summary>
+        Vector3 PushFrom(HandRig rig, Vector3 at, float size)
+        {
+            var push = Vector3.zero;
+            if (rig == null) return push;
+            for (int side = 0; side < 2; side++)
+            {
+                var hand = rig.Get(side == 0);
+                if (!hand.IsTracked || hand.Fist > 0.6f) continue;
+                for (int k = 0; k < 6; k++)
+                {
+                    var point = k < 5 ? (hand.TipJoints[k] != null ? hand.TipJoints[k].position : hand.Tips[k])
+                        : hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
+                    var centre = at + Vector3.up * size * 0.35f;
+                    var away = centre - point;
+                    float d = away.magnitude;
+                    float reach = pushRadius * (size / letterHeight * 0.6f + 0.4f);
+                    if (d >= reach || d < 1e-4f) continue;
+                    push += away / d * (reach - d) * 1.1f;
+                }
+            }
+            return push;
+        }
+
+        Vector3 RingPoint(int ring, float angle)
+        {
+            var tilt = Quaternion.AngleAxis(ringTilts[ring % ringTilts.Length], right) * Quaternion.AngleAxis(ring * 40f, Vector3.up);
+            var local = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * ringRadii[ring];
+            return head + Vector3.up * (height - 0.05f) + tilt * local;
+        }
+
+        /// <summary>A fingertip moving along a ring spins it that way; the spin eases back to a slow turn.</summary>
         void SpinRings(HandRig rig, float dt)
         {
-            for (int r = 0; r < Rings.Length; r++)
+            for (int r = 0; r < rings.Length; r++)
             {
                 ringTouch[r] = Mathf.MoveTowards(ringTouch[r], 0f, dt * 2f);
-                spinVelocity[r] *= Mathf.Exp(-dt * 1.2f);
+                ringSpinVelocity[r] *= Mathf.Exp(-dt * 0.8f);
             }
             if (rig != null && dt > 0f)
             {
@@ -405,59 +387,55 @@ namespace MusicInYourHands
                     for (int k = 0; k < 5; k++)
                     {
                         var tip = hand.TipJoints[k] != null ? hand.TipJoints[k].position : hand.Tips[k];
-                        var last = lastTips[side, k];
+                        var move = (tip - lastTips[side, k]) / dt;
                         lastTips[side, k] = tip;
-                        if (!hand.IsTracked) continue;
-                        var local = poster.InverseTransformPoint(tip);
-                        if (Mathf.Abs(local.z) > 0.08f) continue;
-                        var move = (Vector2)(poster.InverseTransformPoint(tip) - poster.InverseTransformPoint(last)) / dt;
-                        for (int r = 0; r < Rings.Length; r++)
+                        if (!hand.IsTracked || move.magnitude > 6f) continue;
+                        for (int r = 0; r < rings.Length; r++)
                         {
-                            var fromCenter = (Vector2)local - Rings[r].center;
-                            if (Mathf.Abs(fromCenter.magnitude - Rings[r].radius) > 0.025f) continue;
-                            var tangent = new Vector2(-fromCenter.y, fromCenter.x).normalized;
-                            float push = Vector2.Dot(move, tangent) / Rings[r].radius;
-                            spinVelocity[r] = Mathf.Lerp(spinVelocity[r], Mathf.Clamp(push, -12f, 12f), 0.5f);
+                            // The ring's nearest point to the fingertip, and the ring's direction there.
+                            var tilt = Quaternion.AngleAxis(ringTilts[r % ringTilts.Length], right) * Quaternion.AngleAxis(r * 40f, Vector3.up);
+                            var local = Quaternion.Inverse(tilt) * (tip - (head + Vector3.up * (height - 0.05f)));
+                            var flat = new Vector2(local.x, local.z);
+                            if (Mathf.Abs(flat.magnitude - ringRadii[r]) > 0.05f || Mathf.Abs(local.y) > 0.05f) continue;
+                            var tangent = tilt * new Vector3(-flat.y, 0f, flat.x).normalized;
+                            float push = Vector3.Dot(move, tangent) / ringRadii[r];
+                            ringSpinVelocity[r] = Mathf.Lerp(ringSpinVelocity[r], Mathf.Clamp(push, -6f, 6f), 0.5f);
                             ringTouch[r] = 1f;
                         }
                     }
                 }
             }
-            for (int r = 0; r < Rings.Length; r++) spin[r] += (0.3f * Rings[r].dir + spinVelocity[r]) * dt;
+            for (int r = 0; r < rings.Length; r++) ringSpin[r] += (0.08f * (r % 2 == 0 ? 1f : -1f) + ringSpinVelocity[r]) * dt;
         }
 
-        void DrawDots(MusicFrame music)
+        void DrawRings(MusicFrame music, Camera view)
         {
             int n = 0;
             float hat = music.Band(5);
-            for (int r = 0; r < Rings.Length; r++)
+            for (int r = 0; r < rings.Length; r++)
             {
-                var ring = Rings[r];
-                float radius = ring.radius * (1f + music.Band(r + 2) * 0.15f);
-                var color = Color.Lerp(new Color(0.92f, 0.93f, 0.96f, 0.85f), Touch, ringTouch[r]);
-                color.a *= fade;
-                for (int i = 0; i < DotsPerRing; i++)
+                for (int i = 0; i < ringPath.Length; i++)
+                    ringPath[i] = RingPoint(r, i / (float)(ringPath.Length - 1) * Mathf.PI * 2f);
+                var c = Color.Lerp(new Color(0.86f, 0.87f, 0.92f), Touch, ringTouch[r]);
+                c.a = (0.28f + music.Kick * 0.15f + ringTouch[r] * 0.4f) * fade;
+                rings[r].Set(ringPath, ringPath.Length, 0.0025f * (1f + music.Kick * 0.5f), c, view.transform.position, false);
+
+                for (int b = 0; b < BeadsPerRing; b++)
                 {
-                    float a = i / (float)DotsPerRing * Mathf.PI * 2f + spin[r];
-                    var local = new Vector3(ring.center.x + Mathf.Cos(a) * radius, ring.center.y + Mathf.Sin(a) * radius, -0.005f);
-                    dotOut[n++] = Dot(local, (0.006f + hat * 0.006f + ringTouch[r] * 0.003f), color);
+                    var p = RingPoint(r, b / (float)BeadsPerRing * Mathf.PI * 2f + ringSpin[r] * 3f);
+                    var bc = Color.Lerp(new Color(0.93f, 0.94f, 0.97f), Touch, ringTouch[r]);
+                    bc.a = (b % 3 == 0 ? 0.9f : 0.5f) * fade;
+                    beadOut[n++] = new ParticleSystem.Particle
+                    {
+                        position = p,
+                        startSize = (b % 3 == 0 ? 0.012f : 0.007f) * (1f + hat * 0.6f + ringTouch[r] * 0.5f),
+                        startColor = bc,
+                        startLifetime = 10f,
+                        remainingLifetime = 10f
+                    };
                 }
             }
-            for (int i = 0; i < Scatter; i++)
-            {
-                var local = new Vector3(scatter[i].x * frame.x, scatter[i].y * frame.y, 0.02f);
-                dotOut[n++] = Dot(local, 0.005f * (1f + music.Band(scatterBand[i]) * 0.9f), new Color(0.92f, 0.93f, 0.96f, 0.6f * fade));
-            }
-            dots.SetParticles(dotOut, n);
+            beads.SetParticles(beadOut, n);
         }
-
-        ParticleSystem.Particle Dot(Vector3 local, float size, Color color) => new ParticleSystem.Particle
-        {
-            position = poster.TransformPoint(local),
-            startSize = size,
-            startColor = color,
-            startLifetime = 10f,
-            remainingLifetime = 10f
-        };
     }
 }
