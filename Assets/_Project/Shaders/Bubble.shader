@@ -6,7 +6,7 @@ Shader "MusicInYourHands/Bubble"
     Properties
     {
         _Color ("Color", Color) = (1, 0.37, 0.68, 1)
-        _Icon ("Emblem (-1 none, 0-15)", Float) = 0
+        _Icon ("Emblem (-1 none, 0-22)", Float) = 0
         _Hover ("Hover 0-1", Float) = 0
         _Selected ("Current world 0-1", Float) = 0
         _Alpha ("Alpha", Float) = 1
@@ -69,6 +69,12 @@ Shader "MusicInYourHands/Bubble"
             float3 Hue(float h) { return saturate(abs(frac(h + float3(0, 2, 1) / 3) * 6 - 3) - 1); }
 
             float Line(float d, float w) { return smoothstep(w, 0, d); }
+
+            float Segment(float2 p, float2 a, float2 b)
+            {
+                float2 pa = p - a, ba = b - a;
+                return length(pa - ba * saturate(dot(pa, ba) / dot(ba, ba)));
+            }
 
             // A tiny animated picture of each world, in the bubble's disc (-1..1).
             float Emblem(float2 p, float icon, float t)
@@ -222,7 +228,7 @@ Shader "MusicInYourHands/Bubble"
                     }
                     e = stroke + drips;
                 }
-                else
+                else if (icon < 15.5)
                 {
                     // Next song (14) or previous song (15, mirrored): two arrowheads and a bar, nudging forward.
                     float2 q = float2(icon > 14.5 ? -p.x : p.x, p.y);
@@ -233,6 +239,91 @@ Shader "MusicInYourHands/Bubble"
                         e += step(x0, q.x) * step(abs(q.y), 0.3 * saturate((x0 + 0.34 - q.x) / 0.34));
                     }
                     e += step(abs(q.x - 0.32), 0.045) * step(abs(q.y), 0.3);
+                }
+                else if (icon < 16.5)
+                {
+                    // Breathing room: a room in perspective, its back wall breathing, a wave on the floor.
+                    float s = 0.55 + 0.05 * sin(t * 2.5);
+                    float back = 0.24 + 0.03 * sin(t * 2.5);
+                    e = Line(abs(max(abs(p.x), abs(p.y)) - s), 0.025) * 0.6 + Line(abs(max(abs(p.x), abs(p.y)) - back), 0.025);
+                    [unroll] for (int k = 0; k < 4; k++)
+                    {
+                        float2 c = float2(k % 2 == 0 ? -1 : 1, k < 2 ? -1 : 1);
+                        e += Line(Segment(p, c * back, c * s), 0.02) * 0.6;
+                    }
+                    float2 f = float2(p.x, (p.y + 0.42) * 3);
+                    e += pow(abs(sin(length(f) * 8 - t * 3)), 12) * step(p.y, -back) * step(abs(p.x), s) * 0.7;
+                }
+                else if (icon < 17.5)
+                {
+                    // Light trails: a looping ribbon drawn in the air.
+                    float d = 9;
+                    [unroll] for (int k = 0; k < 24; k++)
+                    {
+                        float a0 = k / 24.0 * 6.2832, a1 = (k + 1) / 24.0 * 6.2832;
+                        float2 c0 = float2(sin(a0) * 0.5, sin(a0 * 2) * 0.28), c1 = float2(sin(a1) * 0.5, sin(a1 * 2) * 0.28);
+                        d = min(d, Segment(p, c0, c1));
+                    }
+                    e = Line(d, 0.05 + 0.015 * sin(t * 4));
+                }
+                else if (icon < 18.5)
+                {
+                    // Neon sign: a framed sign, its words flickering on.
+                    float2 q = abs(p) - float2(0.55, 0.32);
+                    e = Line(abs(length(max(q, 0)) + min(max(q.x, q.y), 0) - 0.06), 0.03) * 0.8;
+                    [unroll] for (int k = 0; k < 3; k++)
+                    {
+                        float x = -0.32 + k * 0.32;
+                        float on = step(0.3, frac(t * 0.6 + k * 0.33)) * (0.75 + 0.25 * step(0.5, frac(t * 13 + k)));
+                        e += Line(Segment(p, float2(x - 0.1, -0.02), float2(x + 0.1, 0.02)), 0.045) * on;
+                    }
+                }
+                else if (icon < 19.5)
+                {
+                    // Word drift: words coming towards you out of the distance, growing.
+                    [unroll] for (int k = 0; k < 3; k++)
+                    {
+                        float u = frac(t * 0.3 + k / 3.0);
+                        float2 c = lerp(float2(0.0, 0.1), float2((k - 1) * 0.55, -0.1 + (k % 2) * 0.35), u);
+                        float w = lerp(0.06, 0.3, u), h = lerp(0.02, 0.09, u);
+                        float2 q = abs(p - c) - float2(w, h);
+                        e += step(max(q.x, q.y), 0) * (1 - u * 0.4) * smoothstep(1, 0.8, u);
+                    }
+                }
+                else if (icon < 20.5)
+                {
+                    // Rising floor: a word standing up out of the floor, a ripple round its feet.
+                    float rise = 0.5 + 0.5 * sin(t * 1.5);
+                    float2 q = abs(p - float2(0, -0.2 + rise * 0.2)) - float2(0.32, 0.12);
+                    e = step(max(q.x, q.y), 0) * step(-0.25, p.y);
+                    float2 r = float2(p.x, (p.y + 0.28) * 3.5);
+                    e += Line(abs(length(r) - 0.45 - 0.1 * frac(t)), 0.05) * (1 - frac(t));
+                    e += Line(abs(p.y + 0.25), 0.015) * step(abs(p.x), 0.7) * 0.5;
+                }
+                else if (icon < 21.5)
+                {
+                    // Word snow: little words and flakes falling.
+                    [unroll] for (int k = 0; k < 6; k++)
+                    {
+                        float x = -0.5 + k * 0.2;
+                        float y = 0.6 - frac(t * 0.2 + k * 0.37) * 1.2;
+                        float2 q = p - float2(x + 0.04 * sin(t + k), y);
+                        if (k % 2 == 0) e += step(max(abs(q.x) - 0.1, abs(q.y) - 0.03), 0);
+                        else e += exp(-dot(q, q) * 600);
+                    }
+                }
+                else
+                {
+                    // Ceiling stars: a small constellation, joined by lines, twinkling.
+                    float2 s0 = float2(-0.5, -0.1), s1 = float2(-0.18, 0.25), s2 = float2(0.12, 0.05), s3 = float2(0.45, 0.32), s4 = float2(0.3, -0.35);
+                    e = Line(Segment(p, s0, s1), 0.015) * 0.5 + Line(Segment(p, s1, s2), 0.015) * 0.5
+                      + Line(Segment(p, s2, s3), 0.015) * 0.5 + Line(Segment(p, s2, s4), 0.015) * 0.5;
+                    float2 ss[5] = { s0, s1, s2, s3, s4 };
+                    [unroll] for (int k = 0; k < 5; k++)
+                    {
+                        float2 q = p - ss[k];
+                        e += exp(-dot(q, q) * 250) * (0.7 + 0.3 * sin(t * 3 + k * 2));
+                    }
                 }
                 return saturate(e);
             }

@@ -3,6 +3,7 @@
 //   letters can run off the edge like a cropped poster (Orbit type).
 // - _Spray turns the glyphs into spray paint: a speckled overspray halo and a slightly rough edge (Graffiti).
 // - _Outline draws a solid outline in _OutlineColor around the letters, as graffiti pieces have.
+// - _Halo adds a soft glow around the letters in their own colour, for neon tubes (Neon sign).
 // - _Reveal sprays the word on from left to right, across the text's object-space width (_Extent: min x, max x).
 Shader "MusicInYourHands/Lettering"
 {
@@ -15,6 +16,7 @@ Shader "MusicInYourHands/Lettering"
         _Reveal ("Reveal 0-1", Float) = 1
         _Extent ("Text extent in object space (min x, max x)", Vector) = (-1, 1, 0, 0)
         _Frame ("Crop frame (half width, half height, softness; 0 = none)", Vector) = (0, 0, 0.05, 0)
+        _Halo ("Glow around the letters 0-1", Float) = 0
         _Outline ("Outline 0-1", Float) = 0
         _OutlineColor ("Outline colour", Color) = (1, 1, 1, 1)
         _Alpha ("Fade", Float) = 1
@@ -50,6 +52,7 @@ Shader "MusicInYourHands/Lettering"
                 float4 _Extent;
                 float4 _Frame;
                 float4x4 _FrameMatrix;
+                float _Halo;
                 float _Outline;
                 float4 _OutlineColor;
                 float _Alpha;
@@ -136,6 +139,23 @@ Shader "MusicInYourHands/Lettering"
                     float rim = saturate(smoothstep(0.3, 0.6, grown) - ink) * _Outline;
                     color = lerp(color, _OutlineColor.rgb, rim);
                     alpha = max(alpha, rim);
+                }
+
+                if (_Halo > 0.001)
+                {
+                    // A soft glow: the glyph's coverage averaged over two rings of samples around this point.
+                    float glow = 0;
+                    [unroll] for (int k = 0; k < 8; k++)
+                    {
+                        float a = k * 0.785398;
+                        float2 d = float2(cos(a), sin(a)) * _MainTex_TexelSize.xy;
+                        glow += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv + d * 4).a;
+                        glow += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv + d * 9).a * 0.6;
+                    }
+                    glow = saturate(glow / 12.8) * _Halo;
+                    // The tube itself burns near-white in its middle.
+                    color = lerp(color, 1, ink * 0.45 * _Halo);
+                    alpha = max(alpha, glow * 0.85);
                 }
 
                 // Spray on from left to right.

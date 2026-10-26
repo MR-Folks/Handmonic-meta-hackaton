@@ -49,6 +49,13 @@ namespace MusicInYourHands.EditorTools
                 handOffset: side => side == "R" ? new Vector3(0.05f, 0.05f, 0.2f) : new Vector3(0f, -0.1f, 0f));
             Shot<Graffiti>("13-graffiti", HandPose.BacksToFace, 6f, rig => rig.Right.Pinch = 1f, closeUp: rig => new Vector3(0.3f, 1.45f, 1.55f),
                 handOffset: side => side == "R" ? new Vector3(0.02f, 0.08f, 0.12f) : new Vector3(0f, -0.15f, 0f), lead: 6f);
+            Shot<BreathingRoom>("14-breathing-room", HandPose.PalmsToFace, 6f);
+            Shot<LightTrails>("15-light-trails", HandPose.BacksToFace, 4f, prepare: world => DrawPreviewSculpture((LightTrails)world));
+            Shot<NeonSign>("16-neon-sign", HandPose.BacksToFace, 2f, lead: 4f, extra: 1.7f);
+            Shot<WordDrift>("17-word-drift", HandPose.PalmsToFace, 2f, lead: 6f);
+            Shot<RisingFloor>("18-rising-floor", HandPose.PalmsToFace, 20f, lead: 4f);
+            Shot<WordSnow>("19-word-snow", HandPose.PalmsUp, 10f, lead: 9f);
+            Shot<CeilingStars>("20-ceiling-stars", HandPose.PalmsToFace, -40f, lead: 4f);
             Shot<SandTable>("11-sand-table", HandPose.PalmsDown, 40f, closeUp: rig => rig.Right.Palm.position + Vector3.down * 0.08f,
                 handOffset: side => side == "R" ? new Vector3(0.02f, -0.24f, 0.12f) : new Vector3(-0.05f, -0.12f, 0.06f));
             MenuShot();
@@ -193,7 +200,8 @@ namespace MusicInYourHands.EditorTools
         /// four frames 0.1 s apart around that point (name-close.png), to judge detail and motion.
         /// </summary>
         static void Shot<T>(string name, HandPose pose, float pitch, System.Action<HandRig> holdPose = null,
-            System.Func<HandRig, Vector3> closeUp = null, System.Func<string, Vector3> handOffset = null, float lead = 3f) where T : World
+            System.Func<HandRig, Vector3> closeUp = null, System.Func<string, Vector3> handOffset = null, float lead = 3f,
+            System.Action<World> prepare = null, float extra = 0f) where T : World
         {
             if (!Wanted(name)) return;
             var camera = StageRoom(pitch);
@@ -204,6 +212,7 @@ namespace MusicInYourHands.EditorTools
             if (SceneSettings.TryGetValue(typeof(T), out var json)) EditorJsonUtility.FromJsonOverwrite(json, world);
             else Debug.LogWarning($"[Shots] {typeof(T).Name} is not in the main scene; using its defaults.");
             world.Build();
+            prepare?.Invoke(world);
             HandSkin.Theme = world.Theme;
             HandSkin.FocusStrength = 0f;
             HandSkin.Charge[0] = HandSkin.Charge[1] = 0f;
@@ -225,7 +234,7 @@ namespace MusicInYourHands.EditorTools
                     SetBeat(hand.Skin, clock.BeatAge, clock.Kick);
                 }
             }
-            Play(ChorusStart + 0.09f);
+            Play(ChorusStart + 0.09f + extra);
             File.WriteAllBytes($"{ShotFolder}/{name}.png", Render(camera, 1600, 900).EncodeToPNG());
             if (closeUp == null) return;
 
@@ -240,6 +249,25 @@ namespace MusicInYourHands.EditorTools
             }
             sheet.Apply();
             File.WriteAllBytes($"{ShotFolder}/{name}-close.png", sheet.EncodeToPNG());
+        }
+
+        /// <summary>A few strokes of light in front of the viewer, as if drawn there, for the Light trails shot.</summary>
+        static void DrawPreviewSculpture(LightTrails trails)
+        {
+            var points = new List<Vector3>();
+            for (int i = 0; i < 90; i++)
+            {
+                float a = i / 90f * Mathf.PI * 2.4f;
+                points.Add(new Vector3(Mathf.Sin(a) * 0.32f, 1.45f + Mathf.Sin(a * 2f) * 0.16f, 0.75f + Mathf.Cos(a) * 0.12f));
+            }
+            trails.PreviewStroke(points, Vector3.back, new Color(1f, 0.37f, 0.68f));
+            points.Clear();
+            for (int i = 0; i < 70; i++)
+            {
+                float a = i / 70f * Mathf.PI * 2f;
+                points.Add(new Vector3(-0.15f + Mathf.Cos(a) * 0.18f, 1.35f + i * 0.004f, 0.6f + Mathf.Sin(a) * 0.18f));
+            }
+            trails.PreviewStroke(points, Vector3.up, new Color(0.49f, 0.95f, 0.79f));
         }
 
         static void MenuShot()
@@ -266,7 +294,14 @@ namespace MusicInYourHands.EditorTools
                 MakePreviewWorld<BubbleNotes>(managerGo.transform, "Bubble notes", new Color(1f, 0.6f, 0.85f)),
                 MakePreviewWorld<SandTable>(managerGo.transform, "Sand table", new Color(1f, 0.86f, 0.68f)),
                 MakePreviewWorld<OrbitType>(managerGo.transform, "Orbit type", new Color(0.88f, 0.89f, 0.93f)),
-                MakePreviewWorld<Graffiti>(managerGo.transform, "Graffiti", new Color(1f, 0.7f, 0.42f))
+                MakePreviewWorld<BreathingRoom>(managerGo.transform, "Breathing room", new Color(0.75f, 0.6f, 1f)),
+                MakePreviewWorld<LightTrails>(managerGo.transform, "Light trails", new Color(1f, 0.83f, 0.42f)),
+                MakePreviewWorld<Graffiti>(managerGo.transform, "Graffiti", new Color(1f, 0.7f, 0.42f)),
+                MakePreviewWorld<NeonSign>(managerGo.transform, "Neon sign", new Color(1f, 0.3f, 0.62f)),
+                MakePreviewWorld<WordDrift>(managerGo.transform, "Word drift", new Color(0.8f, 0.88f, 1f)),
+                MakePreviewWorld<RisingFloor>(managerGo.transform, "Rising floor", new Color(0.5f, 0.88f, 1f)),
+                MakePreviewWorld<WordSnow>(managerGo.transform, "Word snow", new Color(0.88f, 0.94f, 1f)),
+                MakePreviewWorld<CeilingStars>(managerGo.transform, "Ceiling stars", new Color(0.78f, 0.7f, 1f))
             };
             var manager = managerGo.AddComponent<WorldManager>();
             var mso = new SerializedObject(manager);

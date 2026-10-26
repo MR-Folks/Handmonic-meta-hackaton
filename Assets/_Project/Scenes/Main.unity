@@ -119,6 +119,57 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &4160532
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4160534}
+  - component: {fileID: 4160533}
+  m_Layer: 0
+  m_Name: BreathingRoom
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &4160533
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4160532}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f7abdc01ce3544bfc9ef6fd546a9e36e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.BreathingRoom
+  displayName: Breathing room
+  color: {r: 0.75, g: 0.6, b: 1, a: 1}
+  gridMaterial: {fileID: 2100000, guid: 1eadb9ea8933e4bf3998274e22b8ff30, type: 2}
+  halfSize: {x: 1.8, y: 1.8}
+  roomHeight: 2.6
+  breathe: 0.04
+  pushSpeed: 0.7
+--- !u!4 &4160534
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4160532}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &62205578
 GameObject:
   m_ObjectHideFlags: 0
@@ -363,6 +414,59 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1462377328}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &214973736
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 214973738}
+  - component: {fileID: 214973737}
+  m_Layer: 0
+  m_Name: CeilingStars
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &214973737
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 214973736}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f86e0187ecdc44a0a800627adbb24bc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.CeilingStars
+  displayName: Ceiling stars
+  color: {r: 0.78, g: 0.7, b: 1, a: 1}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
+  reach: {x: 0.9, y: 2}
+  spread: 50
+  labelHeight: 0.07
+  readHeight: 0.13
+--- !u!4 &214973738
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 214973736}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &298916676
 GameObject:
   m_ObjectHideFlags: 0
@@ -394,6 +498,58 @@ Transform:
   m_Children:
   - {fileID: 62205579}
   m_Father: {fileID: 1512639470}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &377810159
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 377810161}
+  - component: {fileID: 377810160}
+  m_Layer: 0
+  m_Name: WordSnow
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &377810160
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 377810159}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aec8a76d2e5d2473e93d18c1b818673b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.WordSnow
+  displayName: Word snow
+  color: {r: 0.88, g: 0.94, b: 1, a: 1}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  letterHeight: 0.075
+  fallSpeed: 0.22
+  lieTime: 25
+  maxWords: 48
+--- !u!4 &377810161
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 377810159}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &438014119
 PrefabInstance:
@@ -570,6 +726,58 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &683420572
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 683420574}
+  - component: {fileID: 683420573}
+  m_Layer: 0
+  m_Name: RisingFloor
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &683420573
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 683420572}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dae76b68d0ba0430ca02b7ab5fce800a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.RisingFloor
+  displayName: Rising floor
+  color: {r: 0.5, g: 0.88, b: 1, a: 1}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  distance: 1.3
+  letterHeight: 0.22
+  spread: 38
+--- !u!4 &683420574
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 683420572}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &689960894
 GameObject:
@@ -950,6 +1158,58 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1512639469}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1234591345
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1234591347}
+  - component: {fileID: 1234591346}
+  m_Layer: 0
+  m_Name: LightTrails
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1234591346
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1234591345}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f3d93cb6c28d246d09480d064c988675, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.LightTrails
+  displayName: Light trails
+  color: {r: 1, g: 0.83, b: 0.42, a: 1}
+  trailMaterial: {fileID: 2100000, guid: e9a8e89f7016d46359271f8be3b012fd, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  maxStrokes: 60
+  pointsPerStroke: 320
+  halfWidth: {x: 0.008, y: 0.02}
+  lifetime: 120
+--- !u!4 &1234591347
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1234591345}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1289835818
 GameObject:
@@ -1391,8 +1651,15 @@ MonoBehaviour:
   - {fileID: 1153605162}
   - {fileID: 1715105674}
   - {fileID: 2137090334}
+  - {fileID: 4160533}
+  - {fileID: 1234591346}
   - {fileID: 1456184137}
   - {fileID: 2124485061}
+  - {fileID: 2026124819}
+  - {fileID: 1970306282}
+  - {fileID: 683420573}
+  - {fileID: 377810160}
+  - {fileID: 214973737}
   startWorld: 0
 --- !u!4 &1462377328
 Transform:
@@ -1419,6 +1686,13 @@ Transform:
   - {fileID: 2137090335}
   - {fileID: 1456184138}
   - {fileID: 2124485062}
+  - {fileID: 4160534}
+  - {fileID: 1234591347}
+  - {fileID: 2026124820}
+  - {fileID: 1970306283}
+  - {fileID: 683420574}
+  - {fileID: 377810161}
+  - {fileID: 214973738}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1492539440
@@ -2013,6 +2287,58 @@ Transform:
   - {fileID: 1492539441}
   m_Father: {fileID: 1512639471}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1970306281
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1970306283}
+  - component: {fileID: 1970306282}
+  m_Layer: 0
+  m_Name: WordDrift
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1970306282
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1970306281}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a2b6bf2fbc31b46f4a4335c1a298af54, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.WordDrift
+  displayName: Word drift
+  color: {r: 0.8, g: 0.88, b: 1, a: 1}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  startDistance: 3.2
+  travelTime: 5.5
+  letterHeight: {x: 0.09, y: 0.17}
+  holdTime: 6
+--- !u!4 &1970306283
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1970306281}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2000780157
 GameObject:
   m_ObjectHideFlags: 0
@@ -2063,6 +2389,59 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2000780157}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2026124818
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2026124820}
+  - component: {fileID: 2026124819}
+  m_Layer: 0
+  m_Name: NeonSign
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2026124819
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2026124818}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7555c7e9dbad9481382f2d528f777f5b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.NeonSign
+  displayName: Neon sign
+  color: {r: 1, g: 0.3, b: 0.62, a: 1}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
+  distance: 1
+  height: -0.05
+  letterHeight: 0.1
+  maxWidth: 1.1
+--- !u!4 &2026124820
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2026124818}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}

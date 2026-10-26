@@ -57,6 +57,59 @@ namespace MusicInYourHands
             return advance;
         }
 
+        /// <summary>
+        /// Fills <paramref name="mesh"/> with a whole word of extruded letters on one line, centred on the origin
+        /// horizontally with its baseline at y = 0. Returns the word's width (m).
+        /// </summary>
+        public static float BuildWord(Mesh mesh, Font font, string text, int fontSize, FontStyle style, float height, int layers, float depth,
+            Color front, Color back)
+        {
+            mesh.Clear();
+            if (string.IsNullOrEmpty(text)) return 0f;
+            font.RequestCharactersInTexture(text, fontSize, style);
+            float scale = height / fontSize;
+            float width = 0f;
+            foreach (char ch in text)
+                width += font.GetCharacterInfo(ch, out var ci, fontSize, style) ? ci.advance * scale : height * 0.3f;
+
+            layers = Mathf.Max(1, layers);
+            var vertices = new System.Collections.Generic.List<Vector3>();
+            var uvs = new System.Collections.Generic.List<Vector2>();
+            var colors = new System.Collections.Generic.List<Color>();
+            var triangles = new System.Collections.Generic.List<int>();
+            for (int k = 0; k < layers; k++)
+            {
+                int layer = layers - 1 - k;
+                float z = layers > 1 ? depth * layer / (layers - 1) : 0f;
+                float shade = layers > 1 ? layer / (float)(layers - 1) : 0f;
+                var c = layer == 0 ? front : Color.Lerp(Color.Lerp(front, back, 0.45f), back, shade);
+                float x = -width * 0.5f;
+                foreach (char ch in text)
+                {
+                    if (!font.GetCharacterInfo(ch, out var info, fontSize, style)) { x += height * 0.3f; continue; }
+                    if (!char.IsWhiteSpace(ch) && info.maxX > info.minX)
+                    {
+                        int v = vertices.Count;
+                        float x0 = x + info.minX * scale, x1 = x + info.maxX * scale;
+                        float y0 = info.minY * scale, y1 = info.maxY * scale;
+                        vertices.Add(new Vector3(x0, y0, z)); vertices.Add(new Vector3(x0, y1, z));
+                        vertices.Add(new Vector3(x1, y1, z)); vertices.Add(new Vector3(x1, y0, z));
+                        uvs.Add(info.uvBottomLeft); uvs.Add(info.uvTopLeft); uvs.Add(info.uvTopRight); uvs.Add(info.uvBottomRight);
+                        colors.Add(c); colors.Add(c); colors.Add(c); colors.Add(c);
+                        triangles.Add(v); triangles.Add(v + 1); triangles.Add(v + 2);
+                        triangles.Add(v); triangles.Add(v + 2); triangles.Add(v + 3);
+                    }
+                    x += info.advance * scale;
+                }
+            }
+            mesh.SetVertices(vertices);
+            mesh.SetUVs(0, uvs);
+            mesh.SetColors(colors);
+            mesh.SetTriangles(triangles, 0);
+            mesh.RecalculateBounds();
+            return width;
+        }
+
         /// <summary>The advance of a letter (m) without building it.</summary>
         public static float Advance(Font font, char ch, int fontSize, FontStyle style, float height)
         {

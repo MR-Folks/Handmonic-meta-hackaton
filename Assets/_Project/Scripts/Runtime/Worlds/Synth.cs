@@ -90,6 +90,26 @@ namespace MusicInYourHands
             return Store(key, data, rate);
         }
 
+        /// <summary>A neon tube's buzz: a short mains hum with a crackle, for a sign switching on.</summary>
+        public static AudioClip Buzz()
+        {
+            const string key = "buzz";
+            if (Cache.TryGetValue(key, out var clip)) return clip;
+
+            int rate = Rate, length = (int)(rate * 0.35f);
+            var data = new float[length];
+            var random = new System.Random(3);
+            for (int i = 0; i < length; i++)
+            {
+                float t = i / (float)rate;
+                float env = Mathf.Min(1f, t / 0.01f) * Mathf.Exp(-t * 7f);
+                float hum = Mathf.Sign(Mathf.Sin(2f * Mathf.PI * 100f * t)) * 0.5f + Mathf.Sin(2f * Mathf.PI * 200f * t) * 0.3f;
+                float crackle = random.NextDouble() < 0.02 ? (float)(random.NextDouble() * 2 - 1) : 0f;
+                data[i] = (hum * 0.25f + crackle * 0.6f) * env * 0.35f;
+            }
+            return Store(key, data, rate);
+        }
+
         /// <summary>A spray can's hiss: a second of bright noise that loops seamlessly.</summary>
         public static AudioClip Hiss()
         {

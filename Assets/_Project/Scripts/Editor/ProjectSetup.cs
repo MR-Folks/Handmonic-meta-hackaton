@@ -426,7 +426,32 @@ namespace MusicInYourHands.EditorTools
             SetReferences(graffiti, ("letteringMaterial", lettering), ("lineMaterial", line), ("glowMaterial", glow), ("ringMaterial", ring),
                 ("paintMaterial", EnsureMaterial(PaintMaterialPath, "MusicInYourHands/PaintStroke")));
 
-            World[] order = { livingSkin, orb, ribbon, strings, rain, fireflies, pool, wind, bubbles, sand, orbitType, graffiti };
+            var breathing = EnsureWorld<BreathingRoom>(manager.transform, "BreathingRoom", "Breathing room", new Color(0.75f, 0.6f, 1f));
+            SetReferences(breathing, ("gridMaterial", EnsureMaterial(RoomGridMaterialPath, "MusicInYourHands/RoomGrid")));
+
+            var trails = EnsureWorld<LightTrails>(manager.transform, "LightTrails", "Light trails", new Color(1f, 0.83f, 0.42f));
+            SetReferences(trails, ("trailMaterial", EnsureMaterial(TrailMaterialPath, "MusicInYourHands/Trail")), ("glowMaterial", glow));
+
+            var neon = EnsureWorld<NeonSign>(manager.transform, "NeonSign", "Neon sign", new Color(1f, 0.3f, 0.62f));
+            SetReferences(neon, ("letteringMaterial", lettering), ("glowMaterial", glow), ("lineMaterial", line));
+
+            var drift = EnsureWorld<WordDrift>(manager.transform, "WordDrift", "Word drift", new Color(0.8f, 0.88f, 1f));
+            SetReferences(drift, ("letteringMaterial", lettering), ("glowMaterial", glow));
+
+            var rising = EnsureWorld<RisingFloor>(manager.transform, "RisingFloor", "Rising floor", new Color(0.5f, 0.88f, 1f));
+            SetReferences(rising, ("letteringMaterial", lettering), ("ringMaterial", ring), ("glowMaterial", glow));
+
+            var wordSnow = EnsureWorld<WordSnow>(manager.transform, "WordSnow", "Word snow", new Color(0.88f, 0.94f, 1f));
+            SetReferences(wordSnow, ("letteringMaterial", lettering), ("glowMaterial", glow));
+
+            var stars = EnsureWorld<CeilingStars>(manager.transform, "CeilingStars", "Ceiling stars", new Color(0.78f, 0.7f, 1f));
+            SetReferences(stars, ("letteringMaterial", lettering), ("glowMaterial", glow), ("lineMaterial", line));
+
+            World[] order =
+            {
+                livingSkin, orb, ribbon, strings, rain, fireflies, pool, wind, bubbles, sand, breathing, trails,
+                orbitType, graffiti, neon, drift, rising, wordSnow, stars
+            };
             list.arraySize = order.Length;
             for (int i = 0; i < order.Length; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = order[i];
             so.ApplyModifiedPropertiesWithoutUndo();
@@ -476,6 +501,8 @@ namespace MusicInYourHands.EditorTools
         public const string SilkMaterialPath = Root + "/Materials/Silk.mat";
         public const string CausticsMaterialPath = Root + "/Materials/Caustics.mat";
         public const string PaintMaterialPath = Root + "/Materials/PaintStroke.mat";
+        public const string RoomGridMaterialPath = Root + "/Materials/RoomGrid.mat";
+        public const string TrailMaterialPath = Root + "/Materials/Trail.mat";
         public const string PlateMaterialPath = Root + "/Materials/Plate.mat";
         public const string LetteringMaterialPath = Root + "/Materials/Lettering.mat";
         public const string RingMaterialPath = Root + "/Materials/Ring.mat";
