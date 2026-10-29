@@ -28,6 +28,7 @@ namespace MusicInYourHands
         [SerializeField] Material bubbleMaterial;
         [SerializeField] Material ringMaterial;
         [SerializeField] Material glowMaterial;
+        [SerializeField] Material letteringMaterial;
 
         [Header("Bubbles")]
         [SerializeField] float distance = 0.5f;
@@ -83,6 +84,7 @@ namespace MusicInYourHands
         MaterialPropertyBlock block;
         AudioPool voices;
         ParticleSystem droplets;
+        WordLayer words;
         Vector3 center, right, forward;
         float eyeY, songTime;
         MusicFrame frame;
@@ -110,6 +112,7 @@ namespace MusicInYourHands
             droplets = Effects.MakeSparkSystem("Droplets", transform, glowMaterial);
             var main = droplets.main;
             main.gravityModifier = 0.25f;
+            if (letteringMaterial != null) words = new WordLayer("Lyric", transform, letteringMaterial, 6, 0.03f);
         }
 
         protected override void OnEnable()
@@ -130,6 +133,7 @@ namespace MusicInYourHands
                 p.Flash.gameObject.SetActive(false);
             }
             if (droplets != null) droplets.Clear();
+            words?.Clear();
         }
 
         public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
@@ -152,6 +156,47 @@ namespace MusicInYourHands
             else SpawnFromAnalysis(music, dt);
             Float(rig, music, view, dt);
             UpdatePops(view, dt);
+            Sing(music, view, dt);
+        }
+
+        /// <summary>
+        /// Each sung word rides up inside the newest bubble, sized to fit it. Pop the bubble and the word goes with it.
+        /// </summary>
+        void Sing(MusicFrame music, Camera view, float dt)
+        {
+            if (words == null) return;
+            if (words.Next(music, out var text, out _))
+            {
+                int newest = -1;
+                for (int i = 0; i < bubbles.Count; i++)
+                    if (bubbles[i].Active && (newest < 0 || bubbles[i].Age < bubbles[newest].Age)) newest = i;
+                if (newest >= 0)
+                {
+                    var b = bubbles[newest];
+                    var w = words.Add(text, Color.Lerp(PitchColors[Mathf.Abs(b.Midi) % PitchColors.Length], Color.white, 0.55f), 6f);
+                    w.Slot = newest;
+                    w.Position = b.Position;
+                }
+            }
+            words.Tick(dt);
+            var eye = view.transform.position;
+            foreach (var w in words.Words)
+            {
+                if (!w.Active) continue;
+                var b = bubbles[w.Slot];
+                if (!b.Active)
+                {
+                    // Popped: the word lets go and fades.
+                    w.Life = Mathf.Min(w.Life, w.Age + 0.3f);
+                    w.Size *= 1f + dt * 2f;
+                    continue;
+                }
+                w.Size = Mathf.Clamp(b.Radius * 1.5f / Mathf.Max(w.Width * 0.03f, 1e-3f), 0.5f, 1.4f);
+                w.Position = b.Position + (eye - b.Position).normalized * 0.005f + Vector3.down * (words.Height(w) * 0.35f);
+                w.Rotation = WordLayer.Facing(w.Position, eye);
+                w.Halo = 0.15f;
+            }
+            words.Draw(1f);
         }
 
         /// <summary>A bubble for each melody note, released the moment the note is sung.</summary>

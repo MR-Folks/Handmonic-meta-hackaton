@@ -161,7 +161,8 @@ Shader "MusicInYourHands/Lettering"
                 // Spray on from left to right.
                 float span = max(_Extent.y - _Extent.x, 1e-4);
                 float along = (input.objectX - _Extent.x) / span;
-                alpha *= smoothstep(_Reveal + 0.02, _Reveal - 0.06, along);
+                // Fully revealed words show whole, however wide (_Extent is only set by the worlds that spray words on).
+                if (_Reveal < 0.999) alpha *= smoothstep(_Reveal + 0.02, _Reveal - 0.06, along);
 
                 // Soft crop to the frame, like a poster's edge.
                 if (_Frame.x > 0)

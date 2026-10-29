@@ -19,6 +19,7 @@
   <uses-feature android:name="oculus.software.handtracking" android:required="false" />
   <uses-permission android:name="com.oculus.permission.HAND_TRACKING" />
   <uses-permission android:name="android.permission.RECORD_AUDIO" />
+  <uses-permission android:name="com.oculus.permission.USE_SCENE" />
   <uses-feature android:name="com.oculus.feature.PASSTHROUGH" android:required="false" />
   <horizonos:uses-horizonos-sdk horizonos:minSdkVersion="60" horizonos:targetSdkVersion="207" />
 </manifest>

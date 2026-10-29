@@ -7,8 +7,8 @@ namespace MusicInYourHands
     /// The Neon sign world: the lyrics as a neon sign in front of you. Each line appears as unlit glass tubes, and
     /// each word switches on with a flicker and a buzz the moment it is sung, in the line's colour, until the whole
     /// line glows; then it switches off for the next one. The sign throws its light on the wall behind it and on
-    /// the floor below, brighter on the beat. Touch a word and it buzzes and sparks. Until the room is scanned, the
-    /// sign stands about a metre in front of you.
+    /// the floor below, brighter on the beat. Touch a word and it buzzes and sparks. With a room scan the sign hangs
+    /// on a wall within reach; otherwise it stands about a metre in front of you.
     /// </summary>
     public class NeonSign : World
     {
@@ -75,7 +75,7 @@ namespace MusicInYourHands
         Vector2 frameSize;
         Color lineColor = LineColors[0];
         int lineNumber;
-        float floorY, clock, fade;
+        float floorY, clock, fade, scale = 1f;
         bool anchored, built;
 
         public override void Build()
@@ -151,6 +151,17 @@ namespace MusicInYourHands
                 forward = Effects.FlatForward(view);
                 right = Vector3.Cross(Vector3.up, forward).normalized;
                 anchor = view.transform.position + forward * distance + Vector3.up * height;
+                scale = 1f;
+                // Once the room is scanned, a wall within reach takes the sign, a few centimetres off it, and the
+                // letters grow with the distance. Farther walls are out of reach for touching words, so the sign
+                // stays in front of you.
+                if (Room.WallAhead(view.transform.position, forward, distance * 1.6f, out var wall, out var onWall))
+                {
+                    forward = -wall.Normal;
+                    right = Vector3.Cross(Vector3.up, forward).normalized;
+                    anchor = onWall + wall.Normal * 0.05f + Vector3.up * height;
+                    scale = Mathf.Max(1f, Vector3.Distance(view.transform.position, anchor) / distance);
+                }
                 floorY = Effects.FloorY(view);
                 SetSignVisible(true);
                 MarkAnchored(view);
@@ -175,7 +186,8 @@ namespace MusicInYourHands
             var texts = new List<string>(cursor.LineTexts);
             if (texts.Count == 0) texts.Add(cursor.Word);
 
-            float space = letterHeight * 0.45f;
+            float lh = letterHeight * scale;
+            float space = lh * 0.45f;
             var rows = new List<List<int>> { new List<int>() };
             var widths = new List<float> { 0f };
             for (int i = 0; i < words.Count; i++)
@@ -187,13 +199,14 @@ namespace MusicInYourHands
                 w.Text.gameObject.SetActive(w.Used);
                 if (!w.Used) continue;
                 w.Text.text = texts[i];
+                w.Text.characterSize = lh * 10f / FontSize;
                 float width = 0f;
                 font.RequestCharactersInTexture(texts[i], FontSize, FontStyle.Italic);
                 foreach (char ch in texts[i])
-                    if (font.GetCharacterInfo(ch, out var info, FontSize, FontStyle.Italic)) width += info.advance * letterHeight / FontSize;
-                w.Size = new Vector2(width, letterHeight * 1.1f);
+                    if (font.GetCharacterInfo(ch, out var info, FontSize, FontStyle.Italic)) width += info.advance * lh / FontSize;
+                w.Size = new Vector2(width, lh * 1.1f);
                 int row = rows.Count - 1;
-                if (widths[row] > 0f && widths[row] + space + width > maxWidth)
+                if (widths[row] > 0f && widths[row] + space + width > maxWidth * scale)
                 {
                     rows.Add(new List<int>());
                     widths.Add(0f);
@@ -202,7 +215,7 @@ namespace MusicInYourHands
                 widths[row] += (widths[row] > 0f ? space : 0f) + width;
                 rows[row].Add(i);
             }
-            float rowHeight = letterHeight * 1.5f;
+            float rowHeight = lh * 1.5f;
             float top = (rows.Count - 1) * rowHeight * 0.5f;
             float widest = 0f;
             for (int r = 0; r < rows.Count; r++)
@@ -217,7 +230,7 @@ namespace MusicInYourHands
                     w.Text.transform.SetPositionAndRotation(w.Centre, Quaternion.LookRotation(forward, Vector3.up));
                 }
             }
-            frameSize = new Vector2(widest * 0.5f + letterHeight * 0.6f, top + letterHeight * 1.0f);
+            frameSize = new Vector2(widest * 0.5f + lh * 0.6f, top + lh * 1.0f);
         }
 
         void LightUp(int index)

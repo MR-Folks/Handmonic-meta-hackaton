@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace MusicInYourHands
@@ -28,6 +29,7 @@ namespace MusicInYourHands
         [Header("Materials")]
         [SerializeField] Material glowMaterial;
         [SerializeField] Material lineMaterial;
+        [SerializeField] Material letteringMaterial;
 
         [Header("Swarm")]
         [SerializeField] int count = 44;
@@ -62,6 +64,7 @@ namespace MusicInYourHands
             public Vector3 Position;
             public Vector3 Velocity;
             public Vector3 Home;
+            public Vector3 FreeHome;
             public float Phase;
             public float Speed;
             public float Startled;
@@ -73,6 +76,7 @@ namespace MusicInYourHands
         Vector3[] trailPath;
         Color[] trailColors;
         Renderer[] palmGlows;
+        WordLayer words;
         MaterialPropertyBlock block;
         Vector3 center, waveOrigin;
         float waveTime = -10f;
@@ -98,7 +102,7 @@ namespace MusicInYourHands
                     Core = Effects.MakeQuad($"Firefly {i}", transform, glowMaterial),
                     Trail = new LineStrip($"Firefly Trail {i}", transform, lineMaterial, DrawPoints),
                     History = new Vector3[TrailPoints],
-                    Home = RoomSpot(random),
+                    FreeHome = RoomSpot(random),
                     Phase = (float)random.NextDouble() * 20f,
                     Speed = 0.6f + (float)random.NextDouble() * 0.8f,
                     Voice = i % VoiceColors.Length
@@ -109,6 +113,7 @@ namespace MusicInYourHands
             }
             palmGlows = new[] { Effects.MakeQuad("Palm Glow L", transform, glowMaterial), Effects.MakeQuad("Palm Glow R", transform, glowMaterial) };
             foreach (var g in palmGlows) g.gameObject.SetActive(false);
+            if (letteringMaterial != null) words = new WordLayer("Lyric", transform, letteringMaterial, 5, 0.04f);
         }
 
         static void SetVisible(Fly f, bool visible)
@@ -130,6 +135,7 @@ namespace MusicInYourHands
             if (flies == null) return;
             foreach (var f in flies) SetVisible(f, false);
             foreach (var g in palmGlows) g.gameObject.SetActive(false);
+            words?.Clear();
         }
 
         public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
@@ -142,8 +148,22 @@ namespace MusicInYourHands
             {
                 // The swarm lives around you, centred a little below your eyes.
                 center = view.transform.position + Vector3.down * 0.25f;
-                foreach (var f in flies)
+                var nearby = new List<Room.Surface>();
+                foreach (var top in Room.Tops)
+                    if (Vector3.ProjectOnPlane(top.Center - center, Vector3.up).magnitude < 2.4f) nearby.Add(top);
+                var perch = new System.Random(5);
+                for (int i = 0; i < flies.Length; i++)
                 {
+                    var f = flies[i];
+                    f.Home = f.FreeHome;
+                    // With a room scan, some fireflies settle just above your table, sofa and shelves.
+                    if (nearby.Count > 0 && i % 3 == 1)
+                    {
+                        var top = nearby[i / 3 % nearby.Count];
+                        var spot = top.Center + top.Right * (((float)perch.NextDouble() - 0.5f) * top.Size.x * 0.8f)
+                            + top.Up * (((float)perch.NextDouble() - 0.5f) * top.Size.y * 0.8f) + Vector3.up * (0.06f + (float)perch.NextDouble() * 0.2f);
+                        f.Home = spot - center;
+                    }
                     f.Position = center + f.Home;
                     f.Velocity = Vector3.zero;
                     for (int k = 0; k < TrailPoints; k++) f.History[k] = f.Position;
@@ -204,6 +224,35 @@ namespace MusicInYourHands
             }
 
             DrawPalms(rig, view);
+            Sing(music, view, dt);
+        }
+
+        /// <summary>
+        /// Each sung word lights up among the fireflies in front of you, glowing in their gold, and floats slowly up
+        /// as it fades, the line spreading from left to right.
+        /// </summary>
+        void Sing(MusicFrame music, Camera view, float dt)
+        {
+            if (words == null) return;
+            var eye = view.transform.position;
+            if (words.Next(music, out var text, out _))
+            {
+                var w = words.Add(text, Color.Lerp(Effects.Gold, Color.white, 0.25f), 2.8f);
+                float angle = ((words.Index % 5) - 2) * 14f + (w.Seed - 0.5f) * 8f;
+                var dir = Quaternion.AngleAxis(angle, Vector3.up) * Effects.FlatForward(view);
+                w.Position = eye + dir * 0.75f + Vector3.down * (0.12f - (w.Seed - 0.5f) * 0.1f);
+                w.Velocity = Vector3.up * 0.025f;
+            }
+            words.Tick(dt);
+            foreach (var w in words.Words)
+            {
+                if (!w.Active) continue;
+                w.Position += w.Velocity * dt;
+                w.Rotation = WordLayer.Facing(w.Position, eye);
+                // A firefly's flicker.
+                w.Halo = 0.5f + Mathf.Sin(Now * 7f + w.Seed * 20f) * 0.15f + music.Kick * 0.25f;
+            }
+            words.Draw(1f);
         }
 
         Vector3 Target(HandRig rig, Fly f, int i, int side, float t, out float pull)

@@ -1,13 +1,14 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace MusicInYourHands
 {
     /// <summary>
-    /// The Breathing room world: the room itself moves with the music. A faint glowing grid traces four walls and the
+    /// The Breathing room world: the room itself moves with the music. A faint glowing grid traces the walls and the
     /// floor around you; the walls breathe in and out with the bass and brighten on every kick, and rings on the floor
     /// flow in towards your feet. Push your palm towards a wall (or touch it, if you walk up to it) and a wave rolls
-    /// out across it from that spot with a low note. Until the room is scanned, the walls stand a couple of metres
-    /// around where you started.
+    /// out across it from that spot with a low note. With a room scan the grid traces your real walls and floor;
+    /// until then the walls stand a couple of metres around where you started.
     /// </summary>
     public class BreathingRoom : World
     {
@@ -26,6 +27,7 @@ namespace MusicInYourHands
 
         [Header("Materials")]
         [SerializeField] Material gridMaterial;
+        [SerializeField] Material letteringMaterial;
 
         [Header("Room")]
         [Tooltip("Half the width and depth of the stand-in room (m), and its height.")]
@@ -46,33 +48,32 @@ namespace MusicInYourHands
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
         static readonly int WavesId = Shader.PropertyToID("_Waves");
 
-        Renderer[] walls;
+        readonly List<Renderer> walls = new List<Renderer>();
+        // The walls at rest, facing into the room: the scanned walls or four stand-ins.
+        readonly List<Room.Surface> surfaces = new List<Room.Surface>();
         Renderer floor;
+        Room.Surface floorRect;
         readonly Vector4[] waves = new Vector4[8];
         int nextWave;
         readonly float[] cooldown = new float[2];
         MaterialPropertyBlock block;
+        WordLayer words;
         AudioPool voices;
         MusicFrame frame;
         Vector3 centre, forward, right;
         float floorY, fade, breath;
-        bool anchored, built;
+        bool anchored, built, scanned;
 
         public override void Build()
         {
             if (built) return;
             built = true;
             block = new MaterialPropertyBlock();
-            walls = new Renderer[4];
-            for (int i = 0; i < 4; i++)
-            {
-                walls[i] = Effects.MakeQuad($"Wall {i}", transform, gridMaterial);
-                walls[i].gameObject.SetActive(false);
-            }
             floor = Effects.MakeQuad("Floor", transform, gridMaterial);
             floor.gameObject.SetActive(false);
             voices = new AudioPool(transform, 4);
             for (int i = 0; i < waves.Length; i++) waves[i] = new Vector4(0f, 0f, 0f, -1f);
+            if (letteringMaterial != null) words = new WordLayer("Lyric", transform, letteringMaterial, 6, 0.11f);
         }
 
         protected override void OnEnable()
@@ -88,6 +89,7 @@ namespace MusicInYourHands
             if (!built) return;
             foreach (var w in walls) w.gameObject.SetActive(false);
             floor.gameObject.SetActive(false);
+            words?.Clear();
         }
 
         public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
@@ -101,7 +103,8 @@ namespace MusicInYourHands
                 forward = Effects.FlatForward(view);
                 right = Vector3.Cross(Vector3.up, forward).normalized;
                 floorY = Effects.FloorY(view);
-                foreach (var w in walls) w.gameObject.SetActive(true);
+                MeasureRoom();
+                for (int i = 0; i < walls.Count; i++) walls[i].gameObject.SetActive(i < surfaces.Count);
                 floor.gameObject.SetActive(true);
                 MarkAnchored(view);
                 anchored = true;
@@ -115,27 +118,104 @@ namespace MusicInYourHands
             if (music.Beat) AddWave(new Vector3(centre.x, floorY, centre.z), false);
             if (rig != null) Push(rig, dt);
             Place(music);
+            Sing(music, view, dt);
+        }
+
+        /// <summary>
+        /// Each sung word lights up on the wall in front of you, a little further along for each word of the line,
+        /// and sends a wave out across the wall from where it lands.
+        /// </summary>
+        void Sing(MusicFrame music, Camera view, float dt)
+        {
+            if (words == null) return;
+            var eye = view.transform.position;
+            if (words.Next(music, out var text, out _))
+            {
+                float angle = ((words.Index % 5) - 2) * 11f;
+                var dir = Quaternion.AngleAxis(angle, Vector3.up) * Effects.FlatForward(view);
+                if (Hit(eye + Vector3.down * 0.1f, dir, out var hit, out float distance))
+                {
+                    var wall = surfaces[0];
+                    foreach (var su in surfaces)
+                        if (Mathf.Abs(Vector3.Dot(hit - su.Center, su.Normal)) < Mathf.Abs(Vector3.Dot(hit - wall.Center, wall.Normal))) wall = su;
+                    var w = words.Add(text, Color.Lerp(new Color(1f, 0.45f, 0.75f), Color.white, 0.35f), 3.2f);
+                    w.Position = hit + wall.Normal * 0.02f;
+                    w.Rotation = Quaternion.LookRotation(-wall.Normal, Vector3.up);
+                    w.Size = Mathf.Clamp(distance / 1.8f, 0.6f, 1.8f);
+                    AddWave(hit, false);
+                }
+            }
+            words.Tick(dt);
+            foreach (var w in words.Words)
+                if (w.Active) w.Halo = 0.3f + breath * 0.5f;
+            words.Draw(fade);
+        }
+
+        /// <summary>
+        /// Finds the walls: the scanned ones, or four stand-ins around you (front, right, back, left). The floor
+        /// grid covers the space between them.
+        /// </summary>
+        void MeasureRoom()
+        {
+            surfaces.Clear();
+            scanned = Room.Scanned && Room.Walls.Count > 0;
+            if (scanned)
+                surfaces.AddRange(Room.Walls);
+            else
+            {
+                var middle = new Vector3(centre.x, floorY + roomHeight * 0.5f, centre.z);
+                for (int i = 0; i < 4; i++)
+                {
+                    var outward = Quaternion.AngleAxis(90f * i, Vector3.up) * forward;
+                    float reach = i % 2 == 0 ? halfSize.y : halfSize.x;
+                    float span = (i % 2 == 0 ? halfSize.x : halfSize.y) * 2f;
+                    surfaces.Add(new Room.Surface(middle + outward * reach, -outward, Vector3.Cross(Vector3.up, outward), new Vector2(span, roomHeight)));
+                }
+            }
+            while (walls.Count < surfaces.Count)
+            {
+                var quad = Effects.MakeQuad($"Wall {walls.Count}", transform, gridMaterial);
+                quad.gameObject.SetActive(false);
+                walls.Add(quad);
+            }
+
+            // The floor: the box around the walls' ends, lined up with the first wall.
+            var along = Vector3.ProjectOnPlane(surfaces[0].Right, Vector3.up).normalized;
+            var across = Vector3.Cross(along, Vector3.up);
+            Vector2 min = new Vector2(float.MaxValue, float.MaxValue), max = -min;
+            foreach (var w in surfaces)
+                for (int end = -1; end <= 1; end += 2)
+                {
+                    var p = w.Center + w.Right * (w.Size.x * 0.5f * end) - centre;
+                    var q = new Vector2(Vector3.Dot(p, along), Vector3.Dot(p, across));
+                    min = Vector2.Min(min, q);
+                    max = Vector2.Max(max, q);
+                }
+            var mid = (min + max) * 0.5f;
+            floorRect = new Room.Surface(new Vector3(centre.x, floorY, centre.z) + along * mid.x + across * mid.y, Vector3.up, along, max - min);
         }
 
         /// <summary>The walls stand where they are, pushed out a little with each breath.</summary>
         void Place(MusicFrame music)
         {
             float s = 1f + breathe * breath;
-            var middle = new Vector3(centre.x, floorY + roomHeight * 0.5f, centre.z);
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < surfaces.Count; i++)
             {
-                // Front, right, back, left.
-                var normal = Quaternion.AngleAxis(90f * i, Vector3.up) * forward;
-                float reach = (i % 2 == 0 ? halfSize.y : halfSize.x) * s;
-                float span = (i % 2 == 0 ? halfSize.x : halfSize.y) * 2f * s;
+                var surface = surfaces[i];
+                // Along the wall's normal, by a share of its distance from where you stand: stand-in walls breathe out,
+                // real walls breathe in from their surface (they cannot go behind it).
+                float away = Mathf.Max(0.3f, Vector3.Dot(centre - surface.Center, surface.Normal));
+                float shift = scanned ? 0.01f + away * breathe * breath : -away * breathe * breath;
+                var size = new Vector2(surface.Size.x * s, surface.Size.y);
                 var w = walls[i];
-                w.transform.SetPositionAndRotation(middle + normal * reach, Quaternion.LookRotation(normal, Vector3.up));
-                w.transform.localScale = new Vector3(span, roomHeight, 1f);
-                Apply(w, new Vector2(span, roomHeight), false);
+                w.transform.SetPositionAndRotation(surface.Center + surface.Normal * shift, Quaternion.LookRotation(-surface.Normal, Vector3.up));
+                w.transform.localScale = new Vector3(size.x, size.y, 1f);
+                Apply(w, size, false);
             }
-            floor.transform.SetPositionAndRotation(new Vector3(centre.x, floorY + 0.003f, centre.z), Quaternion.LookRotation(Vector3.down, forward));
-            floor.transform.localScale = new Vector3(halfSize.x * 2f * s, halfSize.y * 2f * s, 1f);
-            Apply(floor, new Vector2(halfSize.x * 2f * s, halfSize.y * 2f * s), true);
+            var floorSize = floorRect.Size * s;
+            floor.transform.SetPositionAndRotation(floorRect.Center + Vector3.up * 0.003f, Quaternion.LookRotation(Vector3.down, floorRect.Up));
+            floor.transform.localScale = new Vector3(floorSize.x, floorSize.y, 1f);
+            Apply(floor, floorSize, true);
         }
 
         void Apply(Renderer r, Vector2 size, bool isFloor)
@@ -173,22 +253,23 @@ namespace MusicInYourHands
             }
         }
 
-        /// <summary>Where a ray from the palm meets the stand-in walls.</summary>
+        /// <summary>Where a ray from the palm meets a wall.</summary>
         bool Hit(Vector3 from, Vector3 direction, out Vector3 hit, out float distance)
         {
             hit = Vector3.zero;
             distance = float.MaxValue;
-            float s = 1f + breathe * breath;
-            for (int i = 0; i < 4; i++)
+            foreach (var w in surfaces)
             {
-                var normal = Quaternion.AngleAxis(90f * i, Vector3.up) * forward;
-                float reach = (i % 2 == 0 ? halfSize.y : halfSize.x) * s;
-                var plane = new Plane(-normal, centre + normal * reach);
-                if (!plane.Raycast(new Ray(from, direction), out float enter) || enter > distance) continue;
+                float facing = -Vector3.Dot(direction, w.Normal);
+                if (facing < 1e-3f) continue;
+                float enter = Vector3.Dot(from - w.Center, w.Normal) / facing;
+                if (enter < 0f || enter > distance) continue;
+                var p = from + direction * enter;
+                if (!w.Contains(p, -0.1f)) continue;
                 distance = enter;
-                hit = from + direction * enter;
+                hit = p;
             }
-            return distance < float.MaxValue && hit.y > floorY && hit.y < floorY + roomHeight;
+            return distance < float.MaxValue;
         }
 
         void AddWave(Vector3 at, bool pressed)

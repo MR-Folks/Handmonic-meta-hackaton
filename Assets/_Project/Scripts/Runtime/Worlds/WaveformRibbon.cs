@@ -28,6 +28,7 @@ namespace MusicInYourHands
         [SerializeField] Material lineMaterial;
         [SerializeField] Material glowMaterial;
         [SerializeField] Material silkMaterial;
+        [SerializeField] Material letteringMaterial;
 
         [Header("Ribbon")]
         [SerializeField] int points = 96;
@@ -119,6 +120,7 @@ namespace MusicInYourHands
         Renderer[] grips;
         Vector3[] path, pathB;
         MaterialPropertyBlock block;
+        WordLayer words;
         Vector3 lastA, lastB;
         float hold;
         bool held, built;
@@ -137,6 +139,7 @@ namespace MusicInYourHands
             for (int i = 0; i < Ghosts; i++) ghosts[i] = new Silk($"Silk Trail {i}", transform, silkMaterial, points);
             grips = new Renderer[2];
             for (int i = 0; i < grips.Length; i++) grips[i] = Effects.MakeQuad($"Grip {i}", transform, glowMaterial);
+            if (letteringMaterial != null) words = new WordLayer("Lyric", transform, letteringMaterial, 4, 0.028f);
             Hide();
         }
 
@@ -159,6 +162,7 @@ namespace MusicInYourHands
             foreach (var g in grips) g.gameObject.SetActive(false);
             silk.SetVisible(false);
             foreach (var g in ghosts) { g.Age = -1f; g.SetVisible(false); }
+            words?.Clear();
         }
 
         static Vector3 PinchPoint(HandRig.Hand hand)
@@ -202,6 +206,26 @@ namespace MusicInYourHands
             float amount = held ? tug * music.Kick : 0f;
             Effects.OffsetHand(left, pull * amount);
             Effects.OffsetHand(right, -pull * amount);
+            Sing(music, view, show, dt);
+        }
+
+        /// <summary>Each sung word rides along the ribbon from your left hand to your right, just above the silk.</summary>
+        void Sing(MusicFrame music, Camera view, bool show, float dt)
+        {
+            if (words == null || view == null) return;
+            if (words.Next(music, out var text, out _)) words.Add(text, StrandColors[words.Index % StrandColors.Length], 2.6f);
+            words.Tick(dt);
+            var eye = view.transform.position;
+            foreach (var w in words.Words)
+            {
+                if (!w.Active) continue;
+                float t = Mathf.Clamp01(w.Age / w.Life) * (path.Length - 1);
+                int i = Mathf.Min((int)t, path.Length - 2);
+                w.Position = Vector3.Lerp(path[i], path[i + 1], t - i) + Vector3.up * 0.035f;
+                w.Rotation = WordLayer.Facing(w.Position, eye);
+                w.Halo = 0.2f + music.Kick * 0.3f;
+            }
+            words.Draw(show ? hold : 0f);
         }
 
         void DrawRibbon(MusicFrame music, Camera view, float dt)

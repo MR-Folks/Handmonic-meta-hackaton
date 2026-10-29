@@ -27,6 +27,7 @@ namespace MusicInYourHands
 
         [Header("Materials")]
         [SerializeField] Material glowMaterial;
+        [SerializeField] Material letteringMaterial;
 
         [Header("School")]
         [SerializeField] int count = 420;
@@ -58,6 +59,7 @@ namespace MusicInYourHands
         readonly float[] radii = new float[12];
         Vector3 centre;
         float surge, flashTime = -10f, fade;
+        WordLayer words;
         bool anchored, built;
 
         public override void Build()
@@ -102,6 +104,7 @@ namespace MusicInYourHands
             renderer.lengthScale = 2.2f;
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             renderer.receiveShadows = false;
+            if (letteringMaterial != null) words = new WordLayer("Lyric", transform, letteringMaterial, 4, 0.034f);
         }
 
         protected override void OnEnable()
@@ -115,6 +118,7 @@ namespace MusicInYourHands
         {
             base.OnDisable();
             if (system != null) system.Clear();
+            words?.Clear();
         }
 
         public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
@@ -143,6 +147,44 @@ namespace MusicInYourHands
             CollectObstacles(rig);
             Swim(music, Mathf.Min(dt, 0.05f));
             Draw(music);
+            Sing(music, view, dt);
+        }
+
+        /// <summary>
+        /// Each sung word is carried by a fish swimming past in front of you: it rides just above the fish around the
+        /// ring, turning to face you, until it fades.
+        /// </summary>
+        void Sing(MusicFrame music, Camera view, float dt)
+        {
+            if (words == null) return;
+            var eye = view.transform.position;
+            if (words.Next(music, out var text, out _))
+            {
+                // The fish nearest to where you look, a little to the side the school swims from.
+                var look = Quaternion.AngleAxis(-20f, Vector3.up) * Effects.FlatForward(view);
+                int best = 0;
+                float bestScore = float.MinValue;
+                for (int k = 0; k < 60; k++)
+                {
+                    int i = Random.Range(0, count);
+                    var to = position[i] - eye;
+                    float score = Vector3.Dot(to.normalized, look) - Mathf.Abs(to.magnitude - 0.5f);
+                    if (score > bestScore) { bestScore = score; best = i; }
+                }
+                var w = words.Add(text, new Color(0.85f, 1f, 0.97f), 3f);
+                w.Slot = best;
+                w.Position = position[best];
+            }
+            words.Tick(dt);
+            foreach (var w in words.Words)
+            {
+                if (!w.Active) continue;
+                var target = position[w.Slot] + Vector3.up * 0.025f;
+                w.Position = Vector3.Lerp(w.Position, target, 1f - Mathf.Exp(-12f * dt));
+                w.Rotation = WordLayer.Facing(w.Position, eye);
+                w.Halo = 0.25f + surge * 0.35f;
+            }
+            words.Draw(fade);
         }
 
         /// <summary>Starts the school spread around the ring, each fish already swimming its way.</summary>

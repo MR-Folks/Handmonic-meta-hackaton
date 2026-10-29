@@ -3,7 +3,8 @@
     "rootNamespace": "MusicInYourHands.Meta",
     "references": [
         "MusicInYourHands.Runtime",
-        "Oculus.VR"
+        "Oculus.VR",
+        "meta.xr.mrutilitykit"
     ],
     "defineConstraints": [
         "META_XR_CORE"

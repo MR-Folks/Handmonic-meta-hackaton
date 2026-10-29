@@ -7,7 +7,7 @@ namespace MusicInYourHands
     /// The Word snow world: the lyrics fall like snow. Each sung word drifts down from above, swaying and slowly
     /// tumbling among fine flakes, and settles on the floor around you, where it lies for a while before melting
     /// away. Hold out your hand palm up and words land on it and ride along as you move; make a fist and they drop.
-    /// Until the room is scanned, words settle on the floor (on a scanned room they would settle on your furniture).
+    /// Once the room is scanned, words also settle on your table, sofa, bed and shelves; until then, on the floor.
     /// </summary>
     public class WordSnow : World
     {
@@ -130,7 +130,7 @@ namespace MusicInYourHands
                 head = view.transform.position;
                 forward = Effects.FlatForward(view);
                 floorY = Effects.FloorY(view);
-                ceiling = Mathf.Max(head.y + 0.7f, floorY + 2.3f);
+                ceiling = Mathf.Min(Mathf.Max(head.y + 0.7f, floorY + 2.3f), Room.Ceiling(float.MaxValue) - 0.05f);
                 MarkAnchored(view);
                 anchored = true;
             }
@@ -153,6 +153,16 @@ namespace MusicInYourHands
             float reach = Mathf.Lerp(0.35f, 1.6f, Mathf.Sqrt(Random.value));
             var dir = Quaternion.AngleAxis(angle, Vector3.up) * forward;
             f.Position = new Vector3(head.x, ceiling, head.z) + dir * reach;
+            // With a room scan, some words fall over the furniture near you, to settle on it.
+            if (Room.Tops.Count > 0 && Random.value < 0.45f)
+            {
+                var top = Room.Tops[Random.Range(0, Room.Tops.Count)];
+                if (Vector3.ProjectOnPlane(top.Center - head, Vector3.up).magnitude < 2.6f)
+                {
+                    var spot = top.Center + top.Right * (Random.Range(-0.4f, 0.4f) * top.Size.x) + top.Up * (Random.Range(-0.4f, 0.4f) * top.Size.y);
+                    f.Position = new Vector3(spot.x, ceiling, spot.z);
+                }
+            }
             f.Velocity = Vector3.down * fallSpeed;
             f.Rotation = Quaternion.LookRotation(Vector3.ProjectOnPlane(f.Position - head, Vector3.up).normalized + Vector3.down * 0.2f, Vector3.up);
             f.Spin = new Vector3(Random.Range(-20f, 20f), Random.Range(-35f, 35f), Random.Range(-15f, 15f));
@@ -177,12 +187,13 @@ namespace MusicInYourHands
                         f.Position += (f.Velocity + sway) * dt;
                         f.Rotation = Quaternion.Euler(f.Spin * dt) * f.Rotation;
                         if (rig != null) TryCatch(rig, f);
-                        if (f.State == State.Falling && f.Position.y <= floorY + 0.01f)
+                        float ground = Room.GroundBelow(f.Position, floorY);
+                        if (f.State == State.Falling && f.Position.y <= ground + 0.01f)
                         {
                             f.State = State.Resting;
                             f.Age = 0f;
-                            f.Position.y = floorY + 0.006f;
-                            // Lie down on the floor, reading towards you.
+                            f.Position.y = ground + 0.006f;
+                            // Lie down where it landed, reading towards you.
                             var toward = Vector3.ProjectOnPlane(f.Position - head, Vector3.up);
                             f.Rotation = Quaternion.LookRotation(Vector3.down, toward.sqrMagnitude > 1e-6f ? toward.normalized : forward)
                                 * Quaternion.Euler(0f, 0f, Random.Range(-15f, 15f));

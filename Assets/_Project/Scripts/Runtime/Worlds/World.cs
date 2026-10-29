@@ -21,6 +21,7 @@ namespace MusicInYourHands
         static int recenterCount;
         Vector3 anchorHead;
         int anchorRecenter;
+        int anchorRoom;
         float driftTime;
 
         /// <summary>Called when the headset recenters (Meta's recenter gesture or button).</summary>
@@ -31,17 +32,19 @@ namespace MusicInYourHands
         {
             anchorHead = view.transform.position;
             anchorRecenter = recenterCount;
+            anchorRoom = Room.Version;
             driftTime = 0f;
         }
 
         /// <summary>
-        /// True when the world should place itself again: after a recenter, or once the head has stayed more than
-        /// 25 cm higher or lower (sitting down, standing up) or 90 cm away for a moment and a half.
+        /// True when the world should place itself again: after a recenter or a new room scan, or once the head has
+        /// stayed more than 25 cm higher or lower (sitting down, standing up) or 90 cm away for a moment and a half.
         /// </summary>
         protected bool ShouldReanchor(Camera view, float dt)
         {
             if (view == null) return false;
-            if (anchorRecenter != recenterCount) return true;
+            // Also when the room scan loads or changes, so things move onto the real table, walls and floor.
+            if (anchorRecenter != recenterCount || anchorRoom != Room.Version) return true;
             var head = view.transform.position;
             var flat = new Vector2(head.x - anchorHead.x, head.z - anchorHead.z);
             bool moved = Mathf.Abs(head.y - anchorHead.y) > 0.25f || flat.magnitude > 0.9f;

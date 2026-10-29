@@ -9,7 +9,8 @@ namespace MusicInYourHands
     /// Keep pointing at the same spot and new words pile up over the old ones, as on a real wall;
     /// on walls the paint drips for a moment, then the tag fades away. Pinch to spray paint yourself: a mist streams
     /// from your fingers with a hiss and leaves glowing strokes where you point. Your fingertip gets speckled with
-    /// the paint colour. Until the room is scanned, the walls are an invisible ring around you.
+    /// the paint colour. Tags land on your real walls once the room is scanned; until then the walls are an invisible
+    /// ring around you.
     /// </summary>
     public class Graffiti : World
     {
@@ -34,6 +35,8 @@ namespace MusicInYourHands
         [SerializeField] Material glowMaterial;
         [SerializeField] Material ringMaterial;
         [SerializeField] Material paintMaterial;
+        [Tooltip("The hand-lettered marker font for the tags (Permanent Marker); the built-in font if empty.")]
+        [SerializeField] Font tagFont;
 
         [Header("Walls")]
         [Tooltip("Radius of the stand-in walls around you until the room is scanned (m).")]
@@ -80,6 +83,7 @@ namespace MusicInYourHands
         readonly List<Tag> tags = new List<Tag>();
         readonly List<Stroke> strokes = new List<Stroke>();
         Font font;
+        FontStyle style;
         Material material;
         MaterialPropertyBlock block;
         Renderer reticle;
@@ -98,7 +102,9 @@ namespace MusicInYourHands
             if (built) return;
             built = true;
             block = new MaterialPropertyBlock();
-            font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            font = tagFont != null ? tagFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            // The marker font is drawn bold and slanted already; the built-in one is made bold and italic.
+            style = tagFont != null ? FontStyle.Normal : FontStyle.BoldAndItalic;
             material = new Material(letteringMaterial) { name = "Graffiti Lettering", mainTexture = font.material.mainTexture };
             Font.textureRebuilt += OnFontRebuilt;
             path = new Vector3[StrokePoints];
@@ -110,7 +116,7 @@ namespace MusicInYourHands
                 var text = go.AddComponent<TextMesh>();
                 text.font = font;
                 text.fontSize = FontSize;
-                text.fontStyle = FontStyle.BoldAndItalic;
+                text.fontStyle = style;
                 text.anchor = TextAnchor.MiddleCenter;
                 text.alignment = TextAlignment.Center;
                 var r = go.GetComponent<MeshRenderer>();
@@ -239,7 +245,8 @@ namespace MusicInYourHands
             UpdateStrokes(view, dt);
         }
 
-        /// <summary>Where a ray meets the floor or the stand-in walls (a ring around where you started).</summary>
+        /// <summary>Where a ray meets the floor or a wall: the scanned walls, or until the room is scanned, stand-in walls
+        /// (a ring around where you started).</summary>
         Vector3 Hit(Ray ray, out Vector3 normal, out bool onWall)
         {
             float best = float.MaxValue;
@@ -250,7 +257,19 @@ namespace MusicInYourHands
                 float t = (floorY + 0.002f - ray.origin.y) / ray.direction.y;
                 if (t > 0f) { best = t; normal = Vector3.up; onWall = false; }
             }
-            // Ray against a vertical cylinder around the start point.
+            // The real walls once the room is scanned.
+            if (Room.Scanned)
+            {
+                if (Room.RaycastWalls(ray, Mathf.Min(best, 8f), out float t, out var wall))
+                {
+                    best = t;
+                    normal = wall.Normal;
+                    onWall = true;
+                }
+                if (best == float.MaxValue) best = wallRadius;
+                return ray.GetPoint(best) + normal * 0.004f;
+            }
+            // Else a ray against a vertical cylinder around the start point.
             var o = new Vector2(ray.origin.x - center.x, ray.origin.z - center.z);
             var d = new Vector2(ray.direction.x, ray.direction.z);
             float a = Vector2.Dot(d, d), b = 2f * Vector2.Dot(o, d), c = Vector2.Dot(o, o) - wallRadius * wallRadius;
@@ -283,10 +302,10 @@ namespace MusicInYourHands
             float height = tagHeight * Mathf.Clamp(distance / wallRadius, 0.6f, 1.6f) * Random.Range(0.85f, 1.2f);
             tag.Text.characterSize = height * 10f / FontSize;
             tag.Text.text = word;
-            font.RequestCharactersInTexture(word, FontSize, FontStyle.BoldAndItalic);
+            font.RequestCharactersInTexture(word, FontSize, style);
             float width = 0f;
             foreach (char ch in word)
-                if (font.GetCharacterInfo(ch, out var info, FontSize, FontStyle.BoldAndItalic)) width += info.advance;
+                if (font.GetCharacterInfo(ch, out var info, FontSize, style)) width += info.advance;
             tag.Width = width * height / FontSize;
             tag.Age = 0f;
             tag.Color = Color.Lerp(paint, Color.white, 0.1f);

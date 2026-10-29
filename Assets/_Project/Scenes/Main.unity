@@ -151,6 +151,7 @@ MonoBehaviour:
   displayName: Breathing room
   color: {r: 0.75, g: 0.6, b: 1, a: 1}
   gridMaterial: {fileID: 2100000, guid: 1eadb9ea8933e4bf3998274e22b8ff30, type: 2}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   halfSize: {x: 1.8, y: 1.8}
   roomHeight: 2.6
   breathe: 0.04
@@ -280,6 +281,7 @@ MonoBehaviour:
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   streakMaterial: {fileID: 2100000, guid: 141076a49ca5548e9a16f7ac49f7d207, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   areaWidth: 0.9
   areaDepth: 0.4
   distance: 0.5
@@ -339,6 +341,7 @@ MonoBehaviour:
   color: {r: 0.79, g: 0.61, b: 1, a: 1}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   count: 44
   flySize: 0.016
   startle: 0.4
@@ -357,6 +360,52 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1462377328}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &176874510
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 176874512}
+  - component: {fileID: 176874511}
+  m_Layer: 0
+  m_Name: FrameMeter
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &176874511
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 176874510}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d3865ac253e1b4fdcb1027bc20da7fb5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.FrameMeter
+  interval: 4
+  settle: 1.5
+--- !u!4 &176874512
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 176874510}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &179923058
 GameObject:
@@ -392,6 +441,7 @@ MonoBehaviour:
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   stringCount: 8
   distance: 0.42
   width: 0.62
@@ -813,6 +863,7 @@ MonoBehaviour:
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   tipSize: 0.045
   fingerColors:
   - {r: 1, g: 0.83, b: 0.42, a: 1}
@@ -890,6 +941,7 @@ MonoBehaviour:
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   silkMaterial: {fileID: 2100000, guid: 6a8303df8baf04a3c8de8da833d88525, type: 2}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   points: 96
   amplitude: 0.07
   strandWidth: 0.007
@@ -1091,6 +1143,7 @@ MonoBehaviour:
   displayName: Sound wind
   color: {r: 0.49, g: 0.95, b: 0.79, a: 1}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   count: 360
   orbit: 0.72
   thickness: 0.22
@@ -1192,6 +1245,7 @@ MonoBehaviour:
   color: {r: 1, g: 0.83, b: 0.42, a: 1}
   trailMaterial: {fileID: 2100000, guid: e9a8e89f7016d46359271f8be3b012fd, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   maxStrokes: 60
   pointsPerStroke: 320
   halfWidth: {x: 0.008, y: 0.02}
@@ -2015,6 +2069,112 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1617731234
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1617731237}
+  - component: {fileID: 1617731236}
+  - component: {fileID: 1617731235}
+  m_Layer: 0
+  m_Name: RoomScan
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1617731235
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1617731234}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 991086261ed7c4d4c940ac8c5956004f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Meta::MusicInYourHands.Meta.RoomScanFeed
+--- !u!114 &1617731236
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1617731234}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: de27d7f2f20024e18898941292d6c164, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: meta.xr.mrutilitykit::Meta.XR.MRUtilityKit.MRUK
+  <SceneLoadedEvent>k__BackingField:
+    m_PersistentCalls:
+      m_Calls: []
+  <RoomCreatedEvent>k__BackingField:
+    m_PersistentCalls:
+      m_Calls: []
+  <RoomUpdatedEvent>k__BackingField:
+    m_PersistentCalls:
+      m_Calls: []
+  <RoomRemovedEvent>k__BackingField:
+    m_PersistentCalls:
+      m_Calls: []
+  EnableWorldLock: 0
+  TrackingSpaceOffset:
+    e00: 1
+    e01: 0
+    e02: 0
+    e03: 0
+    e10: 0
+    e11: 1
+    e12: 0
+    e13: 0
+    e20: 0
+    e21: 0
+    e22: 1
+    e23: 0
+    e30: 0
+    e31: 0
+    e32: 0
+    e33: 1
+  SceneSettings:
+    <TrackerConfiguration>k__BackingField:
+      <KeyboardTrackingEnabled>k__BackingField: 0
+      <QRCodeTrackingEnabled>k__BackingField: 0
+    <TrackableAdded>k__BackingField:
+      m_PersistentCalls:
+        m_Calls: []
+    <TrackableRemoved>k__BackingField:
+      m_PersistentCalls:
+        m_Calls: []
+    DataSource: 0
+    RoomIndex: -1
+    RoomPrefabs: []
+    SceneJsons: []
+    LoadSceneOnStartup: 0
+    EnableHighFidelityScene: 0
+    SeatWidth: 0.6
+    SceneJson: 
+  _immersiveSceneDebuggerPrefab: {fileID: 0}
+--- !u!4 &1617731237
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1617731234}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1691727729
 GameObject:
   m_ObjectHideFlags: 0
@@ -2080,6 +2240,7 @@ MonoBehaviour:
   bubbleMaterial: {fileID: 2100000, guid: fa89d5024587b4c8e83405b9bccf5a04, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   distance: 0.5
   width: 0.7
   heightRange: {x: -0.5, y: 0.35}
@@ -2180,6 +2341,7 @@ MonoBehaviour:
   orbMaterial: {fileID: 2100000, guid: 670281a42a551438a91dfccad4c42bad, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   minRadius: 0.05
   maxRadius: 0.2
   radiusPerSpread: 0.5
@@ -2373,6 +2535,7 @@ MonoBehaviour:
   waterMaterial: {fileID: 2100000, guid: 5a8cb478aa2674256bde3519ded63635, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   causticsMaterial: {fileID: 2100000, guid: 630e4af74708d49b4b4e1a22e4c476d3, type: 2}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   size: {x: 0.7, y: 0.48}
   distance: 0.5
   belowEyes: 0.52
@@ -2486,6 +2649,7 @@ MonoBehaviour:
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
   paintMaterial: {fileID: 2100000, guid: 9527ccac3e9d14c0d948501ee821f887, type: 2}
+  tagFont: {fileID: 12800000, guid: 777ec58d2d17349c1a3737bc1e54d93e, type: 3}
   wallRadius: 1.6
   tagHeight: 0.2
   holdTime: 4
@@ -2540,6 +2704,7 @@ MonoBehaviour:
   color: {r: 1, g: 0.86, b: 0.68, a: 1}
   plateMaterial: {fileID: 2100000, guid: 8a2b5c99e3f8449c2968547889d421aa, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   plateSize: 0.5
   distance: 0.46
   belowEyes: 0.52
@@ -2577,3 +2742,5 @@ SceneRoots:
   - {fileID: 1022504059}
   - {fileID: 596022185}
   - {fileID: 1289835820}
+  - {fileID: 1617731237}
+  - {fileID: 176874512}

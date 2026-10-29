@@ -4,6 +4,7 @@
     "references": [
         "MusicInYourHands.Runtime",
         "MusicInYourHands.Meta",
+        "meta.xr.mrutilitykit",
         "Oculus.VR",
         "Oculus.VR.Editor",
         "Unity.RenderPipelines.Core.Runtime",

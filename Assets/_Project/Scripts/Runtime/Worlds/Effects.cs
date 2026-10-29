@@ -42,10 +42,10 @@ namespace MusicInYourHands
         }
 
         /// <summary>
-        /// The floor height. With floor-level tracking the floor is at 0; if the head looks too low for that
-        /// (eye-level tracking), assume the floor is 1.5 m below the eyes.
+        /// The floor height: the scanned floor once the room scan loads. Until then, with floor-level tracking the
+        /// floor is at 0; if the head looks too low for that (eye-level tracking), assume it is 1.5 m below the eyes.
         /// </summary>
-        public static float FloorY(Camera view) => view != null && view.transform.position.y < 0.9f ? view.transform.position.y - 1.5f : 0f;
+        public static float FloorY(Camera view) => Room.Floor(view);
 
         /// <summary>Nudges a hand's visible root by a world-space offset (fake resistance), or resets it.</summary>
         public static void OffsetHand(HandRig.Hand hand, Vector3 worldOffset)

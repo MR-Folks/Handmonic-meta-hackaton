@@ -20,6 +20,7 @@ namespace MusicInYourHands
         [SerializeField] Material glowMaterial;
         [SerializeField] Material ringMaterial;
         [SerializeField] Material lineMaterial;
+        [SerializeField] Material letteringMaterial;
 
         [Header("Fingertip lights")]
         [SerializeField] float tipSize = 0.045f;
@@ -74,6 +75,7 @@ namespace MusicInYourHands
         int waveHue;
         ParticleSystem sparks;
         MaterialPropertyBlock block;
+        WordLayer words;
         bool built;
 
         protected override void OnDisable()
@@ -91,6 +93,7 @@ namespace MusicInYourHands
             foreach (var trail in trails) trail?.SetVisible(false);
             System.Array.Clear(trailStrength, 0, trailStrength.Length);
             if (sparks != null) sparks.Clear();
+            words?.Clear();
         }
 
         /// <summary>Creates the lights, the wave pool and the spark system. Also called by the editor preview.</summary>
@@ -133,6 +136,7 @@ namespace MusicInYourHands
             }
 
             sparks = Effects.MakeSparkSystem("Sparks", transform, glowMaterial);
+            if (letteringMaterial != null) words = new WordLayer("Lyric", transform, letteringMaterial, 3, 0.03f);
         }
 
         public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
@@ -148,6 +152,41 @@ namespace MusicInYourHands
                 if (rig.Right.IsTracked) SpawnWaves(rig.Right, strength);
             }
             AdvanceWaves(dt);
+            Sing(rig, music, view, dt);
+        }
+
+        /// <summary>The sung word glows just above the palm you hold towards your face, in the wave's colour.</summary>
+        void Sing(HandRig rig, MusicFrame music, Camera view, float dt)
+        {
+            if (words == null || view == null) return;
+            if (words.Next(music, out var text, out _)) words.Add(text, fingerColors[waveHue], 1.8f, alone: true);
+            words.Tick(dt);
+            var eye = view.transform.position;
+            HandRig.Hand best = null;
+            float bestFacing = 0.2f;
+            foreach (var hand in new[] { rig.Left, rig.Right })
+            {
+                if (!hand.IsTracked) continue;
+                var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
+                float facing = Vector3.Dot(hand.PalmNormal, (eye - palm).normalized);
+                if (facing > bestFacing) { best = hand; bestFacing = facing; }
+            }
+            foreach (var w in words.Words)
+            {
+                if (!w.Active) continue;
+                if (best != null)
+                {
+                    // Between the palm and the middle fingertip, just off the skin.
+                    var palm = best.PalmJoint != null ? best.PalmJoint.position : best.Palm.position;
+                    var middle = best.TipJoints[2] != null ? best.TipJoints[2].position : best.Tips[2];
+                    var target = Vector3.Lerp(palm, middle, 0.4f) + best.PalmNormal * 0.05f + Vector3.down * (words.Height(w) * 0.4f);
+                    w.Position = w.Age < 0.05f ? target : Vector3.Lerp(w.Position, target, 1f - Mathf.Exp(-18f * dt));
+                }
+                w.Alpha = Mathf.MoveTowards(w.Alpha, best != null ? 1f : 0f, dt * 4f);
+                w.Rotation = WordLayer.Facing(w.Position, eye);
+                w.Halo = 0.25f + music.Kick * 0.5f;
+            }
+            words.Draw(1f);
         }
 
         void UpdateHand(HandRig.Hand hand, int side, float[] bands, float kick, Camera view, float dt, bool beat)

@@ -167,6 +167,8 @@ namespace MusicInYourHands.EditorTools
             var config = OVRProjectConfig.CachedProjectConfig;
             config.handTrackingSupport = OVRProjectConfig.HandTrackingSupport.ControllersAndHands;
             config.insightPassthroughSupport = OVRProjectConfig.FeatureSupport.Supported;
+            // The room scan (walls, tables, floor) the worlds place themselves on.
+            config.sceneSupport = OVRProjectConfig.FeatureSupport.Supported;
             OVRProjectConfig.CommitProjectConfig(config);
 #endif
         }
@@ -253,6 +255,7 @@ namespace MusicInYourHands.EditorTools
             EnsureWorlds();
             if (Object.FindAnyObjectByType<RuntimeDiagnostics>() == null) new GameObject("RuntimeDiagnostics", typeof(RuntimeDiagnostics));
             if (Object.FindAnyObjectByType<DemoTour>() == null) new GameObject("DemoTour", typeof(DemoTour));
+            if (Object.FindAnyObjectByType<FrameMeter>() == null) new GameObject("FrameMeter", typeof(FrameMeter));
             if (Object.FindAnyObjectByType<WorldHint>() == null) new GameObject("WorldHint", typeof(WorldHint));
 
             var debugMaterial = EnsureDebugMaterial();
@@ -378,6 +381,9 @@ namespace MusicInYourHands.EditorTools
             var manager = Object.FindAnyObjectByType<WorldManager>(FindObjectsInactive.Include);
             if (manager == null) manager = new GameObject("Worlds", typeof(WorldManager)).GetComponent<WorldManager>();
 
+            // Every world shows the sung words, so every world gets the lettering material.
+            var lettering = EnsureMaterial(LetteringMaterialPath, "MusicInYourHands/Lettering");
+
             var livingSkin = EnsureWorld<LivingSkin>(manager.transform, "LivingSkin", "Living skin", new Color(1f, 0.37f, 0.68f));
             SetReferences(livingSkin, ("glowMaterial", glow), ("ringMaterial", EnsureMaterial(RingMaterialPath, "MusicInYourHands/Ring")),
                 ("lineMaterial", EnsureMaterial(LineMaterialPath, "MusicInYourHands/Line")));
@@ -418,19 +424,21 @@ namespace MusicInYourHands.EditorTools
 
             var so = new SerializedObject(manager);
             var list = so.FindProperty("worlds");
-            var lettering = EnsureMaterial(LetteringMaterialPath, "MusicInYourHands/Lettering");
             var orbitType = EnsureWorld<OrbitType>(manager.transform, "OrbitType", "Orbit type", new Color(0.88f, 0.89f, 0.93f));
             SetReferences(orbitType, ("letteringMaterial", lettering), ("lineMaterial", line), ("glowMaterial", glow));
 
             var graffiti = EnsureWorld<Graffiti>(manager.transform, "Graffiti", "Graffiti", new Color(1f, 0.7f, 0.42f));
             SetReferences(graffiti, ("letteringMaterial", lettering), ("lineMaterial", line), ("glowMaterial", glow), ("ringMaterial", ring),
-                ("paintMaterial", EnsureMaterial(PaintMaterialPath, "MusicInYourHands/PaintStroke")));
+                ("paintMaterial", EnsureMaterial(PaintMaterialPath, "MusicInYourHands/PaintStroke")),
+                ("tagFont", AssetDatabase.LoadAssetAtPath<Font>("Assets/_Project/Fonts/PermanentMarker-Regular.ttf")));
 
             var breathing = EnsureWorld<BreathingRoom>(manager.transform, "BreathingRoom", "Breathing room", new Color(0.75f, 0.6f, 1f));
             SetReferences(breathing, ("gridMaterial", EnsureMaterial(RoomGridMaterialPath, "MusicInYourHands/RoomGrid")));
 
             var trails = EnsureWorld<LightTrails>(manager.transform, "LightTrails", "Light trails", new Color(1f, 0.83f, 0.42f));
             SetReferences(trails, ("trailMaterial", EnsureMaterial(TrailMaterialPath, "MusicInYourHands/Trail")), ("glowMaterial", glow));
+            foreach (World soundWorld in new World[] { livingSkin, orb, ribbon, strings, rain, fireflies, pool, wind, bubbles, sand, breathing, trails })
+                SetReferences(soundWorld, ("letteringMaterial", lettering));
 
             var neon = EnsureWorld<NeonSign>(manager.transform, "NeonSign", "Neon sign", new Color(1f, 0.3f, 0.62f));
             SetReferences(neon, ("letteringMaterial", lettering), ("glowMaterial", glow), ("lineMaterial", line));
@@ -467,6 +475,16 @@ namespace MusicInYourHands.EditorTools
 #if META_XR_CORE
             if (Object.FindAnyObjectByType<MenuButtonFeed>(FindObjectsInactive.Include) == null)
                 new GameObject("MenuButton", typeof(MenuButtonFeed));
+            if (Object.FindAnyObjectByType<RoomScanFeed>(FindObjectsInactive.Include) == null)
+            {
+                var scan = new GameObject("RoomScan");
+                var mruk = scan.AddComponent<global::Meta.XR.MRUtilityKit.MRUK>();
+                // RoomScanFeed loads the scan itself, without starting Space Setup, and the worlds do their own placing.
+                mruk.EnableWorldLock = false;
+                mruk.SceneSettings ??= new global::Meta.XR.MRUtilityKit.MRUK.MRUKSettings();
+                mruk.SceneSettings.LoadSceneOnStartup = false;
+                scan.AddComponent<RoomScanFeed>();
+            }
 #endif
         }
 

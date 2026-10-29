@@ -31,6 +31,7 @@ namespace MusicInYourHands
         [SerializeField] Material glowMaterial;
         [SerializeField] Material streakMaterial;
         [SerializeField] Material ringMaterial;
+        [SerializeField] Material letteringMaterial;
 
         [Header("Rain")]
         [SerializeField] float areaWidth = 0.9f;
@@ -69,6 +70,8 @@ namespace MusicInYourHands
             public int Midi;
             public bool Active;
             public bool Drizzle;
+            // What it lands on: the floor, or the furniture top under it once the room is scanned.
+            public float Ground;
         }
 
         sealed class Mark
@@ -91,6 +94,7 @@ namespace MusicInYourHands
         readonly Color[] expectColor = { Effects.Blue, Effects.Blue };
         readonly Color[] chargeColor = { Effects.Blue, Effects.Blue };
         Renderer[] palmGlows;
+        WordLayer words;
         AudioPool voices;
         ParticleSystem sparks;
         MaterialPropertyBlock block;
@@ -127,6 +131,7 @@ namespace MusicInYourHands
             palmGlows = new[] { Effects.MakeQuad("Palm Glow L", transform, glowMaterial), Effects.MakeQuad("Palm Glow R", transform, glowMaterial) };
             voices = new AudioPool(transform, 6);
             sparks = Effects.MakeSparkSystem("Sparks", transform, glowMaterial);
+            if (letteringMaterial != null) words = new WordLayer("Lyric", transform, letteringMaterial, 6, 0.04f);
         }
 
         protected override void OnEnable()
@@ -147,6 +152,7 @@ namespace MusicInYourHands
                 m.Glow.gameObject.SetActive(false);
             }
             charge[0] = charge[1] = 0f;
+            words?.Clear();
         }
 
         public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
@@ -176,6 +182,51 @@ namespace MusicInYourHands
             UpdateDrops(rig, view, dt);
             UpdateMarks(dt);
             UpdatePalms(rig, view, music, dt);
+            Sing(music, view, dt);
+        }
+
+        /// <summary>
+        /// Each sung word falls with the rain in front of you, a little left or right along the line, and lands with a
+        /// splash in a puddle of light, where it lies for a moment.
+        /// </summary>
+        void Sing(MusicFrame music, Camera view, float dt)
+        {
+            if (words == null) return;
+            if (words.Next(music, out var text, out _))
+            {
+                var w = words.Add(text, Color.Lerp(Effects.Blue, Color.white, 0.45f), 7f);
+                float x = ((words.Index % 5) - 2) * 0.16f + (w.Seed - 0.5f) * 0.06f;
+                w.Position = center + right * x + forward * 0.1f + Vector3.up * (head.y + 0.12f - center.y);
+                w.Velocity = Vector3.down * 0.06f;
+                w.Slot = 0;
+            }
+            words.Tick(dt);
+            var eye = view.transform.position;
+            foreach (var w in words.Words)
+            {
+                if (!w.Active) continue;
+                float ground = Room.GroundBelow(w.Position, floorY);
+                if (w.Slot == 0)
+                {
+                    // Slow while you read it, then faster, like a drop.
+                    w.Velocity += Vector3.down * (0.25f * dt);
+                    w.Position += w.Velocity * dt;
+                    w.Rotation = WordLayer.Facing(w.Position, eye);
+                    if (w.Position.y <= ground + 0.01f)
+                    {
+                        // Landed: a splash, then it lies in its puddle.
+                        w.Slot = 1;
+                        w.Position.y = ground + 0.005f;
+                        w.Life = w.Age + 2.5f;
+                        var at = new Vector3(w.Position.x, ground + 0.004f, w.Position.z);
+                        AddMark(at, Vector3.up, Effects.Blue, 0.35f, true);
+                        Burst(at, Effects.Blue, 10, 0.25f, true);
+                    }
+                }
+                else w.Rotation = WordLayer.Lying(w.Position, eye);
+                w.Halo = 0.15f + beatGlow * 0.3f;
+            }
+            words.Draw(1f);
         }
 
         /// <summary>Each note appears <see cref="fallTime"/> before it is sung, so it lands on the floor on the note.</summary>
@@ -249,6 +300,7 @@ namespace MusicInYourHands
             drop.Position = center + right * (spot.x * areaWidth * 0.5f) + forward * (spot.y * areaDepth * 0.5f);
             drop.Position.y = spawnY;
             if (at.HasValue) drop.Position = at.Value;
+            drop.Ground = Room.GroundBelow(drop.Position, floorY);
             drop.Color = PitchColors[Mathf.Abs(midi) % PitchColors.Length];
             drop.Size = drizzle ? Random.Range(0.007f, 0.011f) : 0.026f + Mathf.Clamp01((72f - midi) / 12f) * 0.01f;
             if (drizzle) drop.Color = Color.Lerp(Effects.Blue, Color.white, Random.Range(0.1f, 0.35f));
@@ -266,7 +318,7 @@ namespace MusicInYourHands
             {
                 if (!drop.Active) continue;
                 // Synced drops are placed from the song clock, so they always land on their note.
-                if (drop.Synced) drop.Position.y = floorY + Mathf.Clamp01((drop.LandTime - songTime) / fallTime) * (spawnY - floorY);
+                if (drop.Synced) drop.Position.y = drop.Ground + Mathf.Clamp01((drop.LandTime - songTime) / fallTime) * (spawnY - drop.Ground);
                 else drop.Position.y -= speed * (drop.Drizzle ? 1.7f : 1f) * dt;
 
                 if (TryCatch(rig, drop)) continue;
@@ -276,7 +328,7 @@ namespace MusicInYourHands
                     DrawTarget(drop);
                 }
 
-                if (drop.Position.y <= floorY + 0.003f)
+                if (drop.Position.y <= drop.Ground + 0.003f)
                 {
                     Land(drop);
                     continue;
@@ -306,8 +358,8 @@ namespace MusicInYourHands
         /// <summary>A ring on the floor where a melody drop will land: wide and faint at first, tight and bright as it arrives.</summary>
         void DrawTarget(Drop drop)
         {
-            float due = drop.Synced ? 1f - Mathf.Clamp01((drop.LandTime - songTime) / fallTime) : 1f - Mathf.Clamp01((drop.Position.y - floorY) / Mathf.Max(spawnY - floorY, 0.01f));
-            drop.Target.transform.SetPositionAndRotation(new Vector3(drop.Position.x, floorY + 0.003f, drop.Position.z), Quaternion.Euler(90f, 0f, 0f));
+            float due = drop.Synced ? 1f - Mathf.Clamp01((drop.LandTime - songTime) / fallTime) : 1f - Mathf.Clamp01((drop.Position.y - drop.Ground) / Mathf.Max(spawnY - drop.Ground, 0.01f));
+            drop.Target.transform.SetPositionAndRotation(new Vector3(drop.Position.x, drop.Ground + 0.003f, drop.Position.z), Quaternion.Euler(90f, 0f, 0f));
             drop.Target.transform.localScale = Vector3.one * Mathf.Lerp(0.2f, 0.07f, due * due);
             block.Clear();
             block.SetColor(ColorId, drop.Color);
@@ -372,7 +424,7 @@ namespace MusicInYourHands
 
         void Land(Drop drop)
         {
-            var at = new Vector3(drop.Position.x, floorY + 0.004f, drop.Position.z);
+            var at = new Vector3(drop.Position.x, drop.Ground + 0.004f, drop.Position.z);
             if (drop.Drizzle)
             {
                 AddMark(at, Vector3.up, drop.Color, 0.12f, false);

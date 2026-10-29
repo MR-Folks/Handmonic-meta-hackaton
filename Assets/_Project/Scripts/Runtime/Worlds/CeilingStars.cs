@@ -160,7 +160,7 @@ namespace MusicInYourHands
             {
                 head = view.transform.position;
                 forward = Effects.FlatForward(view);
-                ceiling = Mathf.Max(head.y + 0.85f, Effects.FloorY(view) + 2.4f);
+                ceiling = Room.Ceiling(Mathf.Max(head.y + 0.85f, Effects.FloorY(view) + 2.4f));
                 MarkAnchored(view);
                 anchored = true;
             }

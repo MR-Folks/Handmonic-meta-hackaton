@@ -29,6 +29,7 @@ namespace MusicInYourHands
         [SerializeField] Material lineMaterial;
         [SerializeField] Material glowMaterial;
         [SerializeField] Material ringMaterial;
+        [SerializeField] Material letteringMaterial;
 
         [Header("Harp")]
         [SerializeField] int stringCount = 8;
@@ -77,6 +78,7 @@ namespace MusicInYourHands
         AudioPool voices;
         ParticleSystem sparks, notes;
         MaterialPropertyBlock block;
+        WordLayer words;
         readonly float[,] lastSide = new float[10, 8];
         readonly bool[,] hadSide = new bool[10, 8];
         readonly float[] shiver = new float[2];
@@ -106,6 +108,7 @@ namespace MusicInYourHands
             notes = Effects.MakeSparkSystem("Notes", transform, glowMaterial);
             var main = notes.main;
             main.gravityModifier = -0.02f;
+            if (letteringMaterial != null) words = new WordLayer("Lyric", transform, letteringMaterial, 4, 0.032f);
         }
 
         protected override void OnEnable()
@@ -123,6 +126,7 @@ namespace MusicInYourHands
                 Effects.OffsetHand(HandRig.Instance.Left, Vector3.zero);
                 Effects.OffsetHand(HandRig.Instance.Right, Vector3.zero);
             }
+            words?.Clear();
         }
 
         /// <summary>Stands the strings in an arc in front of where you look, curving towards you at the ends.</summary>
@@ -182,6 +186,38 @@ namespace MusicInYourHands
                 var hand = rig != null ? rig.Get(side == 0) : null;
                 if (hand != null) Effects.OffsetHand(hand, Random.insideUnitSphere * (0.0025f * shiver[side]));
             }
+            Sing(music, view, dt);
+        }
+
+        /// <summary>
+        /// Each sung word appears beside the string that hums its note (or the next string along) and glides up it,
+        /// glowing with the string's light.
+        /// </summary>
+        void Sing(MusicFrame music, Camera view, float dt)
+        {
+            if (words == null) return;
+            if (words.Next(music, out var text, out _))
+            {
+                int pick = words.Index % stringCount;
+                for (int i = 0; i < stringCount; i++)
+                    if (strings[i].Hum > 0.3f && strings[i].Hum >= strings[pick].Hum) pick = i;
+                var w = words.Add(text, Color.Lerp(Colors[pick % Colors.Length], Color.white, 0.3f), 2.4f);
+                w.Slot = pick;
+            }
+            words.Tick(dt);
+            var eye = view.transform.position;
+            foreach (var w in words.Words)
+            {
+                if (!w.Active) continue;
+                var s = strings[w.Slot];
+                float up = Mathf.Lerp(0.6f, 0.85f, w.Age / w.Life);
+                var side = Vector3.Cross(Vector3.up, (s.Bottom - eye).normalized).normalized;
+                var along = Vector3.Lerp(s.Bottom, s.Top, up);
+                w.Position = along + side * (0.02f + words.Height(w) * 0.2f + w.Width * words.Height(w) * 0.5f) + (eye - along).normalized * 0.02f;
+                w.Rotation = WordLayer.Facing(w.Position, eye);
+                w.Halo = 0.2f + s.Hum * 0.4f + s.Glow * 0.5f;
+            }
+            words.Draw(1f);
         }
 
         /// <summary>

@@ -31,6 +31,7 @@ namespace MusicInYourHands
         [SerializeField] Material waterMaterial;
         [SerializeField] Material glowMaterial;
         [SerializeField] Material causticsMaterial;
+        [SerializeField] Material letteringMaterial;
 
         [Header("Pool")]
         [SerializeField] Vector2 size = new Vector2(0.7f, 0.48f);
@@ -62,6 +63,7 @@ namespace MusicInYourHands
         float[] height, previous, next, sponge;
         ParticleSystem splashes, specks, stream;
         Renderer caustics;
+        WordLayer words;
         ParticleSystem.Particle[] speckOut, streamOut;
         Vector3[] speckSeed;
         readonly List<(Vector3 position, Vector3 velocity, Color color)> drips = new List<(Vector3, Vector3, Color)>();
@@ -140,6 +142,7 @@ namespace MusicInYourHands
 
             caustics = Effects.MakeQuad("Water Light", transform, causticsMaterial);
             caustics.gameObject.SetActive(false);
+            if (letteringMaterial != null) words = new WordLayer("Lyric", transform, letteringMaterial, 6, 0.034f);
 
             // Specks floating at different depths in the water, each at a fixed spot across the pool.
             var random = new System.Random(4);
@@ -204,6 +207,7 @@ namespace MusicInYourHands
             cutoff = 22000f;
             if (lowPass != null) lowPass.enabled = false;
             if (splashes != null) splashes.Clear();
+            words?.Clear();
         }
 
         public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
@@ -216,12 +220,16 @@ namespace MusicInYourHands
                 var forward = Effects.FlatForward(view);
                 var center = view.transform.position + forward * distance + Vector3.down * belowEyes;
                 center.y = Mathf.Max(center.y, Effects.FloorY(view) + 0.45f);
+                // With a room scan, the pool fills a shallow tray on the real table in front of you.
+                bool onTable = Room.TableAhead(view.transform.position, forward, 1.1f, size.y * 0.5f, out _, out var spot);
+                if (onTable) center = spot + Vector3.up * 0.035f;
                 surface.SetPositionAndRotation(center, Quaternion.LookRotation(forward, Vector3.up));
                 surface.gameObject.SetActive(true);
-                // The water's light falls on the floor right below it.
-                caustics.transform.SetPositionAndRotation(new Vector3(center.x, Effects.FloorY(view) + 0.004f, center.z),
-                    Quaternion.LookRotation(Vector3.down, forward));
-                caustics.transform.localScale = new Vector3(size.x * 1.4f, size.y * 1.4f, 1f);
+                // The water's light falls on the table under it, or on the floor right below it.
+                float lit = onTable ? spot.y + 0.003f : Effects.FloorY(view) + 0.004f;
+                caustics.transform.SetPositionAndRotation(new Vector3(center.x, lit, center.z), Quaternion.LookRotation(Vector3.down, forward));
+                float spread = onTable ? 1.1f : 1.4f;
+                caustics.transform.localScale = new Vector3(size.x * spread, size.y * spread, 1f);
                 caustics.gameObject.SetActive(true);
                 MarkAnchored(view);
                 anchored = true;
@@ -242,6 +250,7 @@ namespace MusicInYourHands
             UpdateMesh(music);
             Muffle(music.Bus, dip, dt);
             DrawSpecks(music);
+            Sing(music, view, dt);
 
             stir *= Mathf.Exp(-dt * 1.5f);
             block.Clear();
@@ -421,6 +430,33 @@ namespace MusicInYourHands
                     };
             }
             stream.SetParticles(streamOut, n);
+        }
+
+        /// <summary>
+        /// Each sung word lands on the water with a ripple and floats there, written on the surface: rising and
+        /// falling with the waves and drifting slowly, the line's words side by side across the pool.
+        /// </summary>
+        void Sing(MusicFrame music, Camera view, float dt)
+        {
+            if (words == null) return;
+            if (words.Next(music, out var text, out _))
+            {
+                var w = words.Add(text, new Color(0.75f, 0.95f, 1f), 3.6f);
+                w.Spot = new Vector2(0.2f + (words.Index % 4) * 0.2f + (w.Seed - 0.5f) * 0.06f, 0.45f + (w.Seed - 0.5f) * 0.25f);
+                w.Velocity = new Vector3((w.Seed - 0.5f) * 0.02f, 0f, 0.015f);
+                Disturb(w.Spot, 0.04f, -0.008f);
+            }
+            words.Tick(dt);
+            var eye = view.transform.position;
+            foreach (var w in words.Words)
+            {
+                if (!w.Active) continue;
+                w.Spot = new Vector2(Mathf.Clamp(w.Spot.x + w.Velocity.x * dt, 0.1f, 0.9f), Mathf.Clamp(w.Spot.y + w.Velocity.z * dt, 0.1f, 0.9f));
+                w.Position = SurfacePoint(w.Spot) + surface.up * (Mathf.Max(HeightAt(w.Spot), 0f) + 0.012f);
+                w.Rotation = WordLayer.Lying(w.Position, eye);
+                w.Halo = 0.2f + music.Kick * 0.25f;
+            }
+            words.Draw(fade);
         }
 
         float HeightAt(Vector2 spot)

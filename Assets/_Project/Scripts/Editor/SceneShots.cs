@@ -59,6 +59,20 @@ namespace MusicInYourHands.EditorTools
             Shot<SandTable>("11-sand-table", HandPose.PalmsDown, 40f, closeUp: rig => rig.Right.Palm.position + Vector3.down * 0.08f,
                 handOffset: side => side == "R" ? new Vector3(0.02f, -0.24f, 0.12f) : new Vector3(-0.05f, -0.12f, 0.06f));
             MenuShot();
+
+            // The same worlds in a scanned, furnished room: on the real table, walls, ceiling and furniture.
+            Shot<SoundPool>("8r-sound-pool-room", HandPose.PalmsDown, 42f, closeUp: rig => rig.Right.Palm.position + Vector3.down * 0.04f,
+                handOffset: side => side == "R" ? new Vector3(-0.03f, -0.53f, 0.15f) : new Vector3(0f, -0.35f, 0.1f), scanned: true);
+            Shot<SandTable>("11r-sand-table-room", HandPose.PalmsDown, 45f, handOffset: side => side == "R" ? new Vector3(0.02f, -0.45f, 0.15f) : new Vector3(-0.05f, -0.3f, 0.06f),
+                scanned: true);
+            Shot<Graffiti>("13r-graffiti-room", HandPose.BacksToFace, 4f, rig => rig.Right.Pinch = 1f,
+                handOffset: side => side == "R" ? new Vector3(0.02f, 0.08f, 0.12f) : new Vector3(0f, -0.15f, 0f), lead: 6f, scanned: true);
+            Shot<BreathingRoom>("14r-breathing-room-room", HandPose.PalmsToFace, 6f, scanned: true);
+            Shot<NeonSign>("16r-neon-sign-room", HandPose.BacksToFace, 2f, lead: 4f, extra: 1.7f, scanned: true);
+            Shot<WordSnow>("19r-word-snow-room", HandPose.PalmsUp, 22f, lead: 14f, scanned: true);
+            Shot<CeilingStars>("20r-ceiling-stars-room", HandPose.PalmsToFace, -40f, lead: 4f, scanned: true);
+            Shot<NoteRain>("5r-note-rain-room", HandPose.PalmsUp, 30f, scanned: true);
+            Room.Clear();
             Debug.Log($"[Shots] Saved screenshots to {ShotFolder}.");
             return true;
 #else
@@ -78,10 +92,15 @@ namespace MusicInYourHands.EditorTools
                 SceneSettings[world.GetType()] = EditorJsonUtility.ToJson(world);
         }
 
-        /// <summary>A room standing in for passthrough: floor and three walls in soft, warm grey tones.</summary>
-        static Camera StageRoom(float pitch)
+        /// <summary>
+        /// A room standing in for passthrough: floor and three walls in soft, warm grey tones. With
+        /// <paramref name="scanned"/>, a smaller furnished room (a table in front, a sofa on the right, a shelf at the
+        /// back, a ceiling) that the worlds also get as a room scan.
+        /// </summary>
+        static Camera StageRoom(float pitch, bool scanned = false)
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            Room.Clear();
             var material = ProjectSetup.EnsureDebugMaterial();
             var block = new MaterialPropertyBlock();
             void Panel(string name, Vector3 position, Vector3 euler, Vector2 size, Color color)
@@ -97,9 +116,14 @@ namespace MusicInYourHands.EditorTools
                 r.SetPropertyBlock(block);
             }
             Panel("Floor", new Vector3(0f, 0f, 1f), new Vector3(90f, 0f, 0f), new Vector2(6f, 6f), new Color(0.36f, 0.32f, 0.28f));
-            Panel("Back Wall", new Vector3(0f, 1.5f, 2.6f), Vector3.zero, new Vector2(6f, 3f), new Color(0.55f, 0.51f, 0.46f));
-            Panel("Left Wall", new Vector3(-1.9f, 1.5f, 1f), new Vector3(0f, -90f, 0f), new Vector2(6f, 3f), new Color(0.5f, 0.46f, 0.42f));
-            Panel("Right Wall", new Vector3(1.9f, 1.5f, 1f), new Vector3(0f, 90f, 0f), new Vector2(6f, 3f), new Color(0.5f, 0.46f, 0.42f));
+            if (scanned)
+                Furnish(Panel, material, block);
+            else
+            {
+                Panel("Back Wall", new Vector3(0f, 1.5f, 2.6f), Vector3.zero, new Vector2(6f, 3f), new Color(0.55f, 0.51f, 0.46f));
+                Panel("Left Wall", new Vector3(-1.9f, 1.5f, 1f), new Vector3(0f, -90f, 0f), new Vector2(6f, 3f), new Color(0.5f, 0.46f, 0.42f));
+                Panel("Right Wall", new Vector3(1.9f, 1.5f, 1f), new Vector3(0f, 90f, 0f), new Vector2(6f, 3f), new Color(0.5f, 0.46f, 0.42f));
+            }
 
             var camera = new GameObject("Head").AddComponent<Camera>();
             camera.clearFlags = CameraClearFlags.SolidColor;
@@ -108,6 +132,50 @@ namespace MusicInYourHands.EditorTools
             camera.nearClipPlane = 0.02f;
             camera.transform.SetPositionAndRotation(new Vector3(0f, 1.6f, 0f), Quaternion.Euler(pitch, 0f, 0f));
             return camera;
+        }
+
+        /// <summary>The scanned stand-in room: walls, ceiling and furniture, drawn and handed to the worlds as Room.</summary>
+        static void Furnish(System.Action<string, Vector3, Vector3, Vector2, Color> panel, Material material, MaterialPropertyBlock block)
+        {
+            const float height = 2.5f, back = 1.5f, behind = -1.5f, side = 1.7f;
+            var wallColor = new Color(0.52f, 0.48f, 0.44f);
+            panel("Back Wall", new Vector3(0f, height * 0.5f, back), Vector3.zero, new Vector2(side * 2f, height), new Color(0.55f, 0.51f, 0.46f));
+            panel("Left Wall", new Vector3(-side, height * 0.5f, 0f), new Vector3(0f, -90f, 0f), new Vector2(back - behind, height), wallColor);
+            panel("Right Wall", new Vector3(side, height * 0.5f, 0f), new Vector3(0f, 90f, 0f), new Vector2(back - behind, height), wallColor);
+            panel("Ceiling", new Vector3(0f, height, 0f), new Vector3(-90f, 0f, 0f), new Vector2(side * 2f, back - behind), new Color(0.6f, 0.57f, 0.53f));
+            void Box(string name, Vector3 top, Vector3 size, Color color)
+            {
+                var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                box.name = name;
+                Object.DestroyImmediate(box.GetComponent<Collider>());
+                box.transform.position = top + Vector3.down * (size.y * 0.5f);
+                box.transform.localScale = size;
+                var r = box.GetComponent<Renderer>();
+                r.sharedMaterial = material;
+                block.SetColor("_BaseColor", color);
+                r.SetPropertyBlock(block);
+            }
+            var table = new Vector3(0f, 0.75f, 0.55f);
+            var sofa = new Vector3(1.25f, 0.45f, 0.4f);
+            var shelf = new Vector3(-1.35f, 0.95f, 1.3f);
+            Box("Table", table, new Vector3(1.2f, 0.04f, 0.7f), new Color(0.42f, 0.33f, 0.26f));
+            Box("Sofa", sofa, new Vector3(0.8f, 0.45f, 1.5f), new Color(0.3f, 0.36f, 0.42f));
+            Box("Shelf", shelf, new Vector3(0.6f, 0.95f, 0.35f), new Color(0.46f, 0.4f, 0.34f));
+
+            Room.Set(0f, height,
+                new[]
+                {
+                    new Room.Surface(new Vector3(0f, height * 0.5f, back), Vector3.back, Vector3.right, new Vector2(side * 2f, height)),
+                    new Room.Surface(new Vector3(-side, height * 0.5f, 0f), Vector3.right, Vector3.back, new Vector2(back - behind, height)),
+                    new Room.Surface(new Vector3(side, height * 0.5f, 0f), Vector3.left, Vector3.forward, new Vector2(back - behind, height)),
+                    new Room.Surface(new Vector3(0f, height * 0.5f, behind), Vector3.forward, Vector3.left, new Vector2(side * 2f, height))
+                },
+                new[] { new Room.Surface(table, Vector3.up, Vector3.right, new Vector2(1.2f, 0.7f)) },
+                new[]
+                {
+                    new Room.Surface(sofa, Vector3.up, Vector3.right, new Vector2(0.8f, 1.5f)),
+                    new Room.Surface(shelf, Vector3.up, Vector3.right, new Vector2(0.6f, 0.35f))
+                });
         }
 
         /// <summary>Both hands about 35 cm in front, at chest height, held the way the world asks for.</summary>
@@ -201,10 +269,10 @@ namespace MusicInYourHands.EditorTools
         /// </summary>
         static void Shot<T>(string name, HandPose pose, float pitch, System.Action<HandRig> holdPose = null,
             System.Func<HandRig, Vector3> closeUp = null, System.Func<string, Vector3> handOffset = null, float lead = 3f,
-            System.Action<World> prepare = null, float extra = 0f) where T : World
+            System.Action<World> prepare = null, float extra = 0f, bool scanned = false) where T : World
         {
             if (!Wanted(name)) return;
-            var camera = StageRoom(pitch);
+            var camera = StageRoom(pitch, scanned);
             var rig = new GameObject("HandRig").AddComponent<HandRig>();
             var hands = PlaceHands(camera, pose, rig, handOffset);
 
