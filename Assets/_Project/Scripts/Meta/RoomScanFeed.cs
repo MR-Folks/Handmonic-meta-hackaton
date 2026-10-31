@@ -11,7 +11,8 @@ namespace MusicInYourHands.Meta
     /// Loads the headset's room scan with Meta's MR Utility Kit and hands the room you are in to the worlds (Room):
     /// floor, ceiling, walls, tables, and the tops of sofas, beds and shelves. Asks for the spatial data permission
     /// first. Never starts Space Setup by itself: without a scan the worlds keep their stand-in room. Checks every
-    /// few seconds which room you are in, for homes scanned room by room.
+    /// few seconds which room you are in, for homes scanned room by room. World lock stays on: the room's anchors keep
+    /// fixed coordinates, and MRUK moves the tracking space so they keep matching the real room, through recentering too.
     /// </summary>
     [RequireComponent(typeof(MRUK))]
     public class RoomScanFeed : MonoBehaviour
@@ -21,14 +22,13 @@ namespace MusicInYourHands.Meta
 
         MRUK mruk;
         MRUKRoom shown;
-        bool loading;
+        bool loading, listening, locked;
         float checkTimer;
 
         void Awake()
         {
             mruk = GetComponent<MRUK>();
-            // The worlds place themselves around you; MRUK must not move the tracking space under them.
-            mruk.EnableWorldLock = false;
+            mruk.EnableWorldLock = true;
             if (mruk.SceneSettings != null) mruk.SceneSettings.LoadSceneOnStartup = false;
         }
 
@@ -42,10 +42,17 @@ namespace MusicInYourHands.Meta
         {
             mruk.RoomUpdatedEvent.RemoveListener(OnRoomChanged);
             mruk.RoomRemovedEvent.RemoveListener(OnRoomChanged);
+            if (listening && OVRManager.display != null) OVRManager.display.RecenteredPose -= OnRecentered;
+            listening = false;
         }
 
         void Start()
         {
+            if (OVRManager.display != null)
+            {
+                OVRManager.display.RecenteredPose += OnRecentered;
+                listening = true;
+            }
 #if UNITY_ANDROID && !UNITY_EDITOR
             if (!Permission.HasUserAuthorizedPermission(OVRPermissionsRequester.ScenePermission))
             {
@@ -75,8 +82,20 @@ namespace MusicInYourHands.Meta
             Refresh();
         }
 
+        void OnRecentered()
+        {
+            var rig = FindAnyObjectByType<OVRCameraRig>();
+            var space = rig != null ? rig.trackingSpace : null;
+            Debug.Log($"[Room] Recentered: world lock {(mruk.IsWorldLockActive ? "on" : "off")}, tracking space at {(space != null ? space.position : Vector3.zero)}.");
+        }
+
         void Update()
         {
+            if (locked != mruk.IsWorldLockActive)
+            {
+                locked = mruk.IsWorldLockActive;
+                Debug.Log($"[Room] World lock {(locked ? "on" : "off")}.");
+            }
             checkTimer -= Time.unscaledDeltaTime;
             if (checkTimer > 0f || loading) return;
             checkTimer = 3f;

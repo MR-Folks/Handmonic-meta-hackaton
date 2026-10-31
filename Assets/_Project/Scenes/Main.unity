@@ -2125,7 +2125,7 @@ MonoBehaviour:
   <RoomRemovedEvent>k__BackingField:
     m_PersistentCalls:
       m_Calls: []
-  EnableWorldLock: 0
+  EnableWorldLock: 1
   TrackingSpaceOffset:
     e00: 1
     e01: 0

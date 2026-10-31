@@ -480,7 +480,7 @@ namespace MusicInYourHands.EditorTools
                 var scan = new GameObject("RoomScan");
                 var mruk = scan.AddComponent<global::Meta.XR.MRUtilityKit.MRUK>();
                 // RoomScanFeed loads the scan itself, without starting Space Setup, and the worlds do their own placing.
-                mruk.EnableWorldLock = false;
+                mruk.EnableWorldLock = true;
                 mruk.SceneSettings ??= new global::Meta.XR.MRUtilityKit.MRUK.MRUKSettings();
                 mruk.SceneSettings.LoadSceneOnStartup = false;
                 scan.AddComponent<RoomScanFeed>();
