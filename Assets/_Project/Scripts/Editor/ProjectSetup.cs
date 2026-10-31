@@ -471,7 +471,7 @@ namespace MusicInYourHands.EditorTools
             var menu = Object.FindAnyObjectByType<WorldMenu>(FindObjectsInactive.Include);
             if (menu == null) menu = new GameObject("WorldMenu", typeof(WorldMenu)).GetComponent<WorldMenu>();
             SetReferences(menu, ("bubbleMaterial", EnsureMaterial(BubbleMaterialPath, "MusicInYourHands/Bubble")), ("glowMaterial", glow),
-                ("lineMaterial", line));
+                ("lineMaterial", line), ("panelMaterial", EnsureMaterial(PanelMaterialPath, "MusicInYourHands/Panel")));
 #if META_XR_CORE
             if (Object.FindAnyObjectByType<MenuButtonFeed>(FindObjectsInactive.Include) == null)
                 new GameObject("MenuButton", typeof(MenuButtonFeed));
@@ -511,6 +511,7 @@ namespace MusicInYourHands.EditorTools
         public const string HandMaterialPath = Root + "/Materials/Hand.mat";
         public const string OrbMaterialPath = Root + "/Materials/Orb.mat";
         public const string SkyMaterialPath = Root + "/Materials/Sky.mat";
+        public const string PanelMaterialPath = Root + "/Materials/Panel.mat";
         public const string SkyTexturePath = Root + "/Materials/NightSky.png";
         public const string OrbDotsMaterialPath = Root + "/Materials/OrbDots.mat";
         public const string LineMaterialPath = Root + "/Materials/Line.mat";

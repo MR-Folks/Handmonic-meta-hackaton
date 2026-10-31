@@ -7,6 +7,7 @@ import android.database.Cursor;
 import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.Bundle;
+import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
 import android.util.Log;
 
@@ -19,24 +20,34 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
 /**
- * Opens the system file picker for songs and copies what is chosen into the app's Songs folder (see SongPicker.cs).
- * A lyrics file picked together with one song is named after that song, so they match whatever they were called. Plain
- * text lyrics become an .lrc with the lines spread evenly over the song.
+ * Opens the system file picker for one file and copies it into the app's Songs folder (see SongPicker.cs): a song, or
+ * lyrics for a chosen song, saved under that song's name so they always match. Plain text lyrics become an .lrc with the
+ * lines spread evenly over the song. The outcome is left in a small result file, as the app beside this window keeps
+ * running and has no other way to know the pick has finished.
  */
 public class SongPickerActivity extends Activity {
     private static final String TAG = "SongPicker";
+    private static final String MODE = "mode";
     private static final String FOLDER = "folder";
+    private static final String SONG = "song";
+    private static final String RESULT = "result";
+    private static final String DOWNLOADS = "content://com.android.externalstorage.documents/document/primary%3ADownload";
     private static final int PICK = 1;
 
     /** Called from SongPicker.cs. */
-    public static void open(Activity from, String folder) {
+    public static void open(Activity from, String mode, String folder, String song, String result) {
         Intent intent = new Intent(from, SongPickerActivity.class);
+        intent.putExtra(MODE, mode);
         intent.putExtra(FOLDER, folder);
+        intent.putExtra(SONG, song);
+        intent.putExtra(RESULT, result);
         from.startActivity(intent);
     }
 
@@ -46,73 +57,57 @@ public class SongPickerActivity extends Activity {
         if (saved != null) return;
         Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         pick.addCategory(Intent.CATEGORY_OPENABLE);
-        // Not "audio/*": .lrc files have no type of their own and would be greyed out.
-        pick.setType("*/*");
-        pick.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        // Lyrics files have no type of their own, so anything may be picked there and the name is checked afterwards.
+        pick.setType(SONG.equals(getIntent().getStringExtra(MODE)) ? "audio/*" : "*/*");
+        pick.putExtra(DocumentsContract.EXTRA_INITIAL_URI, Uri.parse(DOWNLOADS));
         try {
             startActivityForResult(pick, PICK);
         } catch (ActivityNotFoundException e) {
             Log.w(TAG, "This headset has no file picker.", e);
-            finish();
+            finishWith("failed", "");
         }
     }
 
     @Override
     protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
-        if (request != PICK || result != RESULT_OK || data == null) {
-            finish();
+        if (request != PICK) return;
+        if (result != RESULT_OK || data == null || data.getData() == null) {
+            finishWith("cancelled", "");
             return;
         }
-        List<Uri> picked = new ArrayList<>();
-        if (data.getClipData() != null) {
-            for (int i = 0; i < data.getClipData().getItemCount(); i++) picked.add(data.getClipData().getItemAt(i).getUri());
-        } else if (data.getData() != null) {
-            picked.add(data.getData());
-        }
-        File folder = new File(getIntent().getStringExtra(FOLDER));
-        // Copied away from the main thread, as songs can be large; the app gets focus back when this activity ends.
+        Uri picked = data.getData();
+        // Copied away from the main thread, as songs can be large.
         new Thread(() -> {
+            String name = "";
             try {
-                add(picked, folder);
-            } catch (IOException e) {
-                Log.w(TAG, "Couldn't add the song.", e);
+                name = fileName(picked);
+                File folder = new File(getIntent().getStringExtra(FOLDER));
+                folder.mkdirs();
+                String added = SONG.equals(getIntent().getStringExtra(MODE)) ? addSong(picked, name, folder) : addLyrics(picked, name, folder);
+                finishWith(added != null ? "added" : "unsupported", added != null ? added : name);
+            } catch (IOException | RuntimeException e) {
+                Log.w(TAG, "Couldn't add " + name, e);
+                finishWith("failed", name);
             }
-            runOnUiThread(this::finish);
         }).start();
     }
 
-    private void add(List<Uri> picked, File folder) throws IOException {
-        folder.mkdirs();
-        List<File> songs = new ArrayList<>();
-        List<Uri> lyrics = new ArrayList<>();
-        for (Uri uri : picked) {
-            String name = fileName(uri);
-            String extension = extension(name);
-            if (extension.equals("mp3") || extension.equals("ogg") || extension.equals("wav")) {
-                File song = new File(folder, name);
-                try (InputStream in = getContentResolver().openInputStream(uri); OutputStream out = new FileOutputStream(song)) {
-                    copy(in, out);
-                }
-                songs.add(song);
-            } else if (extension.equals("lrc") || extension.equals("txt")) {
-                lyrics.add(uri);
-            } else {
-                Log.w(TAG, "Skipped " + name + ": songs can be .mp3, .ogg or .wav, and lyrics .lrc or .txt.");
-            }
-        }
-        for (Uri uri : lyrics) {
-            String name = fileName(uri);
-            File song = songs.size() == 1 ? songs.get(0) : new File(folder, base(name));
-            File target = new File(folder, base(song.getName()) + ".lrc");
-            if (extension(name).equals("lrc")) {
-                try (InputStream in = getContentResolver().openInputStream(uri); OutputStream out = new FileOutputStream(target)) {
-                    copy(in, out);
-                }
-            } else {
-                timeLines(uri, song, target);
-            }
-        }
+    private String addSong(Uri uri, String name, File folder) throws IOException {
+        String extension = extension(name);
+        if (!extension.equals("mp3") && !extension.equals("ogg") && !extension.equals("wav")) return null;
+        copy(uri, new File(folder, name));
+        return name;
+    }
+
+    private String addLyrics(Uri uri, String name, File folder) throws IOException {
+        String extension = extension(name);
+        File song = new File(getIntent().getStringExtra(SONG));
+        File target = new File(folder, base(song.getName()) + ".lrc");
+        if (extension.equals("lrc")) copy(uri, target);
+        else if (extension.equals("txt")) timeLines(uri, song, target);
+        else return null;
+        return target.getName();
     }
 
     /** Writes plain lyrics as an .lrc, the lines evenly spread between just after the start and just before the end. */
@@ -130,6 +125,29 @@ public class SongPickerActivity extends Activity {
                 double time = start + step * i;
                 writer.println(String.format(Locale.ROOT, "[%02d:%05.2f]%s", (int) (time / 60), time % 60, lines.get(i)));
             }
+        }
+    }
+
+    /** Leaves the outcome for the app, written whole so it never reads half of it. */
+    private void finishWith(String outcome, String file) {
+        String path = getIntent().getStringExtra(RESULT);
+        try {
+            File result = new File(path), written = new File(path + ".new");
+            try (PrintWriter writer = new PrintWriter(written, "UTF-8")) {
+                writer.println(outcome);
+                writer.println(file);
+            }
+            Files.move(written.toPath(), result.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            Log.w(TAG, "Couldn't report the result.", e);
+        }
+        runOnUiThread(this::finish);
+    }
+
+    private void copy(Uri uri, File target) throws IOException {
+        try (InputStream in = getContentResolver().openInputStream(uri); OutputStream out = new FileOutputStream(target)) {
+            byte[] buffer = new byte[64 * 1024];
+            for (int read = in.read(buffer); read > 0; read = in.read(buffer)) out.write(buffer, 0, read);
         }
     }
 
@@ -163,10 +181,5 @@ public class SongPickerActivity extends Activity {
     private static String extension(String name) {
         int dot = name.lastIndexOf('.');
         return dot > 0 ? name.substring(dot + 1).toLowerCase(Locale.ROOT) : "";
-    }
-
-    private static void copy(InputStream in, OutputStream out) throws IOException {
-        byte[] buffer = new byte[64 * 1024];
-        for (int read = in.read(buffer); read > 0; read = in.read(buffer)) out.write(buffer, 0, read);
     }
 }

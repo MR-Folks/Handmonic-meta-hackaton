@@ -46,6 +46,7 @@ namespace MusicInYourHands.EditorTools
             ok &= CheckSongs();
             ok &= CheckLettering();
             ok &= CheckLyricsOption();
+            ok &= CheckPickerResults();
             Debug.Log(ok ? "[Check] All checks passed." : "[Check] Some checks FAILED.");
             return ok;
         }
@@ -124,6 +125,20 @@ namespace MusicInYourHands.EditorTools
             LyricsOption.On = was;
             if (ok) Debug.Log("[Check] Turning lyrics off hides the words and leaves the title for lyric worlds.");
             else Debug.LogError("[Check] The lyrics option doesn't hide the words as it should.");
+            return ok;
+        }
+
+        /// <summary>The file picker's result files are read correctly, including a damaged or empty one.</summary>
+        static bool CheckPickerResults()
+        {
+            SongPicker.Parse("added\nMy Song.mp3\n", out var added, out var file);
+            SongPicker.Parse("cancelled\n\n", out var cancelled, out _);
+            SongPicker.Parse("unsupported\nmy song.m4a\n", out var unsupported, out _);
+            SongPicker.Parse("", out var empty, out _);
+            bool ok = added == SongPicker.Outcome.Added && file == "My Song.mp3" && cancelled == SongPicker.Outcome.Cancelled &&
+                      unsupported == SongPicker.Outcome.Unsupported && empty == SongPicker.Outcome.Failed;
+            if (ok) Debug.Log("[Check] The file picker's results are read correctly.");
+            else Debug.LogError("[Check] The file picker's results aren't read correctly.");
             return ok;
         }
 

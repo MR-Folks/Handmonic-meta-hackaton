@@ -7,8 +7,8 @@ namespace MusicInYourHands
     /// The world menu: glass bubbles in two honeycombs, like an Apple Watch home screen, opened with Meta's left-hand
     /// menu gesture. The sound worlds cluster on the left and the lyric worlds on the right, each bubble showing a
     /// small animated emblem; below them a row plays and pauses the song, steps to the previous and next song
-    /// (including songs added on the headset), switches to listening to the room, turns the lyrics on and off and adds
-    /// a song with its lyrics from the headset's files. Bubbles near where you look are a little larger, and if you look away the menu glides back in front of you. Each hand casts a soft pointer ray onto the menu (from the shoulder through the pinch);
+    /// (including songs added on the headset), switches to listening to the room, turns the lyrics on and off and opens
+    /// your songs (SongLibrary), a page that takes the honeycombs' place. Bubbles near where you look are a little larger, and if you look away the menu glides back in front of you. Each hand casts a soft pointer ray onto the menu (from the shoulder through the pinch);
     /// the bubble it points at swells and its name shows large above the honeycomb. Pinch to pop into it.
     /// </summary>
     [DefaultExecutionOrder(170)]
@@ -17,6 +17,7 @@ namespace MusicInYourHands
         [SerializeField] Material bubbleMaterial;
         [SerializeField] Material glowMaterial;
         [SerializeField] Material lineMaterial;
+        [SerializeField] Material panelMaterial;
         [SerializeField] float distance = 0.48f;
         [SerializeField] float drop = 0.05f;
         [SerializeField] float spacing = 0.086f;
@@ -46,7 +47,7 @@ namespace MusicInYourHands
         const int PreviousSong = -3;
         const int NextSong = -4;
         const int LyricsToggle = -5;
-        const int AddSong = -6;
+        const int Library = -6;
         const int ExtraBubbles = 6;
         static readonly Color ListenColor = new Color(0.98f, 0.62f, 0.5f);
         static readonly Color SongColor = new Color(0.72f, 0.7f, 1f);
@@ -74,6 +75,7 @@ namespace MusicInYourHands
             public Vector3 Origin;
             public int Target = -1;
             public int Aimed = -1;
+            public Vector2 AimedAt;
             public float AimedAge;
             public float Visibility;
             public Renderer Cursor;
@@ -91,7 +93,11 @@ namespace MusicInYourHands
         Transform root;
         MaterialPropertyBlock block;
         AudioPool voices;
-        bool open, toggleRequested, picking;
+        SongLibrary library;
+        readonly Vector2?[] aims = new Vector2?[2];
+        readonly Vector2?[] presses = new Vector2?[2];
+        float honeycomb = 1f;
+        bool open, toggleRequested;
         float openTime, closeAt = -1f, cooldown;
 
         public bool IsOpen => open;
@@ -108,14 +114,6 @@ namespace MusicInYourHands
             if (Instance == this) Instance = null;
         }
         void OnToggle() => toggleRequested = true;
-
-        /// <summary>Back from the file picker: a new song joins the list and starts playing.</summary>
-        void OnApplicationFocus(bool focused)
-        {
-            if (!focused || !picking) return;
-            picking = false;
-            SongPicker.Finish(MusicBus.Instance);
-        }
 
         void LateUpdate()
         {
@@ -142,7 +140,11 @@ namespace MusicInYourHands
             foreach (var p in pointers) p.Armed = false;
         }
 
-        public void Close() => open = false;
+        public void Close()
+        {
+            open = false;
+            library?.Hide();
+        }
 
         void Place(Camera view)
         {
@@ -186,6 +188,9 @@ namespace MusicInYourHands
         {
             if (manager == null || view == null) return;
             Build(manager);
+            // The file picker finished: the menu comes back to show what happened.
+            if (library.Poll(bus)) Open(view);
+            honeycomb = Mathf.MoveTowards(honeycomb, library.IsOpen ? 0f : 1f, dt * 6f);
             if (open && openTime == 0f) Place(view);
             else if (open) Follow(view, dt);
             openTime += dt;
@@ -203,7 +208,7 @@ namespace MusicInYourHands
                 var b = bubbles[i];
                 float appear = open ? Mathf.Clamp01((openTime - b.Delay) / 0.32f) : 0f;
                 b.Pop = Mathf.MoveTowards(b.Pop, 0f, dt * 2.2f);
-                float show = open ? EaseOutBack(appear) : 0f;
+                float show = open ? EaseOutBack(appear) * honeycomb : 0f;
                 bool visible = show > 0.001f || b.Pop > 0.001f;
                 if (b.Renderer.gameObject.activeSelf != visible) b.Renderer.gameObject.SetActive(visible);
                 if (!visible) continue;
@@ -215,7 +220,7 @@ namespace MusicInYourHands
                 var world = root.TransformPoint(local);
                 float size = bubbleSize * fisheye * show;
 
-                bool aimed = open && (pointers[0].Target == i || pointers[1].Target == i);
+                bool aimed = open && !library.IsOpen && (pointers[0].Target == i || pointers[1].Target == i);
                 b.Hover = Mathf.MoveTowards(b.Hover, aimed ? 1f : 0f, dt * 7f);
                 if (aimed) hovered = i;
 
@@ -239,7 +244,7 @@ namespace MusicInYourHands
 
             // Pinch to select: the bubble the hand was aiming at just before the pinch closed, so the small jump of
             // the hand while pinching doesn't change the choice.
-            if (open && cooldown <= 0f)
+            if (open && cooldown <= 0f && !library.IsOpen)
             {
                 foreach (var p in pointers)
                 {
@@ -252,28 +257,51 @@ namespace MusicInYourHands
                 }
             }
 
+            StepLibrary(bus, dt);
             DrawCaption(manager, bus, hovered, view, dt);
             DrawPointers(view);
             if (root.gameObject.activeSelf != (anyVisible || open)) root.gameObject.SetActive(anyVisible || open);
         }
 
+        void StepLibrary(MusicBus bus, float dt)
+        {
+            for (int s = 0; s < 2; s++)
+            {
+                var p = pointers[s];
+                aims[s] = p.Active ? root.InverseTransformPoint(p.Hit) : (Vector2?)null;
+                // As with the bubbles: where the hand was aiming just before the pinch closed.
+                presses[s] = open && library.IsOpen && cooldown <= 0f && p.Active && p.Pinching && p.AimedAge <= 0.35f ? p.AimedAt : (Vector2?)null;
+            }
+            library.Step(bus, open, dt, aims, presses);
+        }
+
+        void OnLibraryPressed()
+        {
+            cooldown = 0.4f;
+            voices.Play(Synth.Chime(Synth.Pentatonic[4]), root.position, 0.5f);
+        }
+
+        /// <summary>Shows made-up songs on the library page, for the editor screenshots.</summary>
+        public void PreviewLibrary(System.Collections.Generic.IReadOnlyList<SongAsset> songs, SongAsset playing, int view) =>
+            library.Preview(songs, playing, view);
+
         static float Icon(int bubble) => bubble switch
         {
-            ListenToggle => 7f, NextSong => 14f, PreviousSong => 15f, LyricsToggle => 23f, AddSong => 24f, _ => 6f
+            ListenToggle => 7f, NextSong => 14f, PreviousSong => 15f, LyricsToggle => 23f, Library => 24f, _ => 6f
         };
 
         static bool IsSongStep(Bubble b) => b.World == PreviousSong || b.World == NextSong;
 
         Color BubbleColor(Bubble b, WorldManager manager) =>
             b.World >= 0 ? manager.Worlds[b.World].Color : b.World == ListenToggle ? ListenColor : IsSongStep(b) ? SongColor
-            : b.World == LyricsToggle ? LyricsColor : b.World == AddSong ? AddColor : new Color(0.85f, 0.85f, 1f);
+            : b.World == LyricsToggle ? LyricsColor : b.World == Library ? AddColor : new Color(0.85f, 0.85f, 1f);
 
         string BubbleName(Bubble b, WorldManager manager, MusicBus bus) =>
             b.World >= 0 ? manager.Worlds[b.World].DisplayName
             : b.World == ListenToggle ? bus != null && bus.IsListening ? "Play the song" : "Listen to the room"
             : IsSongStep(b) ? SongStepName(bus, b.World == NextSong ? 1 : -1)
             : b.World == LyricsToggle ? LyricsOption.On ? "Turn lyrics off" : "Turn lyrics on"
-            : b.World == AddSong ? "Add a song and its lyrics"
+            : b.World == Library ? "Your songs: add a song or lyrics"
             : bus == null ? "Music" : bus.IsPlaying ? $"Pause {bus.Title}" : $"Play {bus.Title}";
 
         static string SongStepName(MusicBus bus, int step)
@@ -332,6 +360,7 @@ namespace MusicInYourHands
                     if (pinch < 0.6f)
                     {
                         p.Aimed = p.Target;
+                        p.AimedAt = localHit;
                         p.AimedAge = 0f;
                     }
                     else p.AimedAge += dt;
@@ -373,7 +402,7 @@ namespace MusicInYourHands
         /// </summary>
         void DrawCaption(WorldManager manager, MusicBus bus, int hovered, Camera view, float dt)
         {
-            float show = open ? Mathf.Clamp01((openTime - 0.1f) / 0.3f) : 0f;
+            float show = open ? Mathf.Clamp01((openTime - 0.1f) / 0.3f) * honeycomb : 0f;
             bool visible = show > 0.001f;
             if (caption.GameObject.activeSelf != visible)
             {
@@ -414,7 +443,7 @@ namespace MusicInYourHands
             cooldown = 0.6f;
             b.Pop = 1f;
             float note = b.World >= 0 ? Synth.Pentatonic[6 + b.World % 5]
-                : Synth.Pentatonic[b.World == ListenToggle ? 4 : IsSongStep(b) ? 3 : b.World == LyricsToggle || b.World == AddSong ? 2 : 5];
+                : Synth.Pentatonic[b.World == ListenToggle ? 4 : IsSongStep(b) ? 3 : b.World == LyricsToggle || b.World == Library ? 2 : 5];
             voices.Play(Synth.Chime(note), b.Renderer.transform.position, 0.6f);
             if (b.World >= 0)
             {
@@ -422,8 +451,8 @@ namespace MusicInYourHands
                 closeAt = openTime + 0.35f;
             }
             else if (b.World == LyricsToggle) LyricsOption.On = !LyricsOption.On;
+            else if (b.World == Library) library.Show();
             else if (bus == null) return;
-            else if (b.World == AddSong) picking = SongPicker.Open(bus);
             else if (b.World == ListenToggle) bus.ToggleListen();
             else if (IsSongStep(b)) bus.StepSong(b.World == NextSong ? 1 : -1);
             else bus.TogglePause();
@@ -512,7 +541,7 @@ namespace MusicInYourHands
 
                 string objectName = world >= 0 ? $"Bubble {world}" : world == ListenToggle ? "Bubble Listen"
                     : world == PreviousSong ? "Bubble Previous Song" : world == NextSong ? "Bubble Next Song"
-                    : world == LyricsToggle ? "Bubble Lyrics" : world == AddSong ? "Bubble Add Song" : "Bubble Now Playing";
+                    : world == LyricsToggle ? "Bubble Lyrics" : world == Library ? "Bubble Library" : "Bubble Now Playing";
                 var r = Effects.MakeQuad(objectName, root, bubbleMaterial);
                 float delay = 0.04f + slot.magnitude * 0.6f;
                 bubbles[i] = new Bubble { Renderer = r, World = world, Slot = slot, Delay = delay };
@@ -527,6 +556,12 @@ namespace MusicInYourHands
             hint = new TypeLabel("Hint", root, 0.0135f, 1f);
             hint.Text = "Point and pinch to choose";
             foreach (var label in new[] { soundLabel, lyricLabel, caption, hint }) label.GameObject.SetActive(false);
+
+            // Editor previews build a menu without the scene's materials.
+            var panel = panelMaterial != null ? panelMaterial : new Material(Shader.Find("MusicInYourHands/Panel"));
+            library = new SongLibrary(root, panel, new Vector2(0f, spacing * 0.2f));
+            library.Pressed += OnLibraryPressed;
+            library.PickerOpened += Close;
 
             for (int s = 0; s < 2; s++)
             {

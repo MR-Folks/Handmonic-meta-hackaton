@@ -395,6 +395,32 @@ namespace MusicInYourHands.EditorTools
             for (int i = 0; i < 24; i++) menu.Step(rig, manager, null, camera, 0.05f);
             foreach (var hand in hands) hand.Root.GetComponent<HandSkin>().Apply();
             File.WriteAllBytes($"{ShotFolder}/7-menu.png", Render(camera, 1600, 900).EncodeToPNG());
+
+            // The song library's pages, with made-up songs.
+            SongAsset Song(string title, string artist, bool lyrics)
+            {
+                var song = ScriptableObject.CreateInstance<SongAsset>();
+                song.title = title;
+                song.artist = artist;
+                song.audioPath = title;
+                song.lyricsPath = lyrics ? title : null;
+                return song;
+            }
+            var songs = new[]
+            {
+                Song("Sunday Morning", "The Open Windows", true), Song("A very long song title that needs to be shortened somehow", "Someone", false),
+                Song("Harbour Lights", "", true), Song("Slow River", "Anna and the Tide", false), Song("Last One", "", false)
+            };
+            void Page(string name, IReadOnlyList<SongAsset> list, int view)
+            {
+                menu.PreviewLibrary(list, list.Count > 0 ? list[0] : null, view);
+                for (int i = 0; i < 24; i++) menu.Step(rig, manager, null, camera, 0.05f);
+                File.WriteAllBytes($"{ShotFolder}/{name}.png", Render(camera, 1600, 900).EncodeToPNG());
+            }
+            Page("7a-library", songs, 0);
+            Page("7b-library-empty", new SongAsset[0], 0);
+            Page("7c-library-ask-lyrics", songs, 1);
+            Page("7d-library-remove", songs, 2);
         }
 #endif
     }

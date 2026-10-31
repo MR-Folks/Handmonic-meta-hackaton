@@ -1041,6 +1041,7 @@ MonoBehaviour:
   bubbleMaterial: {fileID: 2100000, guid: fa89d5024587b4c8e83405b9bccf5a04, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
+  panelMaterial: {fileID: 2100000, guid: 1ec2655ce64ce480ab7a657b64e3f06c, type: 2}
   distance: 0.48
   drop: 0.05
   spacing: 0.086

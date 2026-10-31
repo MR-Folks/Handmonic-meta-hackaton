@@ -35,11 +35,11 @@ namespace MusicInYourHands
         }
 
         /// <summary>
-        /// Fills <paramref name="mesh"/> with a line of text, centred on the origin horizontally with its baseline at
-        /// y = <paramref name="offsetY"/>. <paramref name="slant"/> leans it over like italics. Returns its width (m).
+        /// Fills <paramref name="mesh"/> with a line of text, centred on x = <paramref name="offsetX"/> with its baseline
+        /// at y = <paramref name="offsetY"/>. <paramref name="slant"/> leans it over like italics. Returns its width (m).
         /// </summary>
         public static float BuildWord(Mesh mesh, TypeFace face, string text, float height, int layers, float depth, Color front, Color back,
-            float slant = 0f, float offsetY = 0f)
+            float slant = 0f, float offsetY = 0f, float offsetX = 0f)
         {
             Begin(mesh);
             if (string.IsNullOrEmpty(text))
@@ -51,7 +51,7 @@ namespace MusicInYourHands
             // Back layers first, so the front face draws last over them.
             for (int k = 0; k < Mathf.Max(1, layers); k++)
             {
-                float x = -width * 0.5f;
+                float x = offsetX - width * 0.5f;
                 for (int i = 0; i < text.Length; i++)
                 {
                     if (face.TryGet(text[i], out var letter) && letter.HasInk)

@@ -16,6 +16,7 @@ namespace MusicInYourHands
         readonly Mesh mesh;
         readonly MaterialPropertyBlock block = new MaterialPropertyBlock();
         readonly float height, centreY;
+        readonly bool left;
         string text = "";
 
         public Transform Transform => renderer.transform;
@@ -37,15 +38,18 @@ namespace MusicInYourHands
             {
                 if (text == (value ?? "")) return;
                 text = value ?? "";
-                Glyphs.BuildWord(mesh, TypeFace.Bold, text, height, 1, 0f, Color.white, Color.white, offsetY: centreY);
+                float offsetX = left ? TypeFace.Bold.Width(text) * height * 0.5f : 0f;
+                Glyphs.BuildWord(mesh, TypeFace.Bold, text, height, 1, 0f, Color.white, Color.white, offsetY: centreY, offsetX: offsetX);
             }
         }
 
         /// <param name="height">Letter height (m).</param>
         /// <param name="anchorY">Where the object's origin sits on the text: 0 at its baseline, 1 at the top of its capitals.</param>
-        public TypeLabel(string name, Transform parent, float height, float anchorY = 0.5f)
+        /// <param name="left">Starts the text at the origin, instead of centring it there.</param>
+        public TypeLabel(string name, Transform parent, float height, float anchorY = 0.5f, bool left = false)
         {
             this.height = height;
+            this.left = left;
             centreY = -height * 0.71f * anchorY;
             if (shared == null)
                 shared = new Material(Shader.Find("MusicInYourHands/Lettering")) { name = "Label Lettering", mainTexture = TypeFace.Bold.Atlas, renderQueue = LabelQueue };
