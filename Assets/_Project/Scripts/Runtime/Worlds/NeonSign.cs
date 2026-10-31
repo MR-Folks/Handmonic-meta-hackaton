@@ -47,13 +47,13 @@ namespace MusicInYourHands
         static readonly int HaloId = Shader.PropertyToID("_Halo");
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
         static readonly int IntensityId = Shader.PropertyToID("_Intensity");
-        const int FontSize = 96;
         const int MaxWords = 16;
 
         sealed class Word
         {
-            public TextMesh Text;
+            public string Text;
             public MeshRenderer Renderer;
+            public Mesh Mesh;
             public Vector2 Size;
             public Vector3 Centre;
             public float LitAt = -1f;
@@ -64,7 +64,6 @@ namespace MusicInYourHands
         readonly List<Word> words = new List<Word>();
         readonly LyricCursor cursor = new LyricCursor();
         readonly Vector3[] framePath = new Vector3[5];
-        Font font;
         Material material;
         MaterialPropertyBlock block;
         Renderer wallGlow, floorGlow;
@@ -83,24 +82,13 @@ namespace MusicInYourHands
             if (built) return;
             built = true;
             block = new MaterialPropertyBlock();
-            font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            material = new Material(letteringMaterial) { name = "Neon Lettering", mainTexture = font.material.mainTexture };
-            Font.textureRebuilt += OnFontRebuilt;
+            material = new Material(letteringMaterial) { name = "Neon Lettering", mainTexture = TypeFace.Bold.Atlas };
             for (int i = 0; i < MaxWords; i++)
             {
-                var go = new GameObject($"Word {i}");
-                go.transform.SetParent(transform, false);
-                var text = go.AddComponent<TextMesh>();
-                text.font = font;
-                text.fontSize = FontSize;
-                text.fontStyle = FontStyle.Italic;
-                text.characterSize = letterHeight * 10f / FontSize;
-                text.anchor = TextAnchor.MiddleCenter;
-                text.alignment = TextAlignment.Center;
-                var r = go.GetComponent<MeshRenderer>();
-                r.sharedMaterial = material;
-                go.SetActive(false);
-                words.Add(new Word { Text = text, Renderer = r });
+                var word = new Word();
+                word.Renderer = Glyphs.MakeLetter($"Word {i}", transform, material, out word.Mesh);
+                word.Renderer.gameObject.SetActive(false);
+                words.Add(word);
             }
             wallGlow = Effects.MakeQuad("Wall Glow", transform, glowMaterial);
             floorGlow = Effects.MakeQuad("Floor Glow", transform, glowMaterial);
@@ -109,13 +97,6 @@ namespace MusicInYourHands
             sparks = Effects.MakeSparkSystem("Sparks", transform, glowMaterial);
             SetSignVisible(false);
         }
-
-        void OnFontRebuilt(Font rebuilt)
-        {
-            if (rebuilt == font && material != null) material.mainTexture = font.material.mainTexture;
-        }
-
-        void OnDestroy() => Font.textureRebuilt -= OnFontRebuilt;
 
         void SetSignVisible(bool visible)
         {
@@ -130,14 +111,14 @@ namespace MusicInYourHands
             anchored = false;
             fade = 0f;
             cursor.Reset();
-            if (built) foreach (var w in words) { w.Used = false; w.Text.gameObject.SetActive(false); }
+            if (built) foreach (var w in words) { w.Used = false; w.Renderer.gameObject.SetActive(false); }
         }
 
         protected override void OnDisable()
         {
             base.OnDisable();
             if (!built) return;
-            foreach (var w in words) w.Text.gameObject.SetActive(false);
+            foreach (var w in words) w.Renderer.gameObject.SetActive(false);
             SetSignVisible(false);
         }
 
@@ -196,14 +177,11 @@ namespace MusicInYourHands
                 w.Used = i < texts.Count;
                 w.LitAt = -1f;
                 w.Buzz = 0f;
-                w.Text.gameObject.SetActive(w.Used);
+                w.Renderer.gameObject.SetActive(w.Used);
                 if (!w.Used) continue;
-                w.Text.text = texts[i];
-                w.Text.characterSize = lh * 10f / FontSize;
-                float width = 0f;
-                font.RequestCharactersInTexture(texts[i], FontSize, FontStyle.Italic);
-                foreach (char ch in texts[i])
-                    if (font.GetCharacterInfo(ch, out var info, FontSize, FontStyle.Italic)) width += info.advance * lh / FontSize;
+                w.Text = texts[i];
+                // Slanted like italics, and centred on the middle of the letters.
+                float width = Glyphs.BuildWord(w.Mesh, TypeFace.Bold, w.Text, lh, 1, 0f, Color.white, Color.white, 0.2f, -lh * 0.36f);
                 w.Size = new Vector2(width, lh * 1.1f);
                 int row = rows.Count - 1;
                 if (widths[row] > 0f && widths[row] + space + width > maxWidth * scale)
@@ -227,7 +205,7 @@ namespace MusicInYourHands
                     var w = words[i];
                     w.Centre = anchor + right * (x + w.Size.x * 0.5f) + Vector3.up * (top - r * rowHeight);
                     x += w.Size.x + space;
-                    w.Text.transform.SetPositionAndRotation(w.Centre, Quaternion.LookRotation(forward, Vector3.up));
+                    w.Renderer.transform.SetPositionAndRotation(w.Centre, Quaternion.LookRotation(forward, Vector3.up));
                 }
             }
             frameSize = new Vector2(widest * 0.5f + lh * 0.6f, top + lh * 1.0f);

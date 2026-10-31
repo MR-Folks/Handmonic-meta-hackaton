@@ -1,120 +1,112 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace MusicInYourHands
 {
     /// <summary>
-    /// Builds 3D letters for the lyric worlds: one mesh per letter, made of a stack of glyph quads from the font's
-    /// texture, front face bright and the layers behind it darker, so a letter reads as a solid block of type with
-    /// depth. Draw it with the Lettering material (the font's texture as _MainTex). The mesh's origin is the middle of
-    /// the letter's advance on the baseline; +Z points into the letter, away from a viewer it faces.
+    /// Builds letters for the lyric worlds from a TypeFace: quads over the face's distance field atlas, drawn with the
+    /// Lettering material (the face's atlas as _MainTex). With more than one layer the letter becomes a stack of quads,
+    /// front face bright and the layers behind it darker, for type with real depth. A mesh's origin is the middle of
+    /// the text on the baseline; +Z points into the letters, away from a viewer they face.
     /// </summary>
     public static class Glyphs
     {
-        /// <summary>Fills <paramref name="mesh"/> with an extruded letter, or empties it for a space. Returns the advance (m).</summary>
-        public static float Build(Mesh mesh, Font font, char ch, int fontSize, FontStyle style, float height, int layers, float depth,
-            Color front, Color back)
-        {
-            mesh.Clear();
-            font.RequestCharactersInTexture(ch.ToString(), fontSize, style);
-            if (!font.GetCharacterInfo(ch, out var info, fontSize, style)) return height * 0.3f;
-            float scale = height / fontSize;
-            float advance = info.advance * scale;
-            if (char.IsWhiteSpace(ch) || info.maxX <= info.minX) return advance;
+        /// <summary>
+        /// How far each quad reaches past its letter (ems), to leave room for the Lettering shader's edge, outline and
+        /// glow. Must stay below the atlas's spread (Tools/bake_type.py).
+        /// </summary>
+        const float Pad = 0.16f;
 
-            layers = Mathf.Max(1, layers);
-            var vertices = new Vector3[layers * 4];
-            var uvs = new Vector2[layers * 4];
-            var colors = new Color[layers * 4];
-            var triangles = new int[layers * 6];
-            float x0 = info.minX * scale - advance * 0.5f, x1 = info.maxX * scale - advance * 0.5f;
-            float y0 = info.minY * scale, y1 = info.maxY * scale;
-            // Back layers first, so the front face draws last over them.
-            for (int k = 0; k < layers; k++)
-            {
-                int layer = layers - 1 - k;
-                float z = layers > 1 ? depth * layer / (layers - 1) : 0f;
-                float shade = layers > 1 ? layer / (float)(layers - 1) : 0f;
-                var c = layer == 0 ? front : Color.Lerp(Color.Lerp(front, back, 0.45f), back, shade);
-                int v = k * 4;
-                vertices[v] = new Vector3(x0, y0, z);
-                vertices[v + 1] = new Vector3(x0, y1, z);
-                vertices[v + 2] = new Vector3(x1, y1, z);
-                vertices[v + 3] = new Vector3(x1, y0, z);
-                uvs[v] = info.uvBottomLeft;
-                uvs[v + 1] = info.uvTopLeft;
-                uvs[v + 2] = info.uvTopRight;
-                uvs[v + 3] = info.uvBottomRight;
-                for (int q = 0; q < 4; q++) colors[v + q] = c;
-                int t = k * 6;
-                triangles[t] = v; triangles[t + 1] = v + 1; triangles[t + 2] = v + 2;
-                triangles[t + 3] = v; triangles[t + 4] = v + 2; triangles[t + 5] = v + 3;
-            }
-            mesh.vertices = vertices;
-            mesh.uv = uvs;
-            mesh.colors = colors;
-            mesh.triangles = triangles;
-            mesh.RecalculateBounds();
+        static readonly List<Vector3> vertices = new List<Vector3>();
+        static readonly List<Vector2> uvs = new List<Vector2>();
+        static readonly List<Color> colors = new List<Color>();
+        static readonly List<int> triangles = new List<int>();
+
+        /// <summary>Fills <paramref name="mesh"/> with one letter, or empties it for a space. Returns the advance (m).</summary>
+        public static float Build(Mesh mesh, TypeFace face, char ch, float height, int layers, float depth, Color front, Color back)
+        {
+            float advance = face.Step(ch, '\0') * height;
+            Begin(mesh);
+            if (face.TryGet(ch, out var letter) && letter.HasInk)
+                for (int k = 0; k < Mathf.Max(1, layers); k++)
+                    AddLetter(face, letter, -advance * 0.5f, height, layers, k, depth, front, back, 0f, 0f);
+            Finish(mesh);
             return advance;
         }
 
         /// <summary>
-        /// Fills <paramref name="mesh"/> with a whole word of extruded letters on one line, centred on the origin
-        /// horizontally with its baseline at y = 0. Returns the word's width (m).
+        /// Fills <paramref name="mesh"/> with a line of text, centred on the origin horizontally with its baseline at
+        /// y = <paramref name="offsetY"/>. <paramref name="slant"/> leans it over like italics. Returns its width (m).
         /// </summary>
-        public static float BuildWord(Mesh mesh, Font font, string text, int fontSize, FontStyle style, float height, int layers, float depth,
-            Color front, Color back)
+        public static float BuildWord(Mesh mesh, TypeFace face, string text, float height, int layers, float depth, Color front, Color back,
+            float slant = 0f, float offsetY = 0f)
         {
-            mesh.Clear();
-            if (string.IsNullOrEmpty(text)) return 0f;
-            font.RequestCharactersInTexture(text, fontSize, style);
-            float scale = height / fontSize;
-            float width = 0f;
-            foreach (char ch in text)
-                width += font.GetCharacterInfo(ch, out var ci, fontSize, style) ? ci.advance * scale : height * 0.3f;
-
-            layers = Mathf.Max(1, layers);
-            var vertices = new System.Collections.Generic.List<Vector3>();
-            var uvs = new System.Collections.Generic.List<Vector2>();
-            var colors = new System.Collections.Generic.List<Color>();
-            var triangles = new System.Collections.Generic.List<int>();
-            for (int k = 0; k < layers; k++)
+            Begin(mesh);
+            if (string.IsNullOrEmpty(text))
             {
-                int layer = layers - 1 - k;
-                float z = layers > 1 ? depth * layer / (layers - 1) : 0f;
-                float shade = layers > 1 ? layer / (float)(layers - 1) : 0f;
-                var c = layer == 0 ? front : Color.Lerp(Color.Lerp(front, back, 0.45f), back, shade);
+                Finish(mesh);
+                return 0f;
+            }
+            float width = face.Width(text) * height;
+            // Back layers first, so the front face draws last over them.
+            for (int k = 0; k < Mathf.Max(1, layers); k++)
+            {
                 float x = -width * 0.5f;
-                foreach (char ch in text)
+                for (int i = 0; i < text.Length; i++)
                 {
-                    if (!font.GetCharacterInfo(ch, out var info, fontSize, style)) { x += height * 0.3f; continue; }
-                    if (!char.IsWhiteSpace(ch) && info.maxX > info.minX)
-                    {
-                        int v = vertices.Count;
-                        float x0 = x + info.minX * scale, x1 = x + info.maxX * scale;
-                        float y0 = info.minY * scale, y1 = info.maxY * scale;
-                        vertices.Add(new Vector3(x0, y0, z)); vertices.Add(new Vector3(x0, y1, z));
-                        vertices.Add(new Vector3(x1, y1, z)); vertices.Add(new Vector3(x1, y0, z));
-                        uvs.Add(info.uvBottomLeft); uvs.Add(info.uvTopLeft); uvs.Add(info.uvTopRight); uvs.Add(info.uvBottomRight);
-                        colors.Add(c); colors.Add(c); colors.Add(c); colors.Add(c);
-                        triangles.Add(v); triangles.Add(v + 1); triangles.Add(v + 2);
-                        triangles.Add(v); triangles.Add(v + 2); triangles.Add(v + 3);
-                    }
-                    x += info.advance * scale;
+                    if (face.TryGet(text[i], out var letter) && letter.HasInk)
+                        AddLetter(face, letter, x, height, layers, k, depth, front, back, slant, offsetY);
+                    x += face.Step(text[i], i + 1 < text.Length ? text[i + 1] : '\0') * height;
                 }
             }
+            Finish(mesh);
+            return width;
+        }
+
+        static void Begin(Mesh mesh)
+        {
+            mesh.Clear();
+            vertices.Clear();
+            uvs.Clear();
+            colors.Clear();
+            triangles.Clear();
+        }
+
+        static void Finish(Mesh mesh)
+        {
             mesh.SetVertices(vertices);
             mesh.SetUVs(0, uvs);
             mesh.SetColors(colors);
             mesh.SetTriangles(triangles, 0);
             mesh.RecalculateBounds();
-            return width;
         }
 
-        /// <summary>The advance of a letter (m) without building it.</summary>
-        public static float Advance(Font font, char ch, int fontSize, FontStyle style, float height)
+        /// <summary>Adds layer k (0 = the backmost) of a letter whose origin is at x.</summary>
+        static void AddLetter(TypeFace face, in TypeFace.Letter letter, float x, float height, int layers, int k, float depth,
+            Color front, Color back, float slant, float offsetY)
         {
-            font.RequestCharactersInTexture(ch.ToString(), fontSize, style);
-            return font.GetCharacterInfo(ch, out var info, fontSize, style) ? info.advance * height / fontSize : height * 0.3f;
+            int count = Mathf.Max(1, layers);
+            int layer = count - 1 - k;
+            float z = count > 1 ? depth * layer / (count - 1) : 0f;
+            float shade = count > 1 ? layer / (float)(count - 1) : 0f;
+            var c = layer == 0 ? front : Color.Lerp(Color.Lerp(front, back, 0.45f), back, shade);
+
+            float left = letter.Left - Pad, right = letter.Right + Pad, bottom = letter.Bottom - Pad, top = letter.Top + Pad;
+            float u0 = letter.U - Pad * face.UvPerEm, u1 = letter.U + (letter.Right - letter.Left + Pad) * face.UvPerEm;
+            float v0 = letter.V - Pad * face.UvPerEm, v1 = letter.V + (letter.Top - letter.Bottom + Pad) * face.UvPerEm;
+
+            int v = vertices.Count;
+            vertices.Add(new Vector3(x + (left + bottom * slant) * height, offsetY + bottom * height, z));
+            vertices.Add(new Vector3(x + (left + top * slant) * height, offsetY + top * height, z));
+            vertices.Add(new Vector3(x + (right + top * slant) * height, offsetY + top * height, z));
+            vertices.Add(new Vector3(x + (right + bottom * slant) * height, offsetY + bottom * height, z));
+            uvs.Add(new Vector2(u0, v0));
+            uvs.Add(new Vector2(u0, v1));
+            uvs.Add(new Vector2(u1, v1));
+            uvs.Add(new Vector2(u1, v0));
+            for (int q = 0; q < 4; q++) colors.Add(c);
+            triangles.Add(v); triangles.Add(v + 1); triangles.Add(v + 2);
+            triangles.Add(v); triangles.Add(v + 2); triangles.Add(v + 3);
         }
 
         /// <summary>A GameObject that draws one letter mesh with the given material.</summary>

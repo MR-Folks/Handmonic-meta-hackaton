@@ -4,8 +4,8 @@ using UnityEngine;
 namespace MusicInYourHands
 {
     /// <summary>
-    /// The Word snow world: the lyrics fall like snow. Each sung word drifts down from above, swaying and slowly
-    /// tumbling among fine flakes, and settles on the floor around you, where it lies for a while before melting
+    /// The Word snow world: the lyrics fall like snow. Each sung word drifts down from above, swaying among fine
+    /// flakes and turned to you so it stays readable, and settles on the floor around you, where it lies for a while before melting
     /// away. Hold out your hand palm up and words land on it and ride along as you move; make a fist and they drop.
     /// Once the room is scanned, words also settle on your table, sofa, bed and shelves; until then, on the floor.
     /// </summary>
@@ -39,7 +39,6 @@ namespace MusicInYourHands
 
         static readonly int ColorId = Shader.PropertyToID("_Color");
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
-        const int FontSize = 96;
 
         enum State { Free, Falling, Resting, Held }
 
@@ -51,7 +50,7 @@ namespace MusicInYourHands
             public Vector3 Position;
             public Vector3 Velocity;
             public Quaternion Rotation;
-            public Vector3 Spin;
+            public Quaternion Rest;
             public Vector3 Offset;
             public int Hand;
             public float Width;
@@ -61,7 +60,6 @@ namespace MusicInYourHands
 
         readonly List<Flake> flakes = new List<Flake>();
         readonly LyricCursor cursor = new LyricCursor();
-        Font font;
         Material material;
         MaterialPropertyBlock block;
         ParticleSystem snow;
@@ -74,9 +72,7 @@ namespace MusicInYourHands
             if (built) return;
             built = true;
             block = new MaterialPropertyBlock();
-            font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            material = new Material(letteringMaterial) { name = "Snow Lettering", mainTexture = font.material.mainTexture };
-            Font.textureRebuilt += OnFontRebuilt;
+            material = new Material(letteringMaterial) { name = "Snow Lettering", mainTexture = TypeFace.Bold.Atlas };
             for (int i = 0; i < maxWords; i++)
             {
                 var f = new Flake();
@@ -89,13 +85,6 @@ namespace MusicInYourHands
             main.gravityModifier = 0.006f;
             main.maxParticles = 600;
         }
-
-        void OnFontRebuilt(Font rebuilt)
-        {
-            if (rebuilt == font && material != null) material.mainTexture = font.material.mainTexture;
-        }
-
-        void OnDestroy() => Font.textureRebuilt -= OnFontRebuilt;
 
         protected override void OnEnable()
         {
@@ -148,7 +137,7 @@ namespace MusicInYourHands
             if (f == null)
                 foreach (var x in flakes) if (x.State == State.Resting && (f == null || x.Age > f.Age)) f = x;
             if (f == null) return;
-            f.Width = Glyphs.BuildWord(f.Mesh, font, text, FontSize, FontStyle.Bold, 1f, 4, 0.12f, Color.white, new Color(0.6f, 0.7f, 0.85f));
+            f.Width = Glyphs.BuildWord(f.Mesh, TypeFace.Bold, text, 1f, 1, 0f, Color.white, Color.white);
             float angle = Random.Range(-100f, 100f);
             float reach = Mathf.Lerp(0.35f, 1.6f, Mathf.Sqrt(Random.value));
             var dir = Quaternion.AngleAxis(angle, Vector3.up) * forward;
@@ -164,9 +153,8 @@ namespace MusicInYourHands
                 }
             }
             f.Velocity = Vector3.down * fallSpeed;
-            f.Rotation = Quaternion.LookRotation(Vector3.ProjectOnPlane(f.Position - head, Vector3.up).normalized + Vector3.down * 0.2f, Vector3.up);
-            f.Spin = new Vector3(Random.Range(-20f, 20f), Random.Range(-35f, 35f), Random.Range(-15f, 15f));
             f.Phase = Random.value * 6.28f;
+            f.Rotation = Swaying(f, head);
             f.Age = 0f;
             f.State = State.Falling;
             f.Renderer.gameObject.SetActive(true);
@@ -182,10 +170,10 @@ namespace MusicInYourHands
                 switch (f.State)
                 {
                     case State.Falling:
-                        // Sway and tumble on the way down.
+                        // Sway on the way down, always turned to you so the word stays readable.
                         var sway = new Vector3(Mathf.Sin(f.Age * 1.3f + f.Phase), 0f, Mathf.Cos(f.Age * 1.1f + f.Phase * 1.7f)) * 0.06f;
                         f.Position += (f.Velocity + sway) * dt;
-                        f.Rotation = Quaternion.Euler(f.Spin * dt) * f.Rotation;
+                        f.Rotation = Quaternion.Slerp(f.Rotation, Swaying(f, view.transform.position), 1f - Mathf.Exp(-5f * dt));
                         if (rig != null) TryCatch(rig, f);
                         float ground = Room.GroundBelow(f.Position, floorY);
                         if (f.State == State.Falling && f.Position.y <= ground + 0.01f)
@@ -195,11 +183,12 @@ namespace MusicInYourHands
                             f.Position.y = ground + 0.006f;
                             // Lie down where it landed, reading towards you.
                             var toward = Vector3.ProjectOnPlane(f.Position - head, Vector3.up);
-                            f.Rotation = Quaternion.LookRotation(Vector3.down, toward.sqrMagnitude > 1e-6f ? toward.normalized : forward)
+                            f.Rest = Quaternion.LookRotation(Vector3.down, toward.sqrMagnitude > 1e-6f ? toward.normalized : forward)
                                 * Quaternion.Euler(0f, 0f, Random.Range(-15f, 15f));
                         }
                         break;
                     case State.Resting:
+                        f.Rotation = Quaternion.Slerp(f.Rotation, f.Rest, 1f - Mathf.Exp(-7f * dt));
                         alpha = 1f - Mathf.Clamp01((f.Age - lieTime) / 3f);
                         if (alpha <= 0f) { Melt(f); continue; }
                         break;
@@ -225,6 +214,14 @@ namespace MusicInYourHands
                 block.SetFloat(AlphaId, alpha * fade * Mathf.Clamp01(f.Age / 0.6f + (f.State == State.Falling ? 0f : 1f)));
                 f.Renderer.SetPropertyBlock(block);
             }
+        }
+
+        /// <summary>A falling word turned to the eye, rocking a little like a leaf.</summary>
+        static Quaternion Swaying(Flake f, Vector3 eye)
+        {
+            var away = Vector3.ProjectOnPlane(f.Position - eye, Vector3.up);
+            var facing = away.sqrMagnitude > 1e-6f ? Quaternion.LookRotation(away.normalized, Vector3.up) : Quaternion.identity;
+            return facing * Quaternion.Euler(Mathf.Sin(f.Age * 0.9f + f.Phase) * 14f - 8f, Mathf.Sin(f.Age * 0.7f + f.Phase * 2f) * 16f, Mathf.Sin(f.Age * 1.1f + f.Phase) * 10f);
         }
 
         /// <summary>A palm held up under a falling word catches it.</summary>

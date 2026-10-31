@@ -57,7 +57,6 @@ namespace MusicInYourHands
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
         static readonly int ColorId = Shader.PropertyToID("_Color");
 
-        const int FontSize = 128;
         const int Layers = 6;
         const int Pool = 96;
         const int BeadsPerRing = 36;
@@ -85,7 +84,6 @@ namespace MusicInYourHands
 
         readonly List<Letter> letters = new List<Letter>();
         readonly Vector3[,] lastTips = new Vector3[2, 5];
-        Font font;
         Material material;
         MaterialPropertyBlock block;
         LineStrip[] rings;
@@ -104,9 +102,8 @@ namespace MusicInYourHands
             if (built) return;
             built = true;
             block = new MaterialPropertyBlock();
-            font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            material = new Material(letteringMaterial) { name = "Orbit Lettering", mainTexture = font.material.mainTexture };
-            Font.textureRebuilt += OnFontRebuilt;
+            material = new Material(letteringMaterial) { name = "Orbit Lettering", mainTexture = TypeFace.Bold.Atlas };
+            material.SetFloat("_Rim", 0f);
             for (int i = 0; i < Pool; i++)
             {
                 var letter = new Letter();
@@ -137,16 +134,6 @@ namespace MusicInYourHands
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             beadOut = new ParticleSystem.Particle[ringCount * BeadsPerRing];
         }
-
-        void OnFontRebuilt(Font rebuilt)
-        {
-            if (rebuilt != font || material == null) return;
-            material.mainTexture = font.material.mainTexture;
-            // The atlas moved its glyphs: rebuild every letter on show.
-            foreach (var l in letters) if (l.Role != Role.Hidden) Rebuild(l);
-        }
-
-        void OnDestroy() => Font.textureRebuilt -= OnFontRebuilt;
 
         protected override void OnEnable()
         {
@@ -266,7 +253,7 @@ namespace MusicInYourHands
 
         void Rebuild(Letter l)
         {
-            l.Width = Glyphs.Build(l.Mesh, font, l.Char, FontSize, FontStyle.Bold, 1f, Layers, depth, Ink, Shadow);
+            l.Width = Glyphs.Build(l.Mesh, TypeFace.Bold, l.Char, 1f, Layers, depth, Ink, Shadow);
         }
 
         /// <summary>
@@ -310,7 +297,8 @@ namespace MusicInYourHands
                 {
                     // Words in orbit sit on the rings, each word on its own ring and angle, turning slowly.
                     int ring = l.Word % rings.Length;
-                    float angle = l.Word * 1.3f + ringSpin[ring] + l.Offset * letterHeight / ringRadii[ring] * (orbitLetterHeight / letterHeight);
+                    // Seen from inside the ring, a growing angle runs right to left, so the letters run the other way to read.
+                    float angle = l.Word * 1.3f + ringSpin[ring] - l.Offset * letterHeight / ringRadii[ring] * (orbitLetterHeight / letterHeight);
                     target = RingPoint(ring, angle);
                     size = orbitLetterHeight;
                     l.Spin = Mathf.Lerp(l.Spin, 0f, 1f - Mathf.Exp(-4f * dt));

@@ -6,16 +6,16 @@ namespace MusicInYourHands
     /// <summary>
     /// The Firefly choir world: a swarm of fireflies drifts all around you on slow swirling currents, each a bright core
     /// in a soft halo with a fading trail. They sing in four voices (low to high frequency bands), each voice glowing
-    /// with its part of the music, and on every beat a wave of flashes ripples out through the swarm. Hold out an open
-    /// hand and a few of them come to it, resting on your fingertips and circling your palm, while warm specks twinkle
-    /// in your skin; the rest keep filling the room. Each kick startles some of them away. Close your hand and they
-    /// swirl around your fist. Sweep a hand quickly and the fireflies near it are carried along in that direction.
+    /// with its part of the music, and on every beat a wave of flashes ripples out through the swarm. Hold out a hand
+    /// and some of them gather in a loose cloud in the air around it, following it as it moves without ever touching
+    /// it; the rest keep filling the room. Each kick startles some of them away. Close your hand and the cloud draws in
+    /// closer and swirls faster. Sweep a hand quickly and the fireflies near it are carried along in that direction.
     /// </summary>
     public class FireflyChoir : World
     {
         public override int MenuIcon => 5;
 
-        public override string Hint => "Hold out an open hand and let the fireflies land";
+        public override string Hint => "Hold out a hand and the fireflies gather around it";
 
         public override HandTheme Theme => new HandTheme
         {
@@ -23,7 +23,7 @@ namespace MusicInYourHands
             Edge = new Color(1f, 0.78f, 0.45f),
             Glow = new Color(1f, 0.9f, 0.55f),
             Pattern = HandTheme.Effect.Specks,
-            PatternColor = new Color(1f, 0.85f, 0.45f)
+            PatternColor = new Color(0.42f, 0.34f, 0.22f)
         };
 
         [Header("Materials")]
@@ -32,7 +32,7 @@ namespace MusicInYourHands
         [SerializeField] Material letteringMaterial;
 
         [Header("Swarm")]
-        [SerializeField] int count = 44;
+        [SerializeField] int count = 88;
         [SerializeField] float flySize = 0.014f;
         [Tooltip("Share of the swarm that a kick startles.")]
         [SerializeField, Range(0f, 1f)] float startle = 0.35f;
@@ -51,7 +51,7 @@ namespace MusicInYourHands
         const int TrailPoints = 10;
         const float TrailStep = 0.03f;
         const float TrailLength = 0.06f;
-        const int TrailSmooth = 3;
+        const int TrailSmooth = 2;
         const int DrawPoints = (TrailPoints - 1) * TrailSmooth + 1;
 
         sealed class Fly
@@ -69,6 +69,8 @@ namespace MusicInYourHands
             public float Speed;
             public float Startled;
             public float Landed;
+            /// <summary>Its place in the cloud around a hand, as a direction from the palm.</summary>
+            public Vector3 Around;
             public int Voice;
         }
 
@@ -105,6 +107,7 @@ namespace MusicInYourHands
                     FreeHome = RoomSpot(random),
                     Phase = (float)random.NextDouble() * 20f,
                     Speed = 0.6f + (float)random.NextDouble() * 0.8f,
+                    Around = CloudSpot(i),
                     Voice = i % VoiceColors.Length
                 };
                 f.Halo.sortingOrder = -1;
@@ -206,7 +209,7 @@ namespace MusicInYourHands
                 int caller = i / 4;
                 int side = calling == 0 || i % 4 != 0 ? -1 : calling == 2 ? caller % 2 : (open[0] || fist[0] ? 0 : 1);
                 var target = Target(rig, f, i, side, t, out float pull);
-                if (side >= 0 && Vector3.Distance(f.Position, target) < 0.02f) landedOn[side] += 1f;
+                if (side >= 0 && Vector3.Distance(f.Position, target) < 0.06f) landedOn[side] += 1f;
 
                 if (f.Startled > 0f) pull *= 0.15f;
                 f.Velocity += (target - f.Position) * (pull * dt);
@@ -218,7 +221,7 @@ namespace MusicInYourHands
                 }
                 f.Velocity *= Mathf.Exp(-dt * (side >= 0 ? 6f : 2f));
                 f.Position += f.Velocity * dt;
-                f.Landed = Mathf.MoveTowards(f.Landed, Vector3.Distance(f.Position, target) < 0.02f ? 1f : 0f, dt * 4f);
+                f.Landed = Mathf.MoveTowards(f.Landed, side >= 0 && Vector3.Distance(f.Position, target) < 0.06f ? 1f : 0f, dt * 4f);
 
                 Draw(f, music, view, t, dt);
             }
@@ -235,9 +238,10 @@ namespace MusicInYourHands
         {
             if (words == null) return;
             var eye = view.transform.position;
-            if (words.Next(music, out var text, out _))
+            if (words.Next(music, out var text, out bool newLine))
             {
-                var w = words.Add(text, Color.Lerp(Effects.Gold, Color.white, 0.25f), 2.8f);
+                // A new line clears the last one, whose words would otherwise land on top of the new ones.
+                var w = words.Add(text, Color.Lerp(Effects.Gold, Color.white, 0.25f), 2.8f, newLine);
                 float angle = ((words.Index % 5) - 2) * 14f + (w.Seed - 0.5f) * 8f;
                 var dir = Quaternion.AngleAxis(angle, Vector3.up) * Effects.FlatForward(view);
                 w.Position = eye + dir * 0.75f + Vector3.down * (0.12f - (w.Seed - 0.5f) * 0.1f);
@@ -262,26 +266,22 @@ namespace MusicInYourHands
                 pull = 1.2f;
                 return center + f.Home + Wobble(f, t, 0.1f);
             }
-            var hand = rig.Get(side == 0);
-            var palm = Palm(hand);
-            if (fist[side])
-            {
-                pull = 10f;
-                float a = t * (1.6f + f.Speed) + f.Phase;
-                float radius = 0.08f + (i % 4) * 0.02f;
-                var axis = Quaternion.AngleAxis(f.Phase * 40f, Vector3.up) * Vector3.right;
-                return palm + Quaternion.AngleAxis(a * Mathf.Rad2Deg, axis) * (Vector3.up * radius);
-            }
-            pull = 9f;
-            int slot = i / 8 % 8;
-            if (slot < 5)
-            {
-                var tip = hand.TipJoints[slot] != null ? hand.TipJoints[slot].position : hand.Tips[slot];
-                return tip + hand.PalmNormal * 0.012f + Wobble(f, t, 0.005f);
-            }
-            float b = t * 0.9f * f.Speed + f.Phase;
-            var orbit = Vector3.ProjectOnPlane(new Vector3(Mathf.Cos(b), 0f, Mathf.Sin(b)), hand.PalmNormal).normalized;
-            return palm + hand.PalmNormal * (0.04f + (slot - 5) * 0.02f) + orbit * (0.05f + (slot - 5) * 0.015f);
+            // A cloud in the air around the hand: each firefly keeps its own spot in a shell around the palm, the whole
+            // cloud turning slowly, so it follows the hand loosely and never sits on it.
+            bool closed = fist[side];
+            pull = closed ? 9f : 6f;
+            float turn = t * (closed ? 70f : 22f);
+            float reach = (closed ? 0.11f : 0.15f) + (closed ? 0.06f : 0.13f) * Mathf.Repeat(f.Phase * 0.37f, 1f);
+            return Palm(rig.Get(side == 0)) + Quaternion.AngleAxis(turn, Vector3.up) * f.Around * reach + Wobble(f, t, closed ? 0.008f : 0.02f);
+        }
+
+        /// <summary>The n-th of evenly spread directions around a point (a golden spiral over a sphere).</summary>
+        static Vector3 CloudSpot(int i)
+        {
+            float y = 1f - (i / 4 % 24 + 0.5f) / 24f * 2f;
+            float ring = Mathf.Sqrt(1f - y * y);
+            float angle = i / 4 * 2.39996f;
+            return new Vector3(Mathf.Cos(angle) * ring, y, Mathf.Sin(angle) * ring);
         }
 
         void Draw(Fly f, MusicFrame music, Camera view, float t, float dt)
@@ -358,14 +358,14 @@ namespace MusicInYourHands
             return 0.5f * (2f * p1 + (p2 - p0) * t + (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2 + (3f * p1 - p0 + p3 - 3f * p2) * t3);
         }
 
-        /// <summary>A warm glow on the palm that grows with the fireflies resting on the hand.</summary>
+        /// <summary>A warm glow at the palm that grows with the fireflies gathered around the hand.</summary>
         void DrawPalms(HandRig rig, Camera view)
         {
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
                 var g = palmGlows[side];
-                float share = landedOn[side] / Mathf.Max(1f, flies.Length * 0.5f);
+                float share = landedOn[side] / Mathf.Max(1f, flies.Length * 0.25f);
                 bool show = hand.IsTracked && share > 0.05f;
                 if (g.gameObject.activeSelf != show) g.gameObject.SetActive(show);
                 if (!show) continue;
@@ -374,7 +374,7 @@ namespace MusicInYourHands
                 Effects.Face(g.transform, view);
                 block.Clear();
                 block.SetColor(ColorId, VoiceColors[1]);
-                block.SetFloat(IntensityId, share * 0.7f);
+                block.SetFloat(IntensityId, share * 0.35f);
                 g.SetPropertyBlock(block);
             }
         }

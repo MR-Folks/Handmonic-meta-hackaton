@@ -63,6 +63,7 @@ namespace MusicInYourHands.EditorTools
             EnsureUrp();
             ConfigureXR();
             ConfigureMetaProject();
+            ConfigureTextures();
             EnsureMainScene(EnsureDemoSongs(), rebuild: false);
             AssetDatabase.SaveAssets();
             Debug.Log("[Setup] Music In Your Hands project setup finished.");
@@ -429,8 +430,7 @@ namespace MusicInYourHands.EditorTools
 
             var graffiti = EnsureWorld<Graffiti>(manager.transform, "Graffiti", "Graffiti", new Color(1f, 0.7f, 0.42f));
             SetReferences(graffiti, ("letteringMaterial", lettering), ("lineMaterial", line), ("glowMaterial", glow), ("ringMaterial", ring),
-                ("paintMaterial", EnsureMaterial(PaintMaterialPath, "MusicInYourHands/PaintStroke")),
-                ("tagFont", AssetDatabase.LoadAssetAtPath<Font>("Assets/_Project/Fonts/PermanentMarker-Regular.ttf")));
+                ("paintMaterial", EnsureMaterial(PaintMaterialPath, "MusicInYourHands/PaintStroke")));
 
             var breathing = EnsureWorld<BreathingRoom>(manager.transform, "BreathingRoom", "Breathing room", new Color(0.75f, 0.6f, 1f));
             SetReferences(breathing, ("gridMaterial", EnsureMaterial(RoomGridMaterialPath, "MusicInYourHands/RoomGrid")));
@@ -453,7 +453,7 @@ namespace MusicInYourHands.EditorTools
             SetReferences(wordSnow, ("letteringMaterial", lettering), ("glowMaterial", glow));
 
             var stars = EnsureWorld<CeilingStars>(manager.transform, "CeilingStars", "Ceiling stars", new Color(0.78f, 0.7f, 1f));
-            SetReferences(stars, ("letteringMaterial", lettering), ("glowMaterial", glow), ("lineMaterial", line));
+            SetReferences(stars, ("letteringMaterial", lettering), ("glowMaterial", glow), ("lineMaterial", line), ("skyMaterial", EnsureSkyMaterial()));
 
             World[] order =
             {
@@ -510,6 +510,8 @@ namespace MusicInYourHands.EditorTools
 
         public const string HandMaterialPath = Root + "/Materials/Hand.mat";
         public const string OrbMaterialPath = Root + "/Materials/Orb.mat";
+        public const string SkyMaterialPath = Root + "/Materials/Sky.mat";
+        public const string SkyTexturePath = Root + "/Materials/NightSky.png";
         public const string OrbDotsMaterialPath = Root + "/Materials/OrbDots.mat";
         public const string LineMaterialPath = Root + "/Materials/Line.mat";
         public const string BubbleMaterialPath = Root + "/Materials/Bubble.mat";
@@ -528,6 +530,45 @@ namespace MusicInYourHands.EditorTools
         public static Material EnsureHandMaterial() => EnsureMaterial(HandMaterialPath, "MusicInYourHands/Hand");
 
         /// <summary>Loads the material, creating it from the shader the first time. Tuned values live in the asset.</summary>
+        /// <summary>The atlases hold distances rather than colours, so they stay uncompressed, linear and single-channel.</summary>
+        static void ConfigureTextures()
+        {
+            foreach (var path in new[] { Root + "/Resources/Type/Bold.png", Root + "/Resources/Type/Marker.png" })
+            {
+                if (AssetImporter.GetAtPath(path) is not TextureImporter importer) continue;
+                importer.textureType = TextureImporterType.SingleChannel;
+                var settings = new TextureImporterSettings();
+                importer.ReadTextureSettings(settings);
+                settings.singleChannelComponent = TextureImporterSingleChannelComponent.Red;
+                settings.sRGBTexture = false;
+                settings.mipmapEnabled = true;
+                settings.wrapMode = TextureWrapMode.Clamp;
+                settings.filterMode = FilterMode.Trilinear;
+                settings.npotScale = TextureImporterNPOTScale.None;
+                importer.SetTextureSettings(settings);
+                importer.textureCompression = TextureImporterCompression.Uncompressed;
+                importer.maxTextureSize = 2048;
+                importer.SetPlatformTextureSettings(new TextureImporterPlatformSettings
+                {
+                    name = "Android", overridden = true, format = TextureImporterFormat.R8, maxTextureSize = 2048
+                });
+                importer.SaveAndReimport();
+            }
+            if (AssetImporter.GetAtPath(SkyTexturePath) is TextureImporter sky)
+            {
+                sky.wrapMode = TextureWrapMode.Clamp;
+                sky.mipmapEnabled = true;
+                sky.SaveAndReimport();
+            }
+        }
+
+        static Material EnsureSkyMaterial()
+        {
+            var material = EnsureMaterial(SkyMaterialPath, "MusicInYourHands/Sky");
+            material.SetTexture("_MainTex", AssetDatabase.LoadAssetAtPath<Texture2D>(SkyTexturePath));
+            return material;
+        }
+
         public static Material EnsureMaterial(string path, string shaderName)
         {
             EnsureFolder(Root + "/Materials");

@@ -48,7 +48,6 @@ namespace MusicInYourHands
         {
             new Color(0.55f, 0.9f, 1f), new Color(0.6f, 1f, 0.85f), new Color(0.75f, 0.75f, 1f), new Color(1f, 0.8f, 0.9f)
         };
-        const int FontSize = 96;
         const int MaxWords = 14;
 
         sealed class Stalk
@@ -72,7 +71,6 @@ namespace MusicInYourHands
         readonly List<Stalk> stalks = new List<Stalk>();
         readonly List<Stalk> sinking = new List<Stalk>();
         readonly LyricCursor cursor = new LyricCursor();
-        Font font;
         Material material;
         MaterialPropertyBlock block;
         ParticleSystem splashes;
@@ -86,9 +84,7 @@ namespace MusicInYourHands
             if (built) return;
             built = true;
             block = new MaterialPropertyBlock();
-            font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            material = new Material(letteringMaterial) { name = "Rising Lettering", mainTexture = font.material.mainTexture };
-            Font.textureRebuilt += OnFontRebuilt;
+            material = new Material(letteringMaterial) { name = "Rising Lettering", mainTexture = TypeFace.Bold.Atlas };
             // Two sets of words, so one line can sink while the next one rises.
             for (int i = 0; i < MaxWords * 2; i++)
             {
@@ -103,13 +99,6 @@ namespace MusicInYourHands
             var main = splashes.main;
             main.gravityModifier = 0.4f;
         }
-
-        void OnFontRebuilt(Font rebuilt)
-        {
-            if (rebuilt == font && material != null) material.mainTexture = font.material.mainTexture;
-        }
-
-        void OnDestroy() => Font.textureRebuilt -= OnFontRebuilt;
 
         protected override void OnEnable()
         {
@@ -187,7 +176,7 @@ namespace MusicInYourHands
                 float a = count > 1 ? Mathf.Lerp(-spread, spread, i / (float)(count - 1)) : 0f;
                 var dir = Quaternion.AngleAxis(a, Vector3.up) * forward;
                 s.Foot = new Vector3(head.x, floorY, head.z) + dir * (distance + (i % 2) * 0.15f);
-                s.Width = Glyphs.BuildWord(s.Mesh, font, texts[i], FontSize, FontStyle.Bold, 1f, 5, 0.14f, Color.white, new Color(0.25f, 0.4f, 0.5f));
+                s.Width = Glyphs.BuildWord(s.Mesh, TypeFace.Bold, texts[i], 1f, 1, 0f, Color.white, Color.white);
                 s.Line = lineNumber;
                 s.Index = i;
                 s.Used = true;
@@ -264,7 +253,8 @@ namespace MusicInYourHands
                 if (s.SinkAt >= 0f && s.Rise <= 0f) { Retire(s); continue; }
 
                 float size = letterHeight * (1f + music.Kick * 0.05f);
-                float sunk = (1f - Mathf.SmoothStep(0f, 1f, s.Rise)) * size * 1.15f;
+                // Risen, the word stands clear of the floor, tails of its letters included.
+                float sunk = (1f - Mathf.SmoothStep(0f, 1f, s.Rise)) * size * 1.4f - size * 0.25f;
                 var look = Vector3.ProjectOnPlane(s.Foot - eye, Vector3.up);
                 var facing = look.sqrMagnitude > 1e-6f ? Quaternion.LookRotation(look, Vector3.up) : Quaternion.identity;
                 // Lean from the foot, away from the sweeping hand.

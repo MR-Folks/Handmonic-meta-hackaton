@@ -6,7 +6,7 @@ Shader "MusicInYourHands/Bubble"
     Properties
     {
         _Color ("Color", Color) = (1, 0.37, 0.68, 1)
-        _Icon ("Emblem (-1 none, 0-22)", Float) = 0
+        _Icon ("Emblem (-1 none, 0-24)", Float) = 0
         _Hover ("Hover 0-1", Float) = 0
         _Selected ("Current world 0-1", Float) = 0
         _Alpha ("Alpha", Float) = 1
@@ -312,7 +312,7 @@ Shader "MusicInYourHands/Bubble"
                         else e += exp(-dot(q, q) * 600);
                     }
                 }
-                else
+                else if (icon < 22.5)
                 {
                     // Ceiling stars: a small constellation, joined by lines, twinkling.
                     float2 s0 = float2(-0.5, -0.1), s1 = float2(-0.18, 0.25), s2 = float2(0.12, 0.05), s3 = float2(0.45, 0.32), s4 = float2(0.3, -0.35);
@@ -324,6 +324,23 @@ Shader "MusicInYourHands/Bubble"
                         float2 q = p - ss[k];
                         e += exp(-dot(q, q) * 250) * (0.7 + 0.3 * sin(t * 3 + k * 2));
                     }
+                }
+                else if (icon < 23.5)
+                {
+                    // Lyrics: three lines of text, a word lighting up along them.
+                    [unroll] for (int k = 0; k < 3; k++)
+                    {
+                        float y = 0.3 - k * 0.3;
+                        float width = k == 2 ? 0.3 : 0.5;
+                        float bar = step(abs(p.x + 0.5 - width), width) * step(abs(p.y - y), 0.055);
+                        e += bar * (0.55 + 0.45 * step(frac(t * 0.4 - k * 0.33), 0.33));
+                    }
+                }
+                else
+                {
+                    // Add a song: a plus, gently breathing.
+                    float size = 0.46 + 0.03 * sin(t * 2.5);
+                    e = max(step(abs(p.x), 0.075) * step(abs(p.y), size), step(abs(p.y), 0.075) * step(abs(p.x), size));
                 }
                 return saturate(e);
             }

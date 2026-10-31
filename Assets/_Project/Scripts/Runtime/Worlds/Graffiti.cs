@@ -35,8 +35,6 @@ namespace MusicInYourHands
         [SerializeField] Material glowMaterial;
         [SerializeField] Material ringMaterial;
         [SerializeField] Material paintMaterial;
-        [Tooltip("The hand-lettered marker font for the tags (Permanent Marker); the built-in font if empty.")]
-        [SerializeField] Font tagFont;
 
         [Header("Walls")]
         [Tooltip("Radius of the stand-in walls around you until the room is scanned (m).")]
@@ -52,21 +50,23 @@ namespace MusicInYourHands
         static readonly int ColorId = Shader.PropertyToID("_Color");
         static readonly int RevealId = Shader.PropertyToID("_Reveal");
         static readonly int ExtentId = Shader.PropertyToID("_Extent");
+        static readonly int RimId = Shader.PropertyToID("_Rim");
+        static readonly int MainTexId = Shader.PropertyToID("_MainTex");
         static readonly int SprayId = Shader.PropertyToID("_Spray");
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
         static readonly int RadiusId = Shader.PropertyToID("_Radius");
         static readonly int ThicknessId = Shader.PropertyToID("_Thickness");
-        const int FontSize = 128;
         const int StrokePoints = 160;
 
         sealed class Tag
         {
-            public TextMesh Text;
             public MeshRenderer Renderer;
+            public Mesh Mesh;
+            public TypeFace Face;
             public LineStrip[] Drips;
             public float[] DripX;
             public float[] DripLength;
-            public float Width;
+            public float Width, Height;
             public float Age = -1f;
             public Color Color;
             public bool OnWall;
@@ -82,8 +82,6 @@ namespace MusicInYourHands
 
         readonly List<Tag> tags = new List<Tag>();
         readonly List<Stroke> strokes = new List<Stroke>();
-        Font font;
-        FontStyle style;
         Material material;
         MaterialPropertyBlock block;
         Renderer reticle;
@@ -102,26 +100,14 @@ namespace MusicInYourHands
             if (built) return;
             built = true;
             block = new MaterialPropertyBlock();
-            font = tagFont != null ? tagFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            // The marker font is drawn bold and slanted already; the built-in one is made bold and italic.
-            style = tagFont != null ? FontStyle.Normal : FontStyle.BoldAndItalic;
-            material = new Material(letteringMaterial) { name = "Graffiti Lettering", mainTexture = font.material.mainTexture };
-            Font.textureRebuilt += OnFontRebuilt;
+            material = new Material(letteringMaterial) { name = "Graffiti Lettering", mainTexture = TypeFace.Marker.Atlas };
+            material.SetFloat(RimId, 0f);
             path = new Vector3[StrokePoints];
 
             for (int i = 0; i < maxTags; i++)
             {
-                var go = new GameObject($"Tag {i}");
-                go.transform.SetParent(transform, false);
-                var text = go.AddComponent<TextMesh>();
-                text.font = font;
-                text.fontSize = FontSize;
-                text.fontStyle = style;
-                text.anchor = TextAnchor.MiddleCenter;
-                text.alignment = TextAlignment.Center;
-                var r = go.GetComponent<MeshRenderer>();
-                r.sharedMaterial = material;
-                var tag = new Tag { Text = text, Renderer = r, Drips = new LineStrip[3], DripX = new float[3], DripLength = new float[3] };
+                var tag = new Tag { Face = TypeFace.Marker, Drips = new LineStrip[3], DripX = new float[3], DripLength = new float[3] };
+                tag.Renderer = Glyphs.MakeLetter($"Tag {i}", transform, material, out tag.Mesh);
                 for (int d = 0; d < 3; d++) tag.Drips[d] = new LineStrip($"Drip {i}.{d}", transform, lineMaterial, 2);
                 SetVisible(tag, false);
                 tags.Add(tag);
@@ -151,16 +137,9 @@ namespace MusicInYourHands
             hiss.volume = 0f;
         }
 
-        void OnFontRebuilt(Font rebuilt)
-        {
-            if (rebuilt == font && material != null) material.mainTexture = font.material.mainTexture;
-        }
-
-        void OnDestroy() => Font.textureRebuilt -= OnFontRebuilt;
-
         static void SetVisible(Tag tag, bool visible)
         {
-            tag.Text.gameObject.SetActive(visible);
+            tag.Renderer.gameObject.SetActive(visible);
             foreach (var d in tag.Drips) d.SetVisible(visible && tag.OnWall);
         }
 
@@ -300,13 +279,10 @@ namespace MusicInYourHands
             }
             float distance = Vector3.Distance(view.transform.position, aim);
             float height = tagHeight * Mathf.Clamp(distance / wallRadius, 0.6f, 1.6f) * Random.Range(0.85f, 1.2f);
-            tag.Text.characterSize = height * 10f / FontSize;
-            tag.Text.text = word;
-            font.RequestCharactersInTexture(word, FontSize, style);
-            float width = 0f;
-            foreach (char ch in word)
-                if (font.GetCharacterInfo(ch, out var info, FontSize, style)) width += info.advance;
-            tag.Width = width * height / FontSize;
+            // Words the marker hand has no letters for are written in the plain face.
+            tag.Face = TypeFace.Marker.Covers(word) ? TypeFace.Marker : TypeFace.Bold;
+            tag.Width = Glyphs.BuildWord(tag.Mesh, tag.Face, word, height, 1, 0f, Color.white, Color.white, 0f, -height * 0.36f);
+            tag.Height = height;
             tag.Age = 0f;
             tag.Color = Color.Lerp(paint, Color.white, 0.1f);
             tag.OnWall = onWall;
@@ -322,7 +298,7 @@ namespace MusicInYourHands
             var at = aim + right * Random.Range(-0.03f, 0.03f) + down * Random.Range(-0.02f, 0.02f);
 
             var rotation = facing * Quaternion.Euler(0f, 0f, Random.Range(-6f, 6f));
-            tag.Text.transform.SetPositionAndRotation(at + down * Random.Range(-0.012f, 0.012f), rotation);
+            tag.Renderer.transform.SetPositionAndRotation(at + down * Random.Range(-0.012f, 0.012f), rotation);
             for (int d = 0; d < 3; d++)
             {
                 tag.DripX[d] = (Random.value - 0.5f) * tag.Width * 0.8f;
@@ -440,6 +416,7 @@ namespace MusicInYourHands
                 float reveal = Mathf.Clamp01(tag.Age / 0.3f);
                 block.Clear();
                 block.SetColor(ColorId, tag.Color);
+                block.SetTexture(MainTexId, tag.Face.Atlas);
                 block.SetFloat(RevealId, reveal * 1.1f);
                 block.SetVector(ExtentId, new Vector4(-tag.Width * 0.5f, tag.Width * 0.5f, 0f, 0f));
                 block.SetFloat(SprayId, 1f);
@@ -449,12 +426,11 @@ namespace MusicInYourHands
                 tag.Renderer.SetPropertyBlock(block);
 
                 if (!tag.OnWall) continue;
-                var tr = tag.Text.transform;
-                float letter = tag.Text.characterSize * FontSize / 10f;
+                var tr = tag.Renderer.transform;
                 for (int d = 0; d < 3; d++)
                 {
                     float grow = 1f - Mathf.Exp(-Mathf.Max(0f, tag.Age - 0.3f - d * 0.15f) * 1.6f);
-                    var top = tr.TransformPoint(new Vector3(tag.DripX[d], -letter * 0.3f, 0f));
+                    var top = tr.TransformPoint(new Vector3(tag.DripX[d], -tag.Height * 0.3f, 0f));
                     drip[0] = top;
                     drip[1] = top + Vector3.down * (tag.DripLength[d] * grow + 0.001f);
                     var c = tag.Color;

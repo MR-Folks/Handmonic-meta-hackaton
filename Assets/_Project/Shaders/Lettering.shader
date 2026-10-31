@@ -1,4 +1,7 @@
-// Lyric lettering for TextMesh text: samples the font's glyph texture and adds the lyric worlds' looks.
+// Lyric lettering: draws text from a TypeFace's signed distance field atlas, where 0.5 is a letter's edge and the values
+// fall away from it on either side. That keeps edges sharp at any size, and every effect below reads the same one
+// texture sample, so nothing ever picks up the neighbouring letters in the atlas.
+// - _Rim adds a soft dark edge, so words stay readable over a bright room.
 // - _Frame crops the text softly to a rectangle in a "frame" space (_FrameMatrix: world to frame), so giant
 //   letters can run off the edge like a cropped poster (Orbit type).
 // - _Spray turns the glyphs into spray paint: a speckled overspray halo and a slightly rough edge (Graffiti).
@@ -9,9 +12,10 @@ Shader "MusicInYourHands/Lettering"
 {
     Properties
     {
-        _MainTex ("Font texture", 2D) = "white" {}
+        _MainTex ("Distance field atlas", 2D) = "black" {}
         _Color ("Color", Color) = (1, 1, 1, 1)
         _Glow ("Extra brightness", Float) = 0
+        _Rim ("Dark edge 0-1", Float) = 0.4
         _Spray ("Spray paint 0-1", Float) = 0
         _Reveal ("Reveal 0-1", Float) = 1
         _Extent ("Text extent in object space (min x, max x)", Vector) = (-1, 1, 0, 0)
@@ -44,9 +48,9 @@ Shader "MusicInYourHands/Lettering"
             SAMPLER(sampler_MainTex);
 
             CBUFFER_START(UnityPerMaterial)
-                float4 _MainTex_TexelSize;
                 float4 _Color;
                 float _Glow;
+                float _Rim;
                 float _Spray;
                 float _Reveal;
                 float4 _Extent;
@@ -99,23 +103,24 @@ Shader "MusicInYourHands/Lettering"
             half4 frag(Varyings input) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
-                float a = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv).a;
-                float ink = smoothstep(0.3, 0.6, a);
+                float field = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv).r;
+                // The width of the edge's soft step: about a pixel, however large the letters are on screen.
+                float soft = clamp(fwidth(field) * 0.75, 0.004, 0.2);
+                float ink = smoothstep(0.5 - soft, 0.5 + soft, field);
                 float3 color = _Color.rgb * input.color.rgb;
                 float alpha = ink;
 
+                if (_Rim > 0.001)
+                {
+                    float rim = smoothstep(0.32, 0.47, field) * (1 - ink) * _Rim * saturate(1 - _Halo * 2);
+                    color = lerp(color * 0.12, color, ink);
+                    alpha = saturate(ink + rim);
+                }
+
                 if (_Spray > 0.001)
                 {
-                    // Overspray: a soft halo from nearby glyph texels, broken into fine speckles.
-                    float2 t = _MainTex_TexelSize.xy * 2.5;
-                    float halo = 0;
-                    halo += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv + float2(t.x, 0)).a;
-                    halo += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv - float2(t.x, 0)).a;
-                    halo += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv + float2(0, t.y)).a;
-                    halo += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv - float2(0, t.y)).a;
-                    halo += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv + t * 0.7).a;
-                    halo += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv - t * 0.7).a;
-                    halo = saturate(halo / 6 * 1.6);
+                    // Overspray: a soft halo around the letters, broken into fine speckles.
+                    float halo = saturate((field - 0.14) / 0.36 * 1.4);
                     float grain = Hash(floor(input.positionWS.xy * 900 + input.positionWS.z * 700));
                     float speckle = step(0.62, grain) * halo * (1 - ink);
                     // A slightly rough paint edge.
@@ -125,34 +130,18 @@ Shader "MusicInYourHands/Lettering"
 
                 if (_Outline > 0.001)
                 {
-                    // Grow the letters by a few texels in eight directions; the rim around the ink is the outline.
-                    float2 o = _MainTex_TexelSize.xy * 3.5;
-                    float grown = a;
-                    grown = max(grown, SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv + float2(o.x, 0)).a);
-                    grown = max(grown, SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv - float2(o.x, 0)).a);
-                    grown = max(grown, SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv + float2(0, o.y)).a);
-                    grown = max(grown, SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv - float2(0, o.y)).a);
-                    grown = max(grown, SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv + o * 0.7).a);
-                    grown = max(grown, SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv - o * 0.7).a);
-                    grown = max(grown, SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv + float2(o.x, -o.y) * 0.7).a);
-                    grown = max(grown, SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv + float2(-o.x, o.y) * 0.7).a);
-                    float rim = saturate(smoothstep(0.3, 0.6, grown) - ink) * _Outline;
+                    // The field a little further out is the letter grown; the part outside the ink is the outline.
+                    float grown = smoothstep(0.3 - soft, 0.3 + soft, field);
+                    float rim = saturate(grown - ink) * _Outline;
                     color = lerp(color, _OutlineColor.rgb, rim);
                     alpha = max(alpha, rim);
                 }
 
                 if (_Halo > 0.001)
                 {
-                    // A soft glow: the glyph's coverage averaged over two rings of samples around this point.
-                    float glow = 0;
-                    [unroll] for (int k = 0; k < 8; k++)
-                    {
-                        float a = k * 0.785398;
-                        float2 d = float2(cos(a), sin(a)) * _MainTex_TexelSize.xy;
-                        glow += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv + d * 4).a;
-                        glow += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv + d * 9).a * 0.6;
-                    }
-                    glow = saturate(glow / 12.8) * _Halo;
+                    // A soft glow falling away from the letters.
+                    float glow = saturate(field / 0.5);
+                    glow *= glow * _Halo;
                     // The tube itself burns near-white in its middle.
                     color = lerp(color, 1, ink * 0.45 * _Halo);
                     alpha = max(alpha, glow * 0.85);

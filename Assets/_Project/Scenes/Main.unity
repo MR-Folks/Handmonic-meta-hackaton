@@ -342,7 +342,7 @@ MonoBehaviour:
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
-  count: 44
+  count: 88
   flySize: 0.016
   startle: 0.4
   waveSpeed: 1.1
@@ -498,6 +498,7 @@ MonoBehaviour:
   letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
+  skyMaterial: {fileID: 2100000, guid: a377da8a64af84ae68901afb43ab9d32, type: 2}
   reach: {x: 0.9, y: 2}
   spread: 50
   labelHeight: 0.07
@@ -2484,7 +2485,7 @@ MonoBehaviour:
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   startDistance: 3.2
   travelTime: 5.5
-  letterHeight: {x: 0.09, y: 0.17}
+  letterHeight: {x: 0.09, y: 0.14}
   holdTime: 6
 --- !u!4 &1970306283
 Transform:
@@ -2649,7 +2650,6 @@ MonoBehaviour:
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
   paintMaterial: {fileID: 2100000, guid: 9527ccac3e9d14c0d948501ee821f887, type: 2}
-  tagFont: {fileID: 12800000, guid: 777ec58d2d17349c1a3737bc1e54d93e, type: 3}
   wallRadius: 1.6
   tagHeight: 0.2
   holdTime: 4

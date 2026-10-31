@@ -27,7 +27,7 @@ namespace MusicInYourHands
         public LyricsTrack.State Lyric;
 
         /// <summary>The words of the line being sung, or null.</summary>
-        public LyricsTrack.Word[] LineWords => Lyrics != null && Lyric.HasLine && Lyric.Line < Lyrics.Lines.Count ? Lyrics.Lines[Lyric.Line].Words : null;
+        public LyricsTrack.Word[] LineWords => LyricsOption.On && Lyrics != null && Lyric.HasLine && Lyric.Line < Lyrics.Lines.Count ? Lyrics.Lines[Lyric.Line].Words : null;
 
         /// <summary>The word being sung, or an empty string.</summary>
         public string Word

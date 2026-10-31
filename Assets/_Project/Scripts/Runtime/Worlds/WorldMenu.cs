@@ -7,8 +7,8 @@ namespace MusicInYourHands
     /// The world menu: glass bubbles in two honeycombs, like an Apple Watch home screen, opened with Meta's left-hand
     /// menu gesture. The sound worlds cluster on the left and the lyric worlds on the right, each bubble showing a
     /// small animated emblem; below them a row plays and pauses the song, steps to the previous and next song
-    /// (including songs added on the headset) and switches to listening to the room. Bubbles near where you look
-    /// are a little larger, and if you look away the menu glides back in front of you. Each hand casts a soft pointer ray onto the menu (from the shoulder through the pinch);
+    /// (including songs added on the headset), switches to listening to the room, turns the lyrics on and off and adds
+    /// a song with its lyrics from the headset's files. Bubbles near where you look are a little larger, and if you look away the menu glides back in front of you. Each hand casts a soft pointer ray onto the menu (from the shoulder through the pinch);
     /// the bubble it points at swells and its name shows large above the honeycomb. Pinch to pop into it.
     /// </summary>
     [DefaultExecutionOrder(170)]
@@ -45,9 +45,13 @@ namespace MusicInYourHands
         const int ListenToggle = -2;
         const int PreviousSong = -3;
         const int NextSong = -4;
-        const int ExtraBubbles = 4;
+        const int LyricsToggle = -5;
+        const int AddSong = -6;
+        const int ExtraBubbles = 6;
         static readonly Color ListenColor = new Color(0.98f, 0.62f, 0.5f);
         static readonly Color SongColor = new Color(0.72f, 0.7f, 1f);
+        static readonly Color LyricsColor = new Color(0.55f, 0.85f, 1f);
+        static readonly Color AddColor = new Color(0.55f, 0.95f, 0.7f);
 
         sealed class Bubble
         {
@@ -79,7 +83,7 @@ namespace MusicInYourHands
         Bubble[] bubbles = Array.Empty<Bubble>();
         readonly Pointer[] pointers = { new Pointer(), new Pointer() };
         readonly Vector3[] rayPath = new Vector3[2];
-        TextMesh caption, captionShadow, hint, soundLabel, lyricLabel;
+        TypeLabel caption, hint, soundLabel, lyricLabel;
         Vector3 followPosition;
         Quaternion followRotation;
         float awayTime;
@@ -87,7 +91,7 @@ namespace MusicInYourHands
         Transform root;
         MaterialPropertyBlock block;
         AudioPool voices;
-        bool open, toggleRequested;
+        bool open, toggleRequested, picking;
         float openTime, closeAt = -1f, cooldown;
 
         public bool IsOpen => open;
@@ -104,6 +108,14 @@ namespace MusicInYourHands
             if (Instance == this) Instance = null;
         }
         void OnToggle() => toggleRequested = true;
+
+        /// <summary>Back from the file picker: a new song joins the list and starts playing.</summary>
+        void OnApplicationFocus(bool focused)
+        {
+            if (!focused || !picking) return;
+            picking = false;
+            SongPicker.Finish(MusicBus.Instance);
+        }
 
         void LateUpdate()
         {
@@ -212,7 +224,8 @@ namespace MusicInYourHands
                 b.Renderer.transform.localScale = Vector3.one * Mathf.Max(scale, 1e-4f);
                 Effects.Face(b.Renderer.transform, view);
 
-                bool selected = b.World == ListenToggle ? bus != null && bus.IsListening : b.World == manager.Current;
+                bool selected = b.World == ListenToggle ? bus != null && bus.IsListening
+                    : b.World == LyricsToggle ? LyricsOption.On : b.World == manager.Current;
                 block.Clear();
                 block.SetColor(ColorId, BubbleColor(b, manager));
                 block.SetFloat(IconId, b.World >= 0 ? manager.Worlds[b.World].MenuIcon : Icon(b.World));
@@ -244,17 +257,23 @@ namespace MusicInYourHands
             if (root.gameObject.activeSelf != (anyVisible || open)) root.gameObject.SetActive(anyVisible || open);
         }
 
-        static float Icon(int bubble) => bubble switch { ListenToggle => 7f, NextSong => 14f, PreviousSong => 15f, _ => 6f };
+        static float Icon(int bubble) => bubble switch
+        {
+            ListenToggle => 7f, NextSong => 14f, PreviousSong => 15f, LyricsToggle => 23f, AddSong => 24f, _ => 6f
+        };
 
         static bool IsSongStep(Bubble b) => b.World == PreviousSong || b.World == NextSong;
 
         Color BubbleColor(Bubble b, WorldManager manager) =>
-            b.World >= 0 ? manager.Worlds[b.World].Color : b.World == ListenToggle ? ListenColor : IsSongStep(b) ? SongColor : new Color(0.85f, 0.85f, 1f);
+            b.World >= 0 ? manager.Worlds[b.World].Color : b.World == ListenToggle ? ListenColor : IsSongStep(b) ? SongColor
+            : b.World == LyricsToggle ? LyricsColor : b.World == AddSong ? AddColor : new Color(0.85f, 0.85f, 1f);
 
         string BubbleName(Bubble b, WorldManager manager, MusicBus bus) =>
             b.World >= 0 ? manager.Worlds[b.World].DisplayName
             : b.World == ListenToggle ? bus != null && bus.IsListening ? "Play the song" : "Listen to the room"
             : IsSongStep(b) ? SongStepName(bus, b.World == NextSong ? 1 : -1)
+            : b.World == LyricsToggle ? LyricsOption.On ? "Turn lyrics off" : "Turn lyrics on"
+            : b.World == AddSong ? "Add a song and its lyrics"
             : bus == null ? "Music" : bus.IsPlaying ? $"Pause {bus.Title}" : $"Play {bus.Title}";
 
         static string SongStepName(MusicBus bus, int step)
@@ -356,13 +375,12 @@ namespace MusicInYourHands
         {
             float show = open ? Mathf.Clamp01((openTime - 0.1f) / 0.3f) : 0f;
             bool visible = show > 0.001f;
-            if (caption.gameObject.activeSelf != visible)
+            if (caption.GameObject.activeSelf != visible)
             {
-                caption.gameObject.SetActive(visible);
-                captionShadow.gameObject.SetActive(visible);
-                hint.gameObject.SetActive(visible);
-                soundLabel.gameObject.SetActive(visible);
-                lyricLabel.gameObject.SetActive(visible && lyricCount > 0);
+                caption.GameObject.SetActive(visible);
+                hint.GameObject.SetActive(visible);
+                soundLabel.GameObject.SetActive(visible);
+                lyricLabel.GameObject.SetActive(visible && lyricCount > 0);
             }
             if (!visible) return;
 
@@ -370,13 +388,12 @@ namespace MusicInYourHands
             if (subject == null)
                 foreach (var b in bubbles) if (b.World == manager.Current) subject = b;
             string text = subject != null ? BubbleName(subject, manager, bus) : "";
-            caption.text = captionShadow.text = text;
+            caption.Text = text;
             var color = subject != null ? Color.Lerp(Color.white, BubbleColor(subject, manager), hovered >= 0 ? 0.3f : 0.15f) : Color.white;
             color.a = show * (hovered >= 0 ? 1f : 0.8f);
-            caption.color = color;
-            captionShadow.color = new Color(0f, 0f, 0f, show * 0.55f);
-            hint.color = new Color(1f, 1f, 1f, show * 0.75f);
-            soundLabel.color = lyricLabel.color = new Color(1f, 1f, 1f, show * 0.85f);
+            caption.Color = color;
+            hint.Color = new Color(1f, 1f, 1f, show * 0.8f);
+            soundLabel.Color = lyricLabel.Color = new Color(1f, 1f, 1f, show * 0.9f);
 
             float highest = spacing, lowest = 0f;
             foreach (var b in bubbles)
@@ -386,25 +403,27 @@ namespace MusicInYourHands
             }
             var rotation = root.rotation;
             var top = root.TransformPoint(new Vector3(0f, highest + bubbleSize * 1.45f, 0f));
-            caption.transform.SetPositionAndRotation(top, rotation);
-            captionShadow.transform.SetPositionAndRotation(top + rotation * new Vector3(0.0009f, -0.0009f, 0.001f), rotation);
-            hint.transform.SetPositionAndRotation(root.TransformPoint(new Vector3(0f, lowest - bubbleSize * 0.75f, 0f)), rotation);
-            soundLabel.transform.SetPositionAndRotation(root.TransformPoint(new Vector3(SoundCenter.x, highest + bubbleSize * 0.62f, 0f)), rotation);
-            lyricLabel.transform.SetPositionAndRotation(root.TransformPoint(new Vector3(LyricCenter.x, highest + bubbleSize * 0.62f, 0f)), rotation);
+            caption.Transform.SetPositionAndRotation(top, rotation);
+            hint.Transform.SetPositionAndRotation(root.TransformPoint(new Vector3(0f, lowest - bubbleSize * 0.75f, 0f)), rotation);
+            soundLabel.Transform.SetPositionAndRotation(root.TransformPoint(new Vector3(SoundCenter.x, highest + bubbleSize * 0.62f, 0f)), rotation);
+            lyricLabel.Transform.SetPositionAndRotation(root.TransformPoint(new Vector3(LyricCenter.x, highest + bubbleSize * 0.62f, 0f)), rotation);
         }
 
         void Press(Bubble b, WorldManager manager, MusicBus bus)
         {
             cooldown = 0.6f;
             b.Pop = 1f;
-            float note = b.World >= 0 ? Synth.Pentatonic[6 + b.World % 5] : Synth.Pentatonic[b.World == ListenToggle ? 4 : IsSongStep(b) ? 3 : 5];
+            float note = b.World >= 0 ? Synth.Pentatonic[6 + b.World % 5]
+                : Synth.Pentatonic[b.World == ListenToggle ? 4 : IsSongStep(b) ? 3 : b.World == LyricsToggle || b.World == AddSong ? 2 : 5];
             voices.Play(Synth.Chime(note), b.Renderer.transform.position, 0.6f);
             if (b.World >= 0)
             {
                 manager.Switch(b.World);
                 closeAt = openTime + 0.35f;
             }
+            else if (b.World == LyricsToggle) LyricsOption.On = !LyricsOption.On;
             else if (bus == null) return;
+            else if (b.World == AddSong) picking = SongPicker.Open(bus);
             else if (b.World == ListenToggle) bus.ToggleListen();
             else if (IsSongStep(b)) bus.StepSong(b.World == NextSong ? 1 : -1);
             else bus.TogglePause();
@@ -452,22 +471,6 @@ namespace MusicInYourHands
             return center + new Vector2(Mathf.Cos(rad), Mathf.Sin(rad)) * r;
         }
 
-        TextMesh MakeText(string objectName, Font font, int fontSize, float characterSize, TextAnchor anchor, FontStyle style)
-        {
-            var go = new GameObject(objectName);
-            go.transform.SetParent(root, false);
-            var text = go.AddComponent<TextMesh>();
-            text.font = font;
-            go.GetComponent<MeshRenderer>().sharedMaterial = font.material;
-            text.fontSize = fontSize;
-            text.characterSize = characterSize;
-            text.fontStyle = style;
-            text.anchor = anchor;
-            text.alignment = TextAlignment.Center;
-            go.SetActive(false);
-            return text;
-        }
-
         void Build(WorldManager manager)
         {
             if (root != null && bubbles.Length == manager.Worlds.Count + ExtraBubbles) return;
@@ -480,7 +483,6 @@ namespace MusicInYourHands
             root.SetParent(transform, false);
             voices ??= new AudioPool(transform, 3);
 
-            var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             int count = manager.Worlds.Count;
             bubbles = new Bubble[count + ExtraBubbles];
             int soundIndex = 0, lyricIndex = 0;
@@ -494,34 +496,37 @@ namespace MusicInYourHands
                 lowest = Mathf.Min(lowest, slots[w].y);
             }
             lyricCount = lyricIndex;
-            // The song row sits under both groups: previous, play or pause, next, listen.
+            // The song row sits under both groups: previous, play or pause, next, listen, lyrics, add a song.
             float rowY = lowest - spacing * 1.15f;
             float rowX = (SoundCenter.x + LyricCenter.x) * 0.5f;
             for (int i = 0; i < bubbles.Length; i++)
             {
                 int world = i < count ? i : i == count ? NowPlaying : ListenToggle - (i - count - 1);
                 Vector2 slot = world >= 0 ? slots[world]
-                    : world == PreviousSong ? new Vector2(rowX - spacing * 1.5f, rowY)
-                    : world == NowPlaying ? new Vector2(rowX - spacing * 0.5f, rowY)
-                    : world == NextSong ? new Vector2(rowX + spacing * 0.5f, rowY)
-                    : new Vector2(rowX + spacing * 1.5f, rowY);
+                    : world == PreviousSong ? new Vector2(rowX - spacing * 2.5f, rowY)
+                    : world == NowPlaying ? new Vector2(rowX - spacing * 1.5f, rowY)
+                    : world == NextSong ? new Vector2(rowX - spacing * 0.5f, rowY)
+                    : world == ListenToggle ? new Vector2(rowX + spacing * 0.5f, rowY)
+                    : world == LyricsToggle ? new Vector2(rowX + spacing * 1.5f, rowY)
+                    : new Vector2(rowX + spacing * 2.5f, rowY);
 
                 string objectName = world >= 0 ? $"Bubble {world}" : world == ListenToggle ? "Bubble Listen"
-                    : world == PreviousSong ? "Bubble Previous Song" : world == NextSong ? "Bubble Next Song" : "Bubble Now Playing";
+                    : world == PreviousSong ? "Bubble Previous Song" : world == NextSong ? "Bubble Next Song"
+                    : world == LyricsToggle ? "Bubble Lyrics" : world == AddSong ? "Bubble Add Song" : "Bubble Now Playing";
                 var r = Effects.MakeQuad(objectName, root, bubbleMaterial);
                 float delay = 0.04f + slot.magnitude * 0.6f;
                 bubbles[i] = new Bubble { Renderer = r, World = world, Slot = slot, Delay = delay };
                 r.gameObject.SetActive(false);
             }
 
-            soundLabel = MakeText("Sound Worlds", font, 48, 0.0024f, TextAnchor.LowerCenter, FontStyle.Bold);
-            soundLabel.text = "Sound worlds";
-            lyricLabel = MakeText("Lyric Worlds", font, 48, 0.0024f, TextAnchor.LowerCenter, FontStyle.Bold);
-            lyricLabel.text = "Lyric worlds";
-            captionShadow = MakeText("Caption Shadow", font, 64, 0.0026f, TextAnchor.LowerCenter, FontStyle.Bold);
-            caption = MakeText("Caption", font, 64, 0.0026f, TextAnchor.LowerCenter, FontStyle.Bold);
-            hint = MakeText("Hint", font, 48, 0.0024f, TextAnchor.UpperCenter, FontStyle.Normal);
-            hint.text = "Point and pinch to choose";
+            soundLabel = new TypeLabel("Sound Worlds", root, 0.0135f, 0f);
+            soundLabel.Text = "Sound worlds";
+            lyricLabel = new TypeLabel("Lyric Worlds", root, 0.0135f, 0f);
+            lyricLabel.Text = "Lyric worlds";
+            caption = new TypeLabel("Caption", root, 0.019f, 0f);
+            hint = new TypeLabel("Hint", root, 0.0135f, 1f);
+            hint.Text = "Point and pinch to choose";
+            foreach (var label in new[] { soundLabel, lyricLabel, caption, hint }) label.GameObject.SetActive(false);
 
             for (int s = 0; s < 2; s++)
             {

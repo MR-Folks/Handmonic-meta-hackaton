@@ -44,6 +44,8 @@ namespace MusicInYourHands.EditorTools
             ok &= CheckRainPreview();
             ok &= CheckFirefliesPreview();
             ok &= CheckSongs();
+            ok &= CheckLettering();
+            ok &= CheckLyricsOption();
             Debug.Log(ok ? "[Check] All checks passed." : "[Check] Some checks FAILED.");
             return ok;
         }
@@ -89,6 +91,42 @@ namespace MusicInYourHands.EditorTools
 
 #if META_XR_CORE
         /// <summary>Shows which transform the old id-based lookup would have used, for the record.</summary>
+        /// <summary>The baked faces load, and words built from them are one quad per letter, inside the atlas.</summary>
+        static bool CheckLettering()
+        {
+            bool ok = true;
+            foreach (var (name, face) in new[] { ("Bold", TypeFace.Bold), ("Marker", TypeFace.Marker) })
+            {
+                var mesh = new Mesh();
+                Glyphs.BuildWord(mesh, face, "Hi there", 1f, 1, 0f, Color.white, Color.white);
+                bool inside = true;
+                foreach (var uv in mesh.uv) inside &= uv.x >= 0f && uv.x <= 1f && uv.y >= 0f && uv.y <= 1f;
+                bool good = face.Atlas != null && face.Covers("Hi there") && face.Width("Hi there") > 1f && mesh.vertexCount == 7 * 4 && inside;
+                Object.DestroyImmediate(mesh);
+                if (!good) Debug.LogError($"[Check] The {name} face didn't build a word properly.");
+                ok &= good;
+            }
+            if (ok) Debug.Log("[Check] Lettering faces load and build words inside their atlases.");
+            return ok;
+        }
+
+        /// <summary>With lyrics off no word is sung, and lyric worlds fall back on the song's title.</summary>
+        static bool CheckLyricsOption()
+        {
+            bool was = LyricsOption.On;
+            var lyrics = LyricsTrack.Parse("[00:01.00]hello world\n");
+            var singing = new MusicFrame { Lyrics = lyrics, Lyric = new LyricsTrack.State(0, 1) };
+            var betweenLines = new MusicFrame { Lyrics = lyrics, Lyric = new LyricsTrack.State(-1, -1) };
+            LyricsOption.On = true;
+            bool ok = singing.Word == "world" && !new LyricCursor().Advance(betweenLines, out _);
+            LyricsOption.On = false;
+            ok &= singing.Word == "" && singing.LineWords == null && new LyricCursor().Advance(singing, out _);
+            LyricsOption.On = was;
+            if (ok) Debug.Log("[Check] Turning lyrics off hides the words and leaves the title for lyric worlds.");
+            else Debug.LogError("[Check] The lyrics option doesn't hide the words as it should.");
+            return ok;
+        }
+
         static void ReportIdLookup(GameObject hand, string side)
         {
             var skeleton = hand.GetComponent<OVRCustomSkeleton>();

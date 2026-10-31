@@ -4,11 +4,12 @@ using UnityEngine;
 namespace MusicInYourHands
 {
     /// <summary>
-    /// The Ceiling stars world: the lyrics become a constellation on your ceiling. Each sung word lights up as a star
-    /// overhead with its word beside it, and a line of light draws across to it from the word before, so the line of
-    /// the song is traced in stars. The stars twinkle with the music and pulse on the beat. Point at a star and its
+    /// The Ceiling stars world: your ceiling opens onto a deep night sky, and the lyrics become constellations in it.
+    /// Each sung word lights up as a star overhead with its word beside it, and a line of light draws across to it from
+    /// the word before, so the line of the song is traced in stars. The stars twinkle with the music and pulse on the beat. Point at a star and its
     /// word floats down in front of you to read up close. Each new line forms a new constellation while the last one
-    /// fades. Until the room is scanned, the ceiling is a little above your head.
+    /// fades. With a room scan the sky fills your ceiling; until then it opens a little above your head and fades out
+    /// around you.
     /// </summary>
     public class CeilingStars : World
     {
@@ -31,6 +32,7 @@ namespace MusicInYourHands
         [SerializeField] Material letteringMaterial;
         [SerializeField] Material glowMaterial;
         [SerializeField] Material lineMaterial;
+        [SerializeField] Material skyMaterial;
 
         [Header("Sky")]
         [Tooltip("How far across the ceiling a constellation spreads (m from where you stand), and its width in degrees.")]
@@ -42,7 +44,12 @@ namespace MusicInYourHands
         static readonly int ColorId = Shader.PropertyToID("_Color");
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
         static readonly int IntensityId = Shader.PropertyToID("_Intensity");
-        const int FontSize = 96;
+        static readonly int SizeId = Shader.PropertyToID("_Size");
+        static readonly int SoftId = Shader.PropertyToID("_Soft");
+        static readonly int PulseId = Shader.PropertyToID("_Pulse");
+        // The sky without a room scan: how wide it is and how softly it fades out around you (m).
+        const float OpenSkySize = 10f;
+        const float OpenSkySoft = 3f;
         const int StarsPerLine = 14;
         const int Sets = 2;
 
@@ -70,9 +77,11 @@ namespace MusicInYourHands
         readonly LyricCursor cursor = new LyricCursor();
         readonly Vector3[] linePath = new Vector3[StarsPerLine * 8];
         readonly Color[] lineColors = new Color[StarsPerLine * 8];
-        Font font;
         Material material;
         MaterialPropertyBlock block;
+        Renderer nightSky;
+        Vector2 skySize;
+        float skySoft;
         MeshRenderer reading;
         Mesh readingMesh;
         Star pointed;
@@ -89,9 +98,7 @@ namespace MusicInYourHands
             if (built) return;
             built = true;
             block = new MaterialPropertyBlock();
-            font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            material = new Material(letteringMaterial) { name = "Star Lettering", mainTexture = font.material.mainTexture };
-            Font.textureRebuilt += OnFontRebuilt;
+            material = new Material(letteringMaterial) { name = "Star Lettering", mainTexture = TypeFace.Bold.Atlas };
             for (int s = 0; s < Sets; s++)
             {
                 var sky = new Constellation { Lines = new LineStrip($"Constellation {s}", transform, lineMaterial, linePath.Length) };
@@ -106,18 +113,16 @@ namespace MusicInYourHands
                 }
                 skies[s] = sky;
             }
+            if (skyMaterial != null)
+            {
+                nightSky = Effects.MakeQuad("Night Sky", transform, skyMaterial);
+                nightSky.gameObject.SetActive(false);
+            }
             reading = Glyphs.MakeLetter("Reading", transform, material, out readingMesh);
             reading.gameObject.SetActive(false);
             pointer = new LineStrip("Pointing", transform, lineMaterial, 2);
             pointer.SetVisible(false);
         }
-
-        void OnFontRebuilt(Font rebuilt)
-        {
-            if (rebuilt == font && material != null) material.mainTexture = font.material.mainTexture;
-        }
-
-        void OnDestroy() => Font.textureRebuilt -= OnFontRebuilt;
 
         protected override void OnEnable()
         {
@@ -136,6 +141,7 @@ namespace MusicInYourHands
             foreach (var sky in skies) Clear(sky);
             reading.gameObject.SetActive(false);
             pointer.SetVisible(false);
+            if (nightSky != null) nightSky.gameObject.SetActive(false);
         }
 
         static void Clear(Constellation sky)
@@ -161,6 +167,7 @@ namespace MusicInYourHands
                 head = view.transform.position;
                 forward = Effects.FlatForward(view);
                 ceiling = Room.Ceiling(Mathf.Max(head.y + 0.85f, Effects.FloorY(view) + 2.4f));
+                PlaceSky();
                 MarkAnchored(view);
                 anchored = true;
             }
@@ -180,7 +187,51 @@ namespace MusicInYourHands
             }
             Point(rig, view, dt);
             foreach (var sky in skies) Draw(sky, music, view);
+            DrawNightSky(music);
             DrawReading(music, view, dt);
+        }
+
+        /// <summary>Lays the night sky over the ceiling: across the scanned walls, or centred above you without a scan.</summary>
+        void PlaceSky()
+        {
+            if (nightSky == null) return;
+            var center = new Vector3(head.x, ceiling, head.z);
+            var along = forward;
+            skySize = Vector2.one * OpenSkySize;
+            skySoft = OpenSkySoft;
+            if (Room.Walls.Count > 0)
+            {
+                along = Vector3.ProjectOnPlane(Room.Walls[0].Right, Vector3.up).normalized;
+                var across = Vector3.Cross(Vector3.up, along);
+                Vector2 min = Vector2.positiveInfinity, max = Vector2.negativeInfinity;
+                foreach (var wall in Room.Walls)
+                    for (int end = -1; end <= 1; end += 2)
+                    {
+                        var p = wall.Center + wall.Right * (end * wall.Size.x * 0.5f);
+                        var local = new Vector2(Vector3.Dot(p, across), Vector3.Dot(p, along));
+                        min = Vector2.Min(min, local);
+                        max = Vector2.Max(max, local);
+                    }
+                var middle = (min + max) * 0.5f;
+                center = across * middle.x + along * middle.y + Vector3.up * ceiling;
+                skySize = max - min;
+                skySoft = 0.2f;
+            }
+            // Just under the ceiling, so it never fights with anything at the ceiling's own height.
+            nightSky.transform.SetPositionAndRotation(center + Vector3.down * 0.02f, Quaternion.LookRotation(Vector3.up, along));
+            nightSky.transform.localScale = new Vector3(skySize.x, skySize.y, 1f);
+            nightSky.gameObject.SetActive(true);
+        }
+
+        void DrawNightSky(MusicFrame music)
+        {
+            if (nightSky == null) return;
+            block.Clear();
+            block.SetVector(SizeId, skySize);
+            block.SetFloat(SoftId, skySoft);
+            block.SetFloat(AlphaId, fade);
+            block.SetFloat(PulseId, music.Kick * 0.5f + music.Band(5) * 0.5f);
+            nightSky.SetPropertyBlock(block);
         }
 
         /// <summary>A new star for the sung word, on a wandering path across the ceiling.</summary>
@@ -197,7 +248,7 @@ namespace MusicInYourHands
             star.Text = text;
             star.Born = clock;
             star.Twinkle = Random.value * 6.28f;
-            Glyphs.BuildWord(star.Mesh, font, text, FontSize, FontStyle.Normal, 1f, 1, 0f, Color.white, Color.white);
+            Glyphs.BuildWord(star.Mesh, TypeFace.Bold, text, 1f, 1, 0f, Color.white, Color.white);
             star.Light.gameObject.SetActive(true);
             star.Label.gameObject.SetActive(true);
         }
@@ -234,7 +285,7 @@ namespace MusicInYourHands
             }
             if (best != null)
             {
-                if (best != pointed) Glyphs.BuildWord(readingMesh, font, best.Text, FontSize, FontStyle.Bold, 1f, 5, 0.12f, Color.white, new Color(0.45f, 0.4f, 0.65f));
+                if (best != pointed) Glyphs.BuildWord(readingMesh, TypeFace.Bold, best.Text, 1f, 1, 0f, Color.white, Color.white);
                 pointed = best;
                 readHold = 1.2f;
                 pointerPath[0] = tipOfBest;

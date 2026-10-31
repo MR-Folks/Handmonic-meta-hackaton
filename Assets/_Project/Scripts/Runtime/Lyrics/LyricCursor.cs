@@ -52,7 +52,7 @@ namespace MusicInYourHands
             else
             {
                 // Between lines of a song with lyrics, wait; without lyrics, step through the title on the beat.
-                if (music.LineWords != null || (music.Lyrics != null && music.Lyrics.Lines.Count > 0)) return false;
+                if (LyricsOption.On && (music.LineWords != null || (music.Lyrics != null && music.Lyrics.Lines.Count > 0))) return false;
                 var title = music.Bus != null ? music.Bus.Title : "Music";
                 var parts = title.Split(' ');
                 int step = music.Bus != null ? music.Bus.BeatCount / 4 : Mathf.FloorToInt(music.SongTime / 2f);

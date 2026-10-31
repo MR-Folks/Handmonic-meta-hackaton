@@ -34,26 +34,17 @@ namespace MusicInYourHands
             public bool Active;
             internal MeshRenderer Renderer;
             internal Mesh Mesh;
-            internal int Built;
         }
 
         static readonly int ColorId = Shader.PropertyToID("_Color");
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
         static readonly int HaloId = Shader.PropertyToID("_Halo");
         static readonly int GlowId = Shader.PropertyToID("_Glow");
-        const int FontSize = 96;
-
-        // The font texture grows (and moves its letters) when new letters are asked for; words built before that
-        // are rebuilt.
-        static int fontVersion;
-        static bool listening;
 
         readonly List<Word> words = new List<Word>();
         readonly LyricCursor cursor = new LyricCursor();
-        readonly Font font;
         readonly Material material;
         readonly MaterialPropertyBlock block = new MaterialPropertyBlock();
-        readonly FontStyle style;
         readonly float letterHeight;
 
         public IReadOnlyList<Word> Words => words;
@@ -68,17 +59,10 @@ namespace MusicInYourHands
         /// <summary>The current word's position in its line (0 for the first word).</summary>
         public int Index => cursor.Index;
 
-        public WordLayer(string name, Transform parent, Material lettering, int count, float letterHeight, FontStyle style = FontStyle.Bold)
+        public WordLayer(string name, Transform parent, Material lettering, int count, float letterHeight)
         {
             this.letterHeight = letterHeight;
-            this.style = style;
-            font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            if (!listening)
-            {
-                listening = true;
-                Font.textureRebuilt += _ => fontVersion++;
-            }
-            material = new Material(lettering) { name = $"{name} Lettering", mainTexture = font.material.mainTexture };
+            material = new Material(lettering) { name = $"{name} Lettering", mainTexture = TypeFace.Bold.Atlas };
             for (int i = 0; i < count; i++)
             {
                 var w = new Word();
@@ -119,7 +103,7 @@ namespace MusicInYourHands
                 foreach (var o in words)
                     if (w == null || o.Age / o.Life > w.Age / w.Life) w = o;
             w.Text = text;
-            Build(w);
+            w.Width = Glyphs.BuildWord(w.Mesh, TypeFace.Bold, text, 1f, 1, 0f, Color.white, Color.white);
             w.Age = 0f;
             w.Life = life;
             w.Velocity = Vector3.zero;
@@ -132,12 +116,6 @@ namespace MusicInYourHands
             w.Active = true;
             w.Renderer.gameObject.SetActive(true);
             return w;
-        }
-
-        void Build(Word w)
-        {
-            w.Width = Glyphs.BuildWord(w.Mesh, font, w.Text, FontSize, style, 1f, 4, 0.1f, Color.white, new Color(0.55f, 0.55f, 0.6f));
-            w.Built = fontVersion;
         }
 
         /// <summary>Ages the words and puts away the ones whose life is over.</summary>
@@ -154,11 +132,9 @@ namespace MusicInYourHands
         /// <summary>Draws every word where the world put it. <paramref name="fade"/> fades the whole layer.</summary>
         public void Draw(float fade)
         {
-            if (material.mainTexture != font.material.mainTexture) material.mainTexture = font.material.mainTexture;
             foreach (var w in words)
             {
                 if (!w.Active) continue;
-                if (w.Built != fontVersion) Build(w);
                 w.Renderer.transform.SetPositionAndRotation(w.Position, w.Rotation);
                 w.Renderer.transform.localScale = Vector3.one * (letterHeight * w.Size);
                 float alpha = Mathf.Clamp01(w.Age / 0.25f) * Mathf.Clamp01((w.Life - w.Age) / 0.6f) * w.Alpha * fade;
@@ -166,7 +142,7 @@ namespace MusicInYourHands
                 block.SetColor(ColorId, w.Color);
                 block.SetFloat(AlphaId, alpha);
                 block.SetFloat(HaloId, w.Halo);
-                block.SetFloat(GlowId, 0.2f);
+                block.SetFloat(GlowId, 0.1f);
                 w.Renderer.SetPropertyBlock(block);
             }
         }

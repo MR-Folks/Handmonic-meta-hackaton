@@ -54,7 +54,7 @@ namespace MusicInYourHands
 
         Transform plate;
         Renderer plateRenderer;
-        TextMesh label;
+        TypeLabel label;
         ParticleSystem sand;
         ParticleSystem.Particle[] output;
         Vector2[] grain;
@@ -94,17 +94,9 @@ namespace MusicInYourHands
             plateRenderer.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
             plateRenderer.transform.localScale = Vector3.one * plateSize;
 
-            var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            var labelGo = new GameObject("Mode");
-            labelGo.transform.SetParent(plate, false);
-            label = labelGo.AddComponent<TextMesh>();
-            label.font = font;
-            labelGo.GetComponent<MeshRenderer>().sharedMaterial = font.material;
-            label.fontSize = 48;
-            label.characterSize = 0.0022f;
-            label.anchor = TextAnchor.UpperLeft;
-            labelGo.transform.localPosition = new Vector3(-plateSize * 0.5f, 0.002f, -plateSize * 0.53f);
-            labelGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            label = new TypeLabel("Mode", plate, 0.013f, 1f);
+            label.Transform.localPosition = new Vector3(0f, 0.002f, -plateSize * 0.53f);
+            label.Transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
 
             var go = new GameObject("Sand");
             go.transform.SetParent(transform, false);
@@ -216,8 +208,8 @@ namespace MusicInYourHands
             block.SetFloat(KickId, music.Kick);
             block.SetFloat(AlphaId, fade);
             plateRenderer.SetPropertyBlock(block);
-            label.text = $"mode {Modes[mode].x}:{Modes[mode].y}";
-            label.color = new Color(Sand.r, Sand.g, Sand.b, 0.55f * fade);
+            label.Text = $"mode {Modes[mode].x}:{Modes[mode].y}";
+            label.Color = new Color(Sand.r, Sand.g, Sand.b, 0.75f * fade);
             Sing(music, view, amp, dt);
         }
 

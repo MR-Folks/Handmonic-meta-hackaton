@@ -53,6 +53,10 @@ namespace MusicInYourHands.EditorTools
             Shot<LightTrails>("15-light-trails", HandPose.BacksToFace, 4f, prepare: world => DrawPreviewSculpture((LightTrails)world));
             Shot<NeonSign>("16-neon-sign", HandPose.BacksToFace, 2f, lead: 4f, extra: 1.7f);
             Shot<WordDrift>("17-word-drift", HandPose.PalmsToFace, 2f, lead: 6f);
+            WordDrift drift = null;
+            int heldFrames = 0;
+            Shot<WordDrift>("17h-word-drift-held", HandPose.PalmsToFace, 2f, lead: 7f, prepare: world => drift = (WordDrift)world,
+                holdPose: _ => { if (++heldFrames % 24 == 0) drift.PreviewHold(); });
             Shot<RisingFloor>("18-rising-floor", HandPose.PalmsToFace, 20f, lead: 4f);
             Shot<WordSnow>("19-word-snow", HandPose.PalmsUp, 10f, lead: 9f);
             Shot<CeilingStars>("20-ceiling-stars", HandPose.PalmsToFace, -40f, lead: 4f);
