@@ -73,16 +73,19 @@ Shader "MusicInYourHands/Orb"
             {
                 dir = normalize(dir);
                 float t = _Time.y;
-                float lon = atan2(dir.z, dir.x) + t * _Spin * 0.35;
+                // The nudge keeps the sphere's pole vertices off atan2(0, 0), which is undefined and tears a hole there.
+                float lon = atan2(dir.z, dir.x + 1e-5) + t * _Spin * 0.35;
                 float lat = asin(clamp(dir.y, -1, 1));
                 float energy = saturate(_Band * 0.9 + _Kick * 0.5);
-                float n1 = lerp(2.4, 0.75, energy) + 0.35 * sin(t * 0.7 + _Lobes);
-                float n2 = 1.7 + 0.7 * sin(t * 0.45 + _Lobes * 1.3);
+                // n2 stays above 2: at 2 and below the superformula has creases, which show as hard edges.
+                float n1 = lerp(2.4, 1.0, energy) + 0.25 * sin(t * 0.7 + _Lobes);
+                float n2 = 2.8 + 0.6 * sin(t * 0.45 + _Lobes * 1.3);
                 float r1 = Superformula(lon, _Lobes, n1, n2, n2);
-                float r2 = Superformula(lat, _Lobes - 1, n1 + 1, 1.6, 1.6);
+                float r2 = Superformula(lat, _Lobes - 1, n1 + 1, 2.6, 2.6);
                 float3 shape = float3(r1 * cos(lon) * r2 * cos(lat), r2 * sin(lat) * 0.9, r1 * sin(lon) * r2 * cos(lat));
-                float len = length(shape);
-                shape *= min(1.0, 1.35 / max(len, 1e-3)) / 1.15;
+                // Limits the lobes' reach with a soft curve; a hard limit leaves a crease where it starts.
+                float len = max(length(shape), 1e-3);
+                shape *= 1.35 * tanh(len / 1.35) / len;
                 float3 sphere = dir;
                 return lerp(sphere, shape, saturate(_Amp * 5)) * 0.5;
             }

@@ -52,6 +52,8 @@ namespace MusicInYourHands
         [SerializeField] Vector2 volumeRange = new Vector2(0.3f, 1f);
         [SerializeField] int motesPerBeat = 16;
         [SerializeField] float motesPerSecond = 12f;
+        [Tooltip("Fingertip distance from the orb's centre (m) up to which its thread is fully lit, and where it has faded away.")]
+        [SerializeField] Vector2 threadReach = new Vector2(0.7f, 0.9f);
 
         static readonly int KickId = Shader.PropertyToID("_Kick");
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
@@ -89,8 +91,9 @@ namespace MusicInYourHands
         };
 
         const int DotCount = 1500;
+        const int HeartGrid = 24;
         const int KnotPoints = 180;
-        const int TendrilPoints = 20;
+        const int TendrilPoints = 28;
 
         Transform orb, halo, core, dots;
         Transform[] layers;
@@ -100,6 +103,7 @@ namespace MusicInYourHands
         Vector3[] path;
         Color[] pathColors;
         float[] knotPhase;
+        readonly float[] tendrilFlow = new float[10];
         ParticleSystem motes;
         MaterialPropertyBlock block;
         WordLayer words;
@@ -192,7 +196,7 @@ namespace MusicInYourHands
             float size = radius * 2f * (1f + kick * beatSwell) * Mathf.SmoothStep(0f, 1f, visibility);
             if (show) DrawOrb(music, view, size);
             DrawKnots(music, view, show, size, dt);
-            DrawTendrils(rig, music, view, show, size);
+            DrawTendrils(rig, music, view, show, size, dt);
 
             if (show && holding)
             {
@@ -351,9 +355,11 @@ namespace MusicInYourHands
 
         /// <summary>
         /// Threads of energy from each fingertip into the orb: smooth swaying curves, pink at the hand and gold at
-        /// the orb, with bright drops flowing along them into the orb and a flare on each kick.
+        /// the orb, with bright drops flowing along them into the orb and a flare on each kick. The sway and the drops
+        /// are measured in metres, so a thread looks the same however long it is: it never bunches up as the finger
+        /// nears the orb or stretches as it moves away. It fades as the finger reaches the shell.
         /// </summary>
-        void DrawTendrils(HandRig rig, MusicFrame music, Camera view, bool show, float size)
+        void DrawTendrils(HandRig rig, MusicFrame music, Camera view, bool show, float size, float dt)
         {
             float time = Now;
             for (int side = 0; side < 2; side++)
@@ -366,29 +372,34 @@ namespace MusicInYourHands
                     var tip = visible ? (hand.TipJoints[f] != null ? hand.TipJoints[f].position : hand.Tips[f]) : Vector3.zero;
                     var toTip = tip - center;
                     float reach = toTip.magnitude;
-                    // Only fingers close to the orb are linked to it.
-                    float closeness = visible ? Mathf.Clamp01((0.32f - reach) / 0.08f) : 0f;
+                    // Fingers stay linked to the orb out to about arm's length.
+                    float surface = size * 0.42f;
+                    float closeness = visible ? Mathf.InverseLerp(threadReach.y, threadReach.x, reach) * Mathf.InverseLerp(surface, surface + 0.03f, reach) : 0f;
                     visible &= closeness > 0.01f;
                     line.SetVisible(visible);
                     if (!visible) continue;
 
-                    var end = center + toTip / reach * size * 0.42f;
+                    var end = center + toTip / reach * surface;
                     var along = end - tip;
+                    float length = along.magnitude;
                     var side1 = Vector3.Cross(along, Vector3.up).normalized;
                     var side2 = Vector3.Cross(along, side1).normalized;
                     float seed = side * 5 + f;
-                    float flow = Mathf.Repeat(time * 0.9f + seed * 0.37f, 1f);
+                    // A short thread sways less, so it straightens instead of bunching up.
+                    float sway = Mathf.Clamp01(length / 0.15f);
+                    float flow = tendrilFlow[side * 5 + f] = Mathf.Repeat(tendrilFlow[side * 5 + f] + dt * 0.25f / length, 1f);
                     for (int i = 0; i < TendrilPoints; i++)
                     {
                         float u = i / (float)(TendrilPoints - 1);
-                        float env = Mathf.Sin(u * Mathf.PI);
+                        float metres = u * length;
+                        float env = Mathf.Sin(u * Mathf.PI) * sway;
                         var p = Vector3.Lerp(tip, end, u);
                         p += side2 * (env * 0.018f);
-                        p += side1 * (Mathf.Sin(u * 7f - time * 5f + seed) * 0.006f * env);
-                        p += side2 * (Mathf.Sin(u * 5f + time * 3.3f + seed * 2f) * 0.004f * env);
+                        p += side1 * (Mathf.Sin(metres * 46f - time * 5f + seed) * 0.006f * env);
+                        p += side2 * (Mathf.Sin(metres * 33f + time * 3.3f + seed * 2f) * 0.004f * env);
                         path[i] = p;
 
-                        float drop = Mathf.Exp(-Mathf.Pow((u - flow) * 9f, 2f));
+                        float drop = Mathf.Exp(-Mathf.Pow((u - flow) * length / 0.017f, 2f));
                         var c = Color.Lerp(Pink, Gold, u);
                         c = Color.Lerp(c, Color.white, drop * 0.35f);
                         c.a = 0.12f + drop * 0.6f + music.Kick * 0.35f + music.Band(f + 1) * 0.1f;
@@ -476,6 +487,44 @@ namespace MusicInYourHands
             return mesh;
         }
 
+        /// <summary>
+        /// The heart's mesh: the six faces of a cube, each a fine grid, blown out into a ball. The Orb shader bends it
+        /// into the heart's shape; Unity's Sphere has too few triangles for that, and they show as flat patches.
+        /// </summary>
+        static Mesh BuildHeartMesh()
+        {
+            int side = HeartGrid + 1;
+            var vertices = new Vector3[6 * side * side];
+            var triangles = new int[6 * HeartGrid * HeartGrid * 6];
+            Vector3[] faces = { Vector3.right, Vector3.left, Vector3.up, Vector3.down, Vector3.forward, Vector3.back };
+            // Even steps in angle, so the cells near the cube's corners are not squeezed.
+            float Step(int i) => Mathf.Tan((i / (float)HeartGrid - 0.5f) * Mathf.PI * 0.5f);
+            int t = 0;
+            for (int f = 0; f < faces.Length; f++)
+            {
+                var normal = faces[f];
+                var across = new Vector3(normal.y, normal.z, normal.x);
+                var along = Vector3.Cross(normal, across);
+                int start = f * side * side;
+                for (int y = 0; y < side; y++)
+                    for (int x = 0; x < side; x++)
+                        vertices[start + y * side + x] = (normal + across * Step(x) + along * Step(y)).normalized;
+                for (int y = 0; y < HeartGrid; y++)
+                    for (int x = 0; x < HeartGrid; x++)
+                    {
+                        int v = start + y * side + x;
+                        triangles[t++] = v; triangles[t++] = v + side; triangles[t++] = v + 1;
+                        triangles[t++] = v + 1; triangles[t++] = v + side; triangles[t++] = v + side + 1;
+                    }
+            }
+            var mesh = new Mesh { name = "Orb heart" };
+            mesh.vertices = vertices;
+            mesh.triangles = triangles;
+            // The shader moves the surface, so keep the bounds generous.
+            mesh.bounds = new Bounds(Vector3.zero, Vector3.one * 2f);
+            return mesh;
+        }
+
         public override void Build()
         {
             if (built) return;
@@ -490,18 +539,19 @@ namespace MusicInYourHands
 
             layers = new Transform[Layers.Length];
             layerRenderers = new Renderer[Layers.Length];
+            var heartMesh = BuildHeartMesh();
             for (int i = 0; i < Layers.Length; i++)
             {
-                var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                sphere.name = $"Heart {i}";
-                DebugShapes.RemoveCollider(sphere);
-                sphere.transform.SetParent(orb, false);
-                var r = sphere.GetComponent<Renderer>();
+                var heart = new GameObject($"Heart {i}");
+                heart.transform.SetParent(orb, false);
+                heart.AddComponent<MeshFilter>().sharedMesh = heartMesh;
+                var r = heart.AddComponent<MeshRenderer>();
                 r.sharedMaterial = orbMaterial;
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                r.receiveShadows = false;
                 // Draw inner layers first, so the outer ones layer over them.
                 r.sortingOrder = Layers.Length - i;
-                layers[i] = sphere.transform;
+                layers[i] = heart.transform;
                 layerRenderers[i] = r;
             }
 
@@ -540,6 +590,7 @@ namespace MusicInYourHands
             {
                 tendrils[i] = new LineStrip($"Tendril {i}", transform, lineMaterial, TendrilPoints);
                 tendrils[i].SetVisible(false);
+                tendrilFlow[i] = Mathf.Repeat(i * 0.37f, 1f);
             }
 
             orb.gameObject.SetActive(false);
