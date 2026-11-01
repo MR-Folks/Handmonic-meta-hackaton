@@ -4,10 +4,11 @@ namespace MusicInYourHands
 {
     /// <summary>
     /// The Waveform ribbon world: pinch with both hands and the music stretches between your fingers as a band of
-    /// see-through silk with glowing edges, rippling with smooth waves layered from the frequency bands (bass as long
-    /// slow waves, highs as short quick ones) and slowly twisting. Pull apart and it tightens; bring your hands
-    /// together and it billows. Move your hands and the silk leaves fading copies of itself in the air. Each beat
-    /// tugs your visible hands a little towards each other, as if the ribbon pulled back. Let go and it fades away.
+    /// see-through silk with a glowing thread along each edge, rippling with smooth waves layered from the frequency
+    /// bands (bass as long slow waves, highs as short quick ones) and slowly twisting. Its colours keep moving through
+    /// a palette, and the inside of the silk moves on to a new look every few beats (see the Silk shader). Pull apart and
+    /// it tightens; bring your hands together and it billows. Move your hands and the silk leaves fading copies of itself in the air.
+    /// Each beat tugs your visible hands a little towards each other, as if the ribbon pulled back. Let go and it fades away.
     /// </summary>
     public class WaveformRibbon : World
     {
@@ -37,6 +38,10 @@ namespace MusicInYourHands
         [SerializeField] float strandWidth = 0.004f;
         [Tooltip("Half the width of the silk band (m).")]
         [SerializeField] float silkHalfWidth = 0.024f;
+        [Tooltip("How many beats the silk's inside keeps a look before moving on to the next.")]
+        [SerializeField] int beatsPerLook = 8;
+        [Tooltip("Seconds the ribbon takes to move from one colour of its palette to the next.")]
+        [SerializeField] float secondsPerColor = 5f;
         [Tooltip("Pinch needed to grab, and the lower pinch at which a held ribbon is let go.")]
         [SerializeField] float grabPinch = 0.75f;
         [SerializeField] float releasePinch = 0.45f;
@@ -50,17 +55,30 @@ namespace MusicInYourHands
         static readonly int KickId = Shader.PropertyToID("_Kick");
         static readonly int ClockId = Shader.PropertyToID("_Clock");
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
-        static readonly Color[] StrandColors = { Effects.Gold, Effects.Pink };
+        static readonly int ColorAId = Shader.PropertyToID("_ColorA");
+        static readonly int ColorBId = Shader.PropertyToID("_ColorB");
+        static readonly int LengthId = Shader.PropertyToID("_Length");
+        static readonly int LookId = Shader.PropertyToID("_Look");
+        static readonly Color[] Palette = { Effects.Gold, Effects.Pink, Effects.Violet, Effects.Blue, Effects.Mint };
+        // How far apart in the palette the two hands' colours are.
+        const float ColorSpread = 1.2f;
+        const int Looks = 3;
         const int Ghosts = 7;
         const float GhostLife = 0.7f;
 
-        /// <summary>A band of silk as a strip mesh in world space, two vertices across at each point along it.</summary>
+        /// <summary>
+        /// A band of silk as a strip mesh in world space. Several vertices across at each point keep the pattern even
+        /// where the band twists and narrows: with only two, it shears across each cell in a visible zigzag.
+        /// </summary>
         sealed class Silk
         {
+            public const int Across = 6;
+
             public readonly MeshRenderer Renderer;
             public readonly Vector3[] Vertices;
             public readonly Color[] Colors;
             public float Age = -1f;
+            readonly Vector3[] local;
             readonly Mesh mesh;
             readonly Transform transform;
 
@@ -71,20 +89,25 @@ namespace MusicInYourHands
                 transform = go.transform;
                 mesh = new Mesh { name = name };
                 mesh.MarkDynamic();
-                Vertices = new Vector3[points * 2];
-                Colors = new Color[points * 2];
-                var uv = new Vector2[points * 2];
-                var tris = new int[(points - 1) * 6];
+                Vertices = new Vector3[points * Across];
+                Colors = new Color[points * Across];
+                local = new Vector3[points * Across];
+                var uv = new Vector2[points * Across];
+                var tris = new int[(points - 1) * (Across - 1) * 6];
+                int t = 0;
                 for (int i = 0; i < points; i++)
                 {
                     float u = i / (float)(points - 1);
-                    uv[i * 2] = new Vector2(u, 0f);
-                    uv[i * 2 + 1] = new Vector2(u, 1f);
-                    if (i == points - 1) continue;
-                    int v = i * 2, t = i * 6;
-                    tris[t] = v; tris[t + 1] = v + 2; tris[t + 2] = v + 1;
-                    tris[t + 3] = v + 1; tris[t + 4] = v + 2; tris[t + 5] = v + 3;
+                    for (int j = 0; j < Across; j++)
+                    {
+                        uv[i * Across + j] = new Vector2(u, j / (float)(Across - 1));
+                        if (i == points - 1 || j == Across - 1) continue;
+                        int v = i * Across + j;
+                        tris[t++] = v; tris[t++] = v + Across; tris[t++] = v + 1;
+                        tris[t++] = v + 1; tris[t++] = v + Across; tris[t++] = v + Across + 1;
+                    }
                 }
+                mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt16;
                 mesh.vertices = Vertices;
                 mesh.uv = uv;
                 mesh.colors = Colors;
@@ -98,7 +121,6 @@ namespace MusicInYourHands
 
             public void Upload()
             {
-                var local = new Vector3[Vertices.Length];
                 for (int i = 0; i < Vertices.Length; i++) local[i] = transform.InverseTransformPoint(Vertices[i]);
                 mesh.vertices = local;
                 mesh.colors = Colors;
@@ -121,8 +143,10 @@ namespace MusicInYourHands
         Vector3[] path, pathB;
         MaterialPropertyBlock block;
         WordLayer words;
+        Color colorA = Effects.Gold, colorB = Effects.Pink;
         Vector3 lastA, lastB;
-        float hold;
+        float hold, ribbonLength, look;
+        int beats, lookTarget;
         bool held, built;
 
         public override void Build()
@@ -132,7 +156,7 @@ namespace MusicInYourHands
             block = new MaterialPropertyBlock();
             path = new Vector3[points];
             pathB = new Vector3[points];
-            strands = new LineStrip[StrandColors.Length];
+            strands = new LineStrip[2];
             for (int i = 0; i < strands.Length; i++) strands[i] = new LineStrip($"Strand {i}", transform, lineMaterial, points);
             silk = new Silk("Silk", transform, silkMaterial, points);
             ghosts = new Silk[Ghosts];
@@ -182,6 +206,14 @@ namespace MusicInYourHands
             held = tracked && left.Pinch > need && right.Pinch > need && !left.InSystemGesture && !right.InSystemGesture;
             hold = Mathf.MoveTowards(hold, held ? 1f : 0f, dt * (held ? 6f : 2.5f));
 
+            // The silk's inside moves on every few beats, taking two seconds over each change.
+            if (music.Beat && ++beats % Mathf.Max(1, beatsPerLook) == 0) lookTarget++;
+            look = Mathf.MoveTowards(look, lookTarget, dt * 0.5f);
+
+            float colorStep = Now / Mathf.Max(0.1f, secondsPerColor);
+            colorA = PaletteColor(colorStep);
+            colorB = PaletteColor(colorStep + ColorSpread);
+
             if (tracked)
             {
                 var a = PinchPoint(left);
@@ -209,11 +241,19 @@ namespace MusicInYourHands
             Sing(music, view, show, dt);
         }
 
+        /// <summary>The palette's colour at a step along it, easing from each colour into the next and round again.</summary>
+        static Color PaletteColor(float step)
+        {
+            step = Mathf.Repeat(step, Palette.Length);
+            int from = (int)step;
+            return Color.Lerp(Palette[from], Palette[(from + 1) % Palette.Length], Mathf.SmoothStep(0f, 1f, step - from));
+        }
+
         /// <summary>Each sung word rides along the ribbon from your left hand to your right, just above the silk.</summary>
         void Sing(MusicFrame music, Camera view, bool show, float dt)
         {
             if (words == null || view == null) return;
-            if (words.Next(music, out var text, out _)) words.Add(text, StrandColors[words.Index % StrandColors.Length], 2.6f);
+            if (words.Next(music, out var text, out _)) words.Add(text, words.Index % 2 == 0 ? colorA : colorB, 2.6f);
             words.Tick(dt);
             var eye = view.transform.position;
             foreach (var w in words.Words)
@@ -236,6 +276,7 @@ namespace MusicInYourHands
             var along = b - a;
             float length = along.magnitude;
             if (length < 1e-4f) return;
+            ribbonLength = length;
             var dir = along / length;
             var side = Vector3.Cross(dir, view.transform.position - mid);
             side = side.sqrMagnitude > 1e-8f ? side.normalized : Vector3.up;
@@ -259,9 +300,12 @@ namespace MusicInYourHands
                 // The band twists slowly along its length, narrowing to a point at each hand.
                 float twist = Mathf.Sin(u * Mathf.PI * 2f + t * 1.3f) * 1.1f;
                 var across = (side * Mathf.Cos(twist) + depth * Mathf.Sin(twist)) * (half * Mathf.Pow(envelope, 0.4f));
-                silk.Vertices[i * 2] = centre - across;
-                silk.Vertices[i * 2 + 1] = centre + across;
-                silk.Colors[i * 2] = silk.Colors[i * 2 + 1] = new Color(1f, 1f, 1f, Mathf.SmoothStep(0f, 1f, envelope * 4f));
+                var fade = new Color(1f, 1f, 1f, Mathf.SmoothStep(0f, 1f, envelope * 4f));
+                for (int j = 0; j < Silk.Across; j++)
+                {
+                    silk.Vertices[i * Silk.Across + j] = centre + across * (j * 2f / (Silk.Across - 1) - 1f);
+                    silk.Colors[i * Silk.Across + j] = fade;
+                }
                 path[i] = centre - across;
                 pathB[i] = centre + across;
             }
@@ -270,7 +314,7 @@ namespace MusicInYourHands
 
             for (int s = 0; s < strands.Length; s++)
             {
-                var color = StrandColors[s];
+                var color = s == 0 ? colorA : colorB;
                 color.a = hold * 0.9f;
                 strands[s].Set(s == 0 ? path : pathB, points, strandWidth * (1f + music.Kick * 0.6f), color, view.transform.position);
             }
@@ -311,8 +355,10 @@ namespace MusicInYourHands
         void SetSilk(Renderer r, MusicFrame music, float alpha)
         {
             block.Clear();
-            block.SetColor("_ColorA", StrandColors[0]);
-            block.SetColor("_ColorB", StrandColors[1]);
+            block.SetColor(ColorAId, colorA);
+            block.SetColor(ColorBId, colorB);
+            block.SetFloat(LengthId, ribbonLength);
+            block.SetFloat(LookId, Mathf.Repeat(look, Looks));
             block.SetFloat(KickId, music.Kick);
             block.SetFloat(ClockId, Now);
             block.SetFloat(AlphaId, alpha);
@@ -334,7 +380,7 @@ namespace MusicInYourHands
                 float strength = Mathf.Lerp(0.25f + hand.Pinch * 0.35f, 1.2f + music.Kick * 0.8f, hold);
                 grip.transform.localScale = Vector3.one * (0.03f + 0.02f * hold + music.Kick * 0.012f * hold);
                 block.Clear();
-                block.SetColor(ColorId, i == 0 ? Effects.Gold : Effects.Pink);
+                block.SetColor(ColorId, i == 0 ? colorA : colorB);
                 block.SetFloat(IntensityId, strength);
                 grip.SetPropertyBlock(block);
             }

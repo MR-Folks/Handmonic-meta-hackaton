@@ -55,6 +55,10 @@ namespace MusicInYourHands
 
         /// <summary>As above, with a colour per point (multiplied by <paramref name="color"/>).</summary>
         public void Set(Vector3[] points, Color[] pointColors, int count, float width, Color color, Vector3 viewer, bool fadeEnds = true)
+            => Set(points, pointColors, null, count, width, color, viewer, fadeEnds);
+
+        /// <summary>As above, with a width per point as well (multiplied by <paramref name="width"/>), for lines that taper.</summary>
+        public void Set(Vector3[] points, Color[] pointColors, float[] pointWidths, int count, float width, Color color, Vector3 viewer, bool fadeEnds = true)
         {
             count = Mathf.Clamp(count, 2, maxPoints);
             var local = GameObject.transform;
@@ -68,7 +72,7 @@ namespace MusicInYourHands
 
                 float u = k / (float)(count - 1);
                 float fade = fadeEnds ? Mathf.SmoothStep(0f, 1f, u / 0.08f) * Mathf.SmoothStep(0f, 1f, (1f - u) / 0.08f) : 1f;
-                var half = side * (width * 0.5f);
+                var half = side * (width * 0.5f * (pointWidths != null ? pointWidths[k] : 1f));
                 vertices[i * 2] = local.InverseTransformPoint(p - half);
                 vertices[i * 2 + 1] = local.InverseTransformPoint(p + half);
                 uvs[i * 2] = new Vector2(u, 0f);

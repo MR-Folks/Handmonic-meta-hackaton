@@ -5,7 +5,7 @@ namespace MusicInYourHands
 {
     /// <summary>
     /// The Firefly choir world: a swarm of fireflies drifts all around you on slow swirling currents, each a bright core
-    /// in a soft halo with a fading trail. They sing in four voices (low to high frequency bands), each voice glowing
+    /// in a soft halo with a small tail that narrows and fades away. They sing in four voices (low to high frequency bands), each voice glowing
     /// with its part of the music, and on every beat a wave of flashes ripples out through the swarm. Hold out a hand
     /// and some of them gather in a loose cloud in the air around it, following it as it moves without ever touching
     /// it; the rest keep filling the room. Each kick startles some of them away. Close your hand and the cloud draws in
@@ -34,6 +34,10 @@ namespace MusicInYourHands
         [Header("Swarm")]
         [SerializeField] int count = 88;
         [SerializeField] float flySize = 0.014f;
+        [Tooltip("How close to the palm (m) the cloud around a hand keeps, nearest and furthest. A closed hand draws it in further.")]
+        [SerializeField] Vector2 cloudReach = new Vector2(0.08f, 0.16f);
+        [Tooltip("How wide a tail is where it leaves the firefly, as a share of the firefly's size. The glow fills about half of this.")]
+        [SerializeField] float tailWidth = 1.8f;
         [Tooltip("Share of the swarm that a kick startles.")]
         [SerializeField, Range(0f, 1f)] float startle = 0.35f;
         [Tooltip("How fast the beat's wave of flashes travels through the swarm (m/s).")]
@@ -46,8 +50,8 @@ namespace MusicInYourHands
         {
             new Color(1f, 0.55f, 0.25f), new Color(1f, 0.82f, 0.4f), new Color(0.75f, 1f, 0.45f), new Color(0.85f, 0.95f, 1f)
         };
-        // The trail keeps where the firefly was over the last quarter second, sampled every TrailStep seconds, and is
-        // drawn as a smooth curve through those samples, cut off at TrailLength so fast flights stay short.
+        // The tail keeps where the firefly was over the last quarter second, sampled every TrailStep seconds, and is
+        // drawn as a smooth curve through those samples, stopping at TrailLength so fast flights stay small.
         const int TrailPoints = 10;
         const float TrailStep = 0.03f;
         const float TrailLength = 0.06f;
@@ -77,6 +81,7 @@ namespace MusicInYourHands
         Fly[] flies;
         Vector3[] trailPath;
         Color[] trailColors;
+        float[] trailWidths, trailFlown;
         Renderer[] palmGlows;
         WordLayer words;
         MaterialPropertyBlock block;
@@ -95,6 +100,11 @@ namespace MusicInYourHands
             flies = new Fly[count];
             trailPath = new Vector3[DrawPoints];
             trailColors = new Color[DrawPoints];
+            trailWidths = new float[DrawPoints];
+            trailFlown = new float[DrawPoints];
+            // No white-hot spine: the tail is all soft colour.
+            var trailBlock = new MaterialPropertyBlock();
+            trailBlock.SetFloat("_Core", 0f);
             var random = new System.Random(11);
             for (int i = 0; i < count; i++)
             {
@@ -111,6 +121,7 @@ namespace MusicInYourHands
                     Voice = i % VoiceColors.Length
                 };
                 f.Halo.sortingOrder = -1;
+                f.Trail.Renderer.SetPropertyBlock(trailBlock);
                 SetVisible(f, false);
                 flies[i] = f;
             }
@@ -271,8 +282,8 @@ namespace MusicInYourHands
             bool closed = fist[side];
             pull = closed ? 9f : 6f;
             float turn = t * (closed ? 70f : 22f);
-            float reach = (closed ? 0.11f : 0.15f) + (closed ? 0.06f : 0.13f) * Mathf.Repeat(f.Phase * 0.37f, 1f);
-            return Palm(rig.Get(side == 0)) + Quaternion.AngleAxis(turn, Vector3.up) * f.Around * reach + Wobble(f, t, closed ? 0.008f : 0.02f);
+            float reach = Mathf.Lerp(cloudReach.x, cloudReach.y, Mathf.Repeat(f.Phase * 0.37f, 1f)) * (closed ? 0.65f : 1f);
+            return Palm(rig.Get(side == 0)) + Quaternion.AngleAxis(turn, Vector3.up) * f.Around * reach + Wobble(f, t, closed ? 0.008f : 0.012f);
         }
 
         /// <summary>The n-th of evenly spread directions around a point (a golden spiral over a sphere).</summary>
@@ -311,7 +322,7 @@ namespace MusicInYourHands
             block.SetFloat(IntensityId, glow * 0.45f);
             f.Halo.SetPropertyBlock(block);
 
-            // A soft comet tail along the path the firefly has just flown: a smooth curve that fades to nothing.
+            // A small tail along the path just flown: a smooth curve from the firefly's own width down to a point.
             f.SampleClock += dt;
             if (f.SampleClock >= TrailStep)
             {
@@ -329,27 +340,39 @@ namespace MusicInYourHands
                     trailPath[k * TrailSmooth + j] = CatmullRom(p0, p1, p2, p3, j / (float)TrailSmooth);
             }
             trailPath[DrawPoints - 1] = f.History[TrailPoints - 1];
-            // Fade along the length flown, and stop the tail at TrailLength.
-            float strength = Mathf.Clamp01(0.2f + glow * 0.3f);
+
+            // Measure how far back the tail reaches, stopping at TrailLength.
             float flown = 0f;
-            for (int k = 0; k < DrawPoints; k++)
+            int last = 0;
+            trailFlown[0] = 0f;
+            while (last < DrawPoints - 1 && flown < TrailLength)
             {
-                if (k > 0)
+                last++;
+                float step = Vector3.Distance(trailPath[last], trailPath[last - 1]);
+                if (flown + step > TrailLength)
                 {
-                    float step = Vector3.Distance(trailPath[k], trailPath[k - 1]);
-                    if (flown + step > TrailLength)
-                    {
-                        trailPath[k] = Vector3.Lerp(trailPath[k - 1], trailPath[k], (TrailLength - flown) / Mathf.Max(step, 1e-5f));
-                        step = TrailLength - flown;
-                    }
-                    flown += step;
+                    trailPath[last] = Vector3.Lerp(trailPath[last - 1], trailPath[last], (TrailLength - flown) / Mathf.Max(step, 1e-5f));
+                    step = TrailLength - flown;
                 }
-                float u = flown / TrailLength;
-                var c = color;
-                c.a = strength * (1f - u) * (1f - u);
-                trailColors[k] = c;
+                flown += step;
+                trailFlown[last] = flown;
             }
-            f.Trail.Set(trailPath, trailColors, DrawPoints, flySize * 0.22f, Color.white, view.transform.position, false);
+            bool moving = flown > 0.004f;
+            f.Trail.SetVisible(moving);
+            if (!moving) return;
+
+            // Narrowing and fading are measured against this tail's own length, so a short tail ends in a point too.
+            float strength = Mathf.Clamp01(0.25f + glow * 0.3f);
+            for (int k = 0; k <= last; k++)
+            {
+                float left = 1f - trailFlown[k] / flown;
+                var c = color;
+                c.a = strength * left * Mathf.Sqrt(left);
+                trailColors[k] = c;
+                // Holds its width near the firefly, then curves in to the point.
+                trailWidths[k] = left * (2f - left);
+            }
+            f.Trail.Set(trailPath, trailColors, trailWidths, last + 1, flySize * tailWidth, Color.white, view.transform.position, false);
         }
 
         static Vector3 CatmullRom(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
