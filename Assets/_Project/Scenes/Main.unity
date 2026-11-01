@@ -862,9 +862,10 @@ MonoBehaviour:
   displayName: Living skin
   color: {r: 1, g: 0.37, b: 0.68, a: 1}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
-  ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
+  shellMaterial: {fileID: 2100000, guid: 7d7d84a573d046f798dcc6662578ac1a, type: 2}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  wallMaterial: {fileID: 2100000, guid: b3d1b3af32f949bd9006b316dc20a6fd, type: 2}
   tipSize: 0.045
   fingerColors:
   - {r: 1, g: 0.83, b: 0.42, a: 1}
@@ -872,9 +873,9 @@ MonoBehaviour:
   - {r: 0.5, g: 0.72, b: 1, a: 1}
   - {r: 0.79, g: 0.61, b: 1, a: 1}
   - {r: 1, g: 0.56, b: 0.78, a: 1}
-  waveRadius: 0.14
+  waveRadius: 0.15
   waveLife: 1.1
-  maxWaves: 16
+  maxWaves: 6
   trailSpeed: {x: 0.35, y: 1.1}
   sparksPerMetre: 70
   sparksPerBeat: 3

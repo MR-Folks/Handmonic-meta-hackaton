@@ -157,42 +157,13 @@ namespace MusicInYourHands
         /// </summary>
         void MeasureRoom()
         {
-            surfaces.Clear();
-            scanned = Room.Scanned && Room.Walls.Count > 0;
-            if (scanned)
-                surfaces.AddRange(Room.Walls);
-            else
-            {
-                var middle = new Vector3(centre.x, floorY + roomHeight * 0.5f, centre.z);
-                for (int i = 0; i < 4; i++)
-                {
-                    var outward = Quaternion.AngleAxis(90f * i, Vector3.up) * forward;
-                    float reach = i % 2 == 0 ? halfSize.y : halfSize.x;
-                    float span = (i % 2 == 0 ? halfSize.x : halfSize.y) * 2f;
-                    surfaces.Add(new Room.Surface(middle + outward * reach, -outward, Vector3.Cross(Vector3.up, outward), new Vector2(span, roomHeight)));
-                }
-            }
+            scanned = Room.Around(centre, forward, floorY, halfSize, roomHeight, surfaces, out floorRect);
             while (walls.Count < surfaces.Count)
             {
                 var quad = Effects.MakeQuad($"Wall {walls.Count}", transform, gridMaterial);
                 quad.gameObject.SetActive(false);
                 walls.Add(quad);
             }
-
-            // The floor: the box around the walls' ends, lined up with the first wall.
-            var along = Vector3.ProjectOnPlane(surfaces[0].Right, Vector3.up).normalized;
-            var across = Vector3.Cross(along, Vector3.up);
-            Vector2 min = new Vector2(float.MaxValue, float.MaxValue), max = -min;
-            foreach (var w in surfaces)
-                for (int end = -1; end <= 1; end += 2)
-                {
-                    var p = w.Center + w.Right * (w.Size.x * 0.5f * end) - centre;
-                    var q = new Vector2(Vector3.Dot(p, along), Vector3.Dot(p, across));
-                    min = Vector2.Min(min, q);
-                    max = Vector2.Max(max, q);
-                }
-            var mid = (min + max) * 0.5f;
-            floorRect = new Room.Surface(new Vector3(centre.x, floorY, centre.z) + along * mid.x + across * mid.y, Vector3.up, along, max - min);
         }
 
         /// <summary>The walls stand where they are, pushed out a little with each breath.</summary>
@@ -254,23 +225,8 @@ namespace MusicInYourHands
         }
 
         /// <summary>Where a ray from the palm meets a wall.</summary>
-        bool Hit(Vector3 from, Vector3 direction, out Vector3 hit, out float distance)
-        {
-            hit = Vector3.zero;
-            distance = float.MaxValue;
-            foreach (var w in surfaces)
-            {
-                float facing = -Vector3.Dot(direction, w.Normal);
-                if (facing < 1e-3f) continue;
-                float enter = Vector3.Dot(from - w.Center, w.Normal) / facing;
-                if (enter < 0f || enter > distance) continue;
-                var p = from + direction * enter;
-                if (!w.Contains(p, -0.1f)) continue;
-                distance = enter;
-                hit = p;
-            }
-            return distance < float.MaxValue;
-        }
+        bool Hit(Vector3 from, Vector3 direction, out Vector3 hit, out float distance) =>
+            Room.Hit(surfaces, from, direction, out hit, out distance);
 
         void AddWave(Vector3 at, bool pressed)
         {

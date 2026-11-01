@@ -386,8 +386,9 @@ namespace MusicInYourHands.EditorTools
             var lettering = EnsureMaterial(LetteringMaterialPath, "MusicInYourHands/Lettering");
 
             var livingSkin = EnsureWorld<LivingSkin>(manager.transform, "LivingSkin", "Living skin", new Color(1f, 0.37f, 0.68f));
-            SetReferences(livingSkin, ("glowMaterial", glow), ("ringMaterial", EnsureMaterial(RingMaterialPath, "MusicInYourHands/Ring")),
-                ("lineMaterial", EnsureMaterial(LineMaterialPath, "MusicInYourHands/Line")));
+            SetReferences(livingSkin, ("glowMaterial", glow), ("shellMaterial", EnsureMaterial(ShellMaterialPath, "MusicInYourHands/Shell")),
+                ("lineMaterial", EnsureMaterial(LineMaterialPath, "MusicInYourHands/Line")),
+                ("wallMaterial", EnsureMaterial(LivingWallsMaterialPath, "MusicInYourHands/LivingWalls")));
 
             var orb = EnsureWorld<HeartbeatOrb>(manager.transform, "HeartbeatOrb", "Heartbeat orb", new Color(1f, 0.83f, 0.42f));
             SetReferences(orb, ("glowMaterial", glow), ("orbMaterial", EnsureMaterial(OrbMaterialPath, "MusicInYourHands/Orb")),
@@ -527,6 +528,8 @@ namespace MusicInYourHands.EditorTools
         public const string PlateMaterialPath = Root + "/Materials/Plate.mat";
         public const string LetteringMaterialPath = Root + "/Materials/Lettering.mat";
         public const string RingMaterialPath = Root + "/Materials/Ring.mat";
+        public const string ShellMaterialPath = Root + "/Materials/Shell.mat";
+        public const string LivingWallsMaterialPath = Root + "/Materials/LivingWalls.mat";
 
         public static Material EnsureHandMaterial() => EnsureMaterial(HandMaterialPath, "MusicInYourHands/Hand");
 

@@ -40,6 +40,7 @@ namespace MusicInYourHands
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
         static readonly int HaloId = Shader.PropertyToID("_Halo");
         static readonly int GlowId = Shader.PropertyToID("_Glow");
+        static readonly int RimId = Shader.PropertyToID("_Rim");
 
         readonly List<Word> words = new List<Word>();
         readonly LyricCursor cursor = new LyricCursor();
@@ -54,6 +55,12 @@ namespace MusicInYourHands
         {
             get => material.renderQueue;
             set => material.renderQueue = value;
+        }
+
+        /// <summary>How strong the dark edge around the letters is, 0-1. It only shows on words without a Halo.</summary>
+        public float Rim
+        {
+            set => material.SetFloat(RimId, value);
         }
 
         /// <summary>The current word's position in its line (0 for the first word).</summary>

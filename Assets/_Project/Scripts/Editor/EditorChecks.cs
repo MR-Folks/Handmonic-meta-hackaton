@@ -260,7 +260,7 @@ namespace MusicInYourHands.EditorTools
             var skin = new GameObject("LivingSkin").AddComponent<LivingSkin>();
             var so = new SerializedObject(skin);
             so.FindProperty("glowMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow");
-            so.FindProperty("ringMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.RingMaterialPath, "MusicInYourHands/Ring");
+            so.FindProperty("shellMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.ShellMaterialPath, "MusicInYourHands/Shell");
             so.FindProperty("lineMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.LineMaterialPath, "MusicInYourHands/Line");
             so.ApplyModifiedPropertiesWithoutUndo();
             skin.Build();

@@ -5,9 +5,10 @@ namespace MusicInYourHands
 {
     /// <summary>
     /// The Living skin world: your hands are made of the music. Each fingertip carries a soft light tuned to one
-    /// frequency band, every beat sends a wave out of each palm in the colour of one of the fingers, sparks drift off
-    /// the fingertips as they move, and quick finger movements leave short trails of light in the air.
-    /// The pulse that runs through the hand itself lives in the hand shader (see HandSkin).
+    /// frequency band, every beat sends a round wave out of each palm in the colour of one of the fingers, sparks drift
+    /// off the fingertips as they move, and quick finger movements leave short trails of light in the air. Each wave
+    /// carries on across the room and lands on it, lighting veins in the walls (LivingWalls), and each sung word flies
+    /// from your palm to the wall ahead. The pulse that runs through the hand itself lives in the hand shader (see HandSkin).
     /// </summary>
     [DefaultExecutionOrder(150)]
     public class LivingSkin : World
@@ -18,9 +19,10 @@ namespace MusicInYourHands
 
         [Header("Materials")]
         [SerializeField] Material glowMaterial;
-        [SerializeField] Material ringMaterial;
+        [SerializeField] Material shellMaterial;
         [SerializeField] Material lineMaterial;
         [SerializeField] Material letteringMaterial;
+        [SerializeField] Material wallMaterial;
 
         [Header("Fingertip lights")]
         [SerializeField] float tipSize = 0.045f;
@@ -32,9 +34,24 @@ namespace MusicInYourHands
         };
 
         [Header("Palm waves")]
-        [SerializeField] float waveRadius = 0.14f;
+        [SerializeField] float waveRadius = 0.15f;
         [SerializeField] float waveLife = 1.1f;
-        [SerializeField] int maxWaves = 16;
+        [SerializeField] int maxWaves = 6;
+        [Tooltip("A wave leaves the palms once every this many beats.")]
+        [SerializeField] int waveEveryBeats = 2;
+
+        [Header("Room")]
+        [Tooltip("Half the width and depth of the stand-in room (m), and its height.")]
+        [SerializeField] Vector2 halfSize = new Vector2(1.8f, 1.8f);
+        [SerializeField] float roomHeight = 2.6f;
+
+        [Header("Lyrics")]
+        [Tooltip("The distance (m) at which the letters are their true size, so they grow on a further wall to read the same, and how far above your eyes the line sits at that distance.")]
+        [SerializeField] Vector2 lineSpot = new Vector2(0.9f, 0.09f);
+        [Tooltip("How wide a row of words may get (m) at that distance before it wraps.")]
+        [SerializeField] float lineWidth = 0.62f;
+        [Tooltip("How long (s) a line stays after its last word starts.")]
+        [SerializeField] float lineHold = 2.5f;
 
         [Header("Trails")]
         [Tooltip("Fingertip speed (m/s) where trails start to show, and where they are fully lit.")]
@@ -46,9 +63,13 @@ namespace MusicInYourHands
 
         static readonly int ColorId = Shader.PropertyToID("_Color");
         static readonly int IntensityId = Shader.PropertyToID("_Intensity");
-        static readonly int RadiusId = Shader.PropertyToID("_Radius");
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
-        static readonly int ThicknessId = Shader.PropertyToID("_Thickness");
+        static readonly int AxisId = Shader.PropertyToID("_Axis");
+        static readonly int PhaseId = Shader.PropertyToID("_Phase");
+
+        // Longer than any line takes: a line stays until the next one, or until lineHold after its last word.
+        const float LineLife = 600f;
+        const float LetterHeight = 0.05f;
 
         sealed class Wave
         {
@@ -57,6 +78,7 @@ namespace MusicInYourHands
             public float Age;
             public float Strength;
             public Color Color;
+            public Vector3 Axis;
         }
 
         readonly List<Wave> waves = new List<Wave>();
@@ -76,7 +98,22 @@ namespace MusicInYourHands
         ParticleSystem sparks;
         MaterialPropertyBlock block;
         WordLayer words;
+        // Where each word of the current line lands: metres right of and above the line's spot on the wall.
+        readonly List<Vector2> lineSlots = new List<Vector2>();
+        Vector3 lineAt, lineRight;
+        Quaternion lineRotation = Quaternion.identity;
+        float lineSize = 1f;
+        bool lineShowing;
+        LivingWalls walls;
+        bool anchored;
+        int beats;
         bool built;
+
+        protected override void OnEnable()
+        {
+            base.OnEnable();
+            anchored = false;
+        }
 
         protected override void OnDisable()
         {
@@ -94,6 +131,8 @@ namespace MusicInYourHands
             System.Array.Clear(trailStrength, 0, trailStrength.Length);
             if (sparks != null) sparks.Clear();
             words?.Clear();
+            lineShowing = false;
+            walls?.Hide();
         }
 
         /// <summary>Creates the lights, the wave pool and the spark system. Also called by the editor preview.</summary>
@@ -115,7 +154,7 @@ namespace MusicInYourHands
 
             for (int i = 0; i < tipLights.Length; i++)
             {
-                var quad = MakeQuad($"Tip Light {i}", tipMaterial);
+                var quad = Make(PrimitiveType.Quad, $"Tip Light {i}", tipMaterial);
                 tipLights[i] = quad.transform;
                 tipRenderers[i] = quad.GetComponent<Renderer>();
                 quad.SetActive(false);
@@ -123,9 +162,9 @@ namespace MusicInYourHands
 
             for (int i = 0; i < maxWaves; i++)
             {
-                var quad = MakeQuad($"Wave {i}", ringMaterial);
-                quad.SetActive(false);
-                waves.Add(new Wave { Transform = quad.transform, Renderer = quad.GetComponent<Renderer>(), Age = -1f });
+                var shell = Make(PrimitiveType.Sphere, $"Wave {i}", shellMaterial);
+                shell.SetActive(false);
+                waves.Add(new Wave { Transform = shell.transform, Renderer = shell.GetComponent<Renderer>(), Age = -1f });
             }
 
             for (int i = 0; i < trails.Length; i++)
@@ -136,58 +175,144 @@ namespace MusicInYourHands
             }
 
             sparks = Effects.MakeSparkSystem("Sparks", transform, glowMaterial);
-            if (letteringMaterial != null) words = new WordLayer("Lyric", transform, letteringMaterial, 3, 0.03f);
+            if (letteringMaterial != null)
+            {
+                words = new WordLayer("Lyric", transform, letteringMaterial, 24, LetterHeight);
+                words.Rim = 0.9f;
+            }
+            if (wallMaterial != null) walls = new LivingWalls(transform, wallMaterial, halfSize, roomHeight);
         }
 
         public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
         {
             Build();
+            if (walls != null && view != null && (!anchored || ShouldReanchor(view, dt)))
+            {
+                walls.Place(view.transform.position, Effects.FlatForward(view), Effects.FloorY(view));
+                MarkAnchored(view);
+                anchored = true;
+            }
             UpdateHand(rig.Left, 0, music.Bands, music.Kick, view, dt, music.Beat);
             UpdateHand(rig.Right, 1, music.Bands, music.Kick, view, dt, music.Beat);
-            if (music.Beat)
+            if (music.Beat && ++beats % Mathf.Max(1, waveEveryBeats) == 0)
             {
                 waveHue = (waveHue + 1) % fingerColors.Length;
                 float strength = 0.6f + 0.4f * music.Kick;
-                if (rig.Left.IsTracked) SpawnWaves(rig.Left, strength);
-                if (rig.Right.IsTracked) SpawnWaves(rig.Right, strength);
+                if (rig.Left.IsTracked) SpawnWave(rig.Left, view, strength);
+                if (rig.Right.IsTracked) SpawnWave(rig.Right, view, strength);
             }
             AdvanceWaves(dt);
+            walls?.Step(music, dt);
             Sing(rig, music, view, dt);
         }
 
-        /// <summary>The sung word glows just above the palm you hold towards your face, in the wave's colour.</summary>
+        /// <summary>
+        /// Each sung word leaves a palm, turns as it flies and lands in its place on the wall ahead of you. The line's
+        /// place is chosen when its first word starts and then stays put, so the row builds up word by word and is still
+        /// to read. The word being sung takes the wave's colour; the rest settle to white.
+        /// </summary>
         void Sing(HandRig rig, MusicFrame music, Camera view, float dt)
         {
-            if (words == null || view == null) return;
-            if (words.Next(music, out var text, out _)) words.Add(text, fingerColors[waveHue], 1.8f, alone: true);
-            words.Tick(dt);
-            var eye = view.transform.position;
-            HandRig.Hand best = null;
-            float bestFacing = 0.2f;
-            foreach (var hand in new[] { rig.Left, rig.Right })
+            if (words == null || walls == null || view == null) return;
+            if (words.Next(music, out var text, out bool newLine))
             {
-                if (!hand.IsTracked) continue;
-                var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
-                float facing = Vector3.Dot(hand.PalmNormal, (eye - palm).normalized);
-                if (facing > bestFacing) { best = hand; bestFacing = facing; }
+                if (newLine) PlanLine(music.LineWords, view);
+                Launch(rig, text, view);
             }
+            words.Tick(dt);
+            var sung = music.LineWords;
+            if (lineShowing && (sung == null || music.SongTime > sung[sung.Length - 1].Time + lineHold)) FadeLine();
+
+            var eye = view.transform.position;
+            var bright = Color.Lerp(fingerColors[waveHue], Color.white, 0.2f);
+            float step = 1f - Mathf.Exp(-4.5f * dt);
             foreach (var w in words.Words)
             {
-                if (!w.Active) continue;
-                if (best != null)
-                {
-                    // Between the palm and the middle fingertip, just off the skin.
-                    var palm = best.PalmJoint != null ? best.PalmJoint.position : best.Palm.position;
-                    var middle = best.TipJoints[2] != null ? best.TipJoints[2].position : best.Tips[2];
-                    var target = Vector3.Lerp(palm, middle, 0.4f) + best.PalmNormal * 0.05f + Vector3.down * (words.Height(w) * 0.4f);
-                    w.Position = w.Age < 0.05f ? target : Vector3.Lerp(w.Position, target, 1f - Mathf.Exp(-18f * dt));
-                }
-                w.Alpha = Mathf.MoveTowards(w.Alpha, best != null ? 1f : 0f, dt * 4f);
-                w.Rotation = WordLayer.Facing(w.Position, eye);
-                w.Halo = 0.25f + music.Kick * 0.5f;
+                // Words of an earlier line stay where they landed while they fade.
+                if (!w.Active || w.Line != music.Lyric.Line) continue;
+                var target = lineAt + lineRight * w.Spot.x + Vector3.up * w.Spot.y;
+                w.Position = Vector3.Lerp(w.Position, target, step);
+                w.Size = Mathf.Lerp(w.Size, lineSize, step);
+                w.Rotation = Quaternion.Slerp(WordLayer.Facing(w.Position, eye), lineRotation, Mathf.SmoothStep(0f, 1f, w.Age / 0.8f));
+                w.Color = Color.Lerp(w.Color, w.Slot == music.Lyric.Word ? bright : Color.white, 1f - Mathf.Exp(-14f * dt));
+                // Glowing in flight; the glow gives way to the dark edge that makes it readable on the wall.
+                w.Halo = Mathf.Max(0f, 0.4f - w.Age * 0.5f);
             }
             words.Draw(1f);
         }
+
+        /// <summary>Picks the line's spot on the wall ahead of you and where each of its words will land.</summary>
+        void PlanLine(LyricsTrack.Word[] sung, Camera view)
+        {
+            FadeLine();
+            lineSlots.Clear();
+            if (sung == null) return;
+            lineShowing = true;
+
+            var eye = view.transform.position;
+            var forward = Effects.FlatForward(view);
+            if (!walls.Aim(eye, forward, out var wall, out var hit, out float distance))
+            {
+                distance = 2f;
+                hit = eye + forward * distance;
+                wall = new Room.Surface(hit, -forward, Vector3.Cross(Vector3.up, forward), new Vector2(6f, 3f));
+            }
+            lineSize = Mathf.Clamp(distance / lineSpot.x, 1f, 3.5f);
+            lineRotation = Quaternion.LookRotation(-wall.Normal, Vector3.up);
+            lineRight = lineRotation * Vector3.right;
+
+            // Slide along the wall if the row would run off its end.
+            float width = lineWidth * lineSize;
+            float spare = Mathf.Max(0f, wall.Size.x * 0.5f - width * 0.5f);
+            float along = Mathf.Clamp(wall.Local(hit).x, -spare, spare);
+            lineAt = hit + wall.Right * (along - wall.Local(hit).x) + wall.Normal * 0.02f + Vector3.up * (lineSpot.y * lineSize);
+
+            // Centred rows, each at most lineWidth wide.
+            float height = LetterHeight * lineSize, gap = height * 0.3f, y = 0f;
+            for (int first = 0; first < sung.Length;)
+            {
+                float rowWidth = -gap;
+                int last = first;
+                for (; last < sung.Length; last++)
+                {
+                    float add = TypeFace.Bold.Width(sung[last].Text) * height + gap;
+                    if (last > first && rowWidth + add > width) break;
+                    rowWidth += add;
+                }
+                float x = -rowWidth * 0.5f;
+                for (int i = first; i < last; i++)
+                {
+                    float wide = TypeFace.Bold.Width(sung[i].Text) * height;
+                    lineSlots.Add(new Vector2(x + wide * 0.5f, y));
+                    x += wide + gap;
+                }
+                y -= height * 1.4f;
+                first = last;
+            }
+        }
+
+        /// <summary>Sends a word off from a palm, taking turns when both hands are tracked.</summary>
+        void Launch(HandRig rig, string text, Camera view)
+        {
+            int index = words.Index;
+            var w = words.Add(text, Color.white, LineLife);
+            w.Slot = index;
+            w.Spot = index < lineSlots.Count ? lineSlots[index] : Vector2.zero;
+            w.Size = 0.7f;
+            var hand = rig.Left.IsTracked && (!rig.Right.IsTracked || index % 2 == 0) ? rig.Left : rig.Right;
+            var eye = view.transform.position;
+            w.Position = hand.IsTracked ? PalmOf(hand) + hand.PalmNormal * 0.04f : eye + Effects.FlatForward(view) * 0.35f + Vector3.down * 0.25f;
+            w.Rotation = WordLayer.Facing(w.Position, eye);
+        }
+
+        void FadeLine()
+        {
+            foreach (var w in words.Words)
+                if (w.Active) w.Life = Mathf.Min(w.Life, w.Age + 0.6f);
+            lineShowing = false;
+        }
+
+        static Vector3 PalmOf(HandRig.Hand hand) => hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
 
         void UpdateHand(HandRig.Hand hand, int side, float[] bands, float kick, Camera view, float dt, bool beat)
         {
@@ -300,14 +425,26 @@ namespace MusicInYourHands
             }
         }
 
-        void SpawnWaves(HandRig.Hand hand, float strength)
+        void SpawnWave(HandRig.Hand hand, Camera view, float strength)
         {
-            Spawn(hand, 0f, strength);
-            // A softer echo just behind the first wave makes each beat feel deeper.
-            Spawn(hand, -0.14f, strength * 0.5f);
+            Spawn(hand, strength);
+            SendToRoom(hand, view, strength);
         }
 
-        void Spawn(HandRig.Hand hand, float age, float strength)
+        /// <summary>
+        /// Carries the beat on across the room: the way the palm faces when it faces away from you, so you can aim it;
+        /// past the hand when it faces you, so the wave still lands somewhere you can see.
+        /// </summary>
+        void SendToRoom(HandRig.Hand hand, Camera view, float strength)
+        {
+            if (walls == null || view == null) return;
+            var palm = PalmOf(hand);
+            var outward = (palm - view.transform.position).normalized;
+            var direction = Vector3.Dot(hand.PalmNormal, outward) > 0.2f ? hand.PalmNormal : outward;
+            walls.Send(palm, direction, fingerColors[waveHue], strength * 0.5f);
+        }
+
+        void Spawn(HandRig.Hand hand, float strength)
         {
             Wave wave = null;
             foreach (var w in waves)
@@ -317,13 +454,12 @@ namespace MusicInYourHands
             if (wave == null) return;
 
             var normal = hand.PalmNormal.sqrMagnitude > 0.5f ? hand.PalmNormal : Vector3.forward;
-            var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
             wave.Transform.SetParent(transform, false);
-            wave.Transform.SetPositionAndRotation(palm + normal * 0.015f, Quaternion.LookRotation(normal));
-            wave.Transform.localScale = Vector3.one * waveRadius * 2f;
-            wave.Age = age;
+            wave.Transform.position = PalmOf(hand) + normal * 0.015f;
+            wave.Age = 0f;
             wave.Strength = strength;
             wave.Color = fingerColors[waveHue];
+            wave.Axis = normal;
             wave.Transform.gameObject.SetActive(true);
             ApplyWave(wave);
         }
@@ -346,28 +482,28 @@ namespace MusicInYourHands
         void ApplyWave(Wave wave)
         {
             float u = Mathf.Clamp01(wave.Age / waveLife);
-            bool started = wave.Age >= 0f;
             float eased = 1f - Mathf.Pow(1f - u, 3f);
+            wave.Transform.localScale = Vector3.one * (Mathf.Lerp(0.03f, waveRadius, eased) * 2f);
             block.Clear();
-            // Each beat's wave takes the next finger's colour, starting bright and thin and fading as it spreads.
+            // Each beat's wave takes the next finger's colour, starting bright and fading as it swells around the hand.
             block.SetColor(ColorId, Color.Lerp(Color.Lerp(wave.Color, Color.white, 0.35f), wave.Color, Mathf.SmoothStep(0f, 1f, u * 2f)));
-            block.SetFloat(RadiusId, Mathf.Lerp(0.04f, 0.85f, eased));
-            block.SetFloat(ThicknessId, Mathf.Lerp(0.01f, 0.022f, u));
-            block.SetFloat(AlphaId, started ? Mathf.Pow(1f - u, 3f) * wave.Strength * 1.2f : 0f);
+            block.SetVector(AxisId, wave.Axis);
+            block.SetFloat(PhaseId, eased * 9f);
+            block.SetFloat(AlphaId, Mathf.Pow(1f - u, 3f) * wave.Strength * 0.3f);
             wave.Renderer.SetPropertyBlock(block);
         }
 
-        GameObject MakeQuad(string objectName, Material material)
+        GameObject Make(PrimitiveType shape, string objectName, Material material)
         {
-            var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            quad.name = objectName;
-            DebugShapes.RemoveCollider(quad);
-            quad.transform.SetParent(transform, false);
-            var r = quad.GetComponent<Renderer>();
+            var go = GameObject.CreatePrimitive(shape);
+            go.name = objectName;
+            DebugShapes.RemoveCollider(go);
+            go.transform.SetParent(transform, false);
+            var r = go.GetComponent<Renderer>();
             r.sharedMaterial = material;
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             r.receiveShadows = false;
-            return quad;
+            return go;
         }
     }
 }
