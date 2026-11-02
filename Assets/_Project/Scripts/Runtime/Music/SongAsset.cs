@@ -26,6 +26,16 @@ namespace MusicInYourHands
         /// </summary>
         [NonSerialized] public string audioPath, lyricsPath;
 
+        /// <summary>
+        /// For a song streamed from Audius: its track id, who published it there (the owner its license asks to
+        /// credit) and its page on audius.co. Empty for other songs.
+        /// </summary>
+        [NonSerialized] public string audiusId, owner, link;
+
         public bool IsAdded => !string.IsNullOrEmpty(audioPath);
+        public bool IsFromAudius => !string.IsNullOrEmpty(audiusId);
+
+        /// <summary>Added songs and songs from Audius load their audio only while they play.</summary>
+        public bool LoadsOnDemand => IsAdded || IsFromAudius;
     }
 }

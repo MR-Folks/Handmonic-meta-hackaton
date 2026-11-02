@@ -421,6 +421,33 @@ namespace MusicInYourHands.EditorTools
             Page("7b-library-empty", new SongAsset[0], 0);
             Page("7c-library-ask-lyrics", songs, 1);
             Page("7d-library-remove", songs, 2);
+
+            // The Audius tab, a song's credits, and the menu's credit line while a song from Audius plays.
+            SongAsset FromAudius(string title, string artist, string owner, string page)
+            {
+                var song = ScriptableObject.CreateInstance<SongAsset>();
+                song.title = title;
+                song.artist = artist;
+                song.owner = owner;
+                song.audiusId = page;
+                song.link = "https://audius.co/" + page;
+                return song;
+            }
+            var streamed = new[]
+            {
+                FromAudius("The Night Air Was Cool", "ATTLAS", "ATTLAS", "attlas/the-night-air-was-cool-90231"),
+                FromAudius("It's Okay", "Yasper", "Chillhop Music", "chillhopmusic/yasper-its-okay"),
+                FromAudius("Soul Trouble", "Kevin McKay", "Kevin McKay", "kevinmckay/soul-trouble"),
+                FromAudius("fsh (AUDIUS EXCLUSIVE)", "harris cole", "harris cole", "harriscole/fsh-audius-exclusive-140992"),
+                FromAudius("Crystals", "Fonts", "Critical Music", "CriticalMusic/fonts-crystals")
+            };
+            Page("7e-library-audius", streamed, 3);
+            Page("7f-library-credits", new[] { streamed[1] }, 4);
+            menu.Close();
+            menu.PreviewCredit(streamed[1]);
+            menu.Open(camera);
+            for (int i = 0; i < 24; i++) menu.Step(rig, manager, null, camera, 0.05f);
+            File.WriteAllBytes($"{ShotFolder}/7g-menu-audius-credit.png", Render(camera, 1600, 900).EncodeToPNG());
         }
 #endif
     }

@@ -7,9 +7,11 @@ namespace MusicInYourHands
     /// The world menu: glass bubbles in two honeycombs, like an Apple Watch home screen, opened with Meta's left-hand
     /// menu gesture. The sound worlds cluster on the left and the lyric worlds on the right, each bubble showing a
     /// small animated emblem; below them a row plays and pauses the song, steps to the previous and next song
-    /// (including songs added on the headset), switches to listening to the room, turns the lyrics on and off and opens
-    /// your songs (SongLibrary), a page that takes the honeycombs' place. Bubbles near where you look are a little larger, and if you look away the menu glides back in front of you. Each hand casts a soft pointer ray onto the menu (from the shoulder through the pinch);
-    /// the bubble it points at swells and its name shows large above the honeycomb. Pinch to pop into it.
+    /// (including songs added on the headset and songs from Audius), switches to listening to the room, turns the lyrics
+    /// on and off and opens the song page (SongLibrary), which takes the honeycombs' place. Bubbles near where you look are a little larger, and if you look away the menu glides back in front of you. Each hand casts a soft pointer ray onto the menu (from the shoulder through the pinch);
+    /// the bubble it points at swells and its name shows large above the honeycomb. Pinch to pop into it. Under the
+    /// menu a line says how to choose, or that a song is loading or couldn't play, and while a song from Audius plays,
+    /// a second line gives the credit its license asks for.
     /// </summary>
     [DefaultExecutionOrder(170)]
     public class WorldMenu : MonoBehaviour
@@ -82,10 +84,13 @@ namespace MusicInYourHands
             public LineStrip Ray;
         }
 
+        const string ChooseHint = "Point and pinch to choose";
+
         Bubble[] bubbles = Array.Empty<Bubble>();
         readonly Pointer[] pointers = { new Pointer(), new Pointer() };
         readonly Vector3[] rayPath = new Vector3[2];
-        TypeLabel caption, hint, soundLabel, lyricLabel;
+        TypeLabel caption, hint, soundLabel, lyricLabel, credit;
+        SongAsset credited, previewCredit;
         Vector3 followPosition;
         Quaternion followRotation;
         float awayTime;
@@ -285,6 +290,9 @@ namespace MusicInYourHands
         public void PreviewLibrary(System.Collections.Generic.IReadOnlyList<SongAsset> songs, SongAsset playing, int view) =>
             library.Preview(songs, playing, view);
 
+        /// <summary>Shows the credit line as if this song from Audius were playing, for the editor screenshots.</summary>
+        public void PreviewCredit(SongAsset song) => previewCredit = song;
+
         static float Icon(int bubble) => bubble switch
         {
             ListenToggle => 7f, NextSong => 14f, PreviousSong => 15f, LyricsToggle => 23f, Library => 24f, _ => 6f
@@ -301,7 +309,7 @@ namespace MusicInYourHands
             : b.World == ListenToggle ? bus != null && bus.IsListening ? "Play the song" : "Listen to the room"
             : IsSongStep(b) ? SongStepName(bus, b.World == NextSong ? 1 : -1)
             : b.World == LyricsToggle ? LyricsOption.On ? "Turn lyrics off" : "Turn lyrics on"
-            : b.World == Library ? "Your songs: add a song or lyrics"
+            : b.World == Library ? "Your songs and songs from Audius"
             : bus == null ? "Music" : bus.IsPlaying ? $"Pause {bus.Title}" : $"Play {bus.Title}";
 
         static string SongStepName(MusicBus bus, int step)
@@ -309,6 +317,17 @@ namespace MusicInYourHands
             var song = bus != null ? bus.SongAt(step) : null;
             string where = step > 0 ? "Next" : "Previous";
             return song == null ? $"{where} song" : $"{where}: {song.title}";
+        }
+
+        /// <summary>The line under the menu: news of a song that is loading or couldn't play, else how to choose.</summary>
+        static string HintText(MusicBus bus)
+        {
+            if (bus == null) return ChooseHint;
+            var song = bus.Loading;
+            if (song != null) return song.IsFromAudius ? $"Streaming {song.title} from Audius…" : $"Loading {song.title}…";
+            song = bus.Failed;
+            if (song == null) return ChooseHint;
+            return song.IsFromAudius ? $"Couldn't stream {song.title}. Is the headset online?" : $"Couldn't play {song.title}";
         }
 
         /// <summary>
@@ -411,6 +430,9 @@ namespace MusicInYourHands
                 soundLabel.GameObject.SetActive(visible);
                 lyricLabel.GameObject.SetActive(visible && lyricCount > 0);
             }
+            var playing = previewCredit != null ? previewCredit : bus != null && !bus.IsListening ? bus.CurrentSong : null;
+            bool credits = visible && playing != null && playing.IsFromAudius;
+            if (credit.GameObject.activeSelf != credits) credit.GameObject.SetActive(credits);
             if (!visible) return;
 
             Bubble subject = hovered >= 0 ? bubbles[hovered] : null;
@@ -433,7 +455,18 @@ namespace MusicInYourHands
             var rotation = root.rotation;
             var top = root.TransformPoint(new Vector3(0f, highest + bubbleSize * 1.45f, 0f));
             caption.Transform.SetPositionAndRotation(top, rotation);
+            hint.Text = HintText(bus);
             hint.Transform.SetPositionAndRotation(root.TransformPoint(new Vector3(0f, lowest - bubbleSize * 0.75f, 0f)), rotation);
+            if (credits)
+            {
+                if (credited != playing)
+                {
+                    credited = playing;
+                    credit.Text = AudiusSongs.Credit(playing);
+                }
+                credit.Color = new Color(1f, 1f, 1f, show * 0.65f);
+                credit.Transform.SetPositionAndRotation(root.TransformPoint(new Vector3(0f, lowest - bubbleSize * 0.75f - 0.024f, 0f)), rotation);
+            }
             soundLabel.Transform.SetPositionAndRotation(root.TransformPoint(new Vector3(SoundCenter.x, highest + bubbleSize * 0.62f, 0f)), rotation);
             lyricLabel.Transform.SetPositionAndRotation(root.TransformPoint(new Vector3(LyricCenter.x, highest + bubbleSize * 0.62f, 0f)), rotation);
         }
@@ -554,8 +587,10 @@ namespace MusicInYourHands
             lyricLabel.Text = "Lyric worlds";
             caption = new TypeLabel("Caption", root, 0.019f, 0f);
             hint = new TypeLabel("Hint", root, 0.0135f, 1f);
-            hint.Text = "Point and pinch to choose";
-            foreach (var label in new[] { soundLabel, lyricLabel, caption, hint }) label.GameObject.SetActive(false);
+            hint.Text = ChooseHint;
+            credit = new TypeLabel("Credit", root, 0.0115f, 1f);
+            credited = null;
+            foreach (var label in new[] { soundLabel, lyricLabel, caption, hint, credit }) label.GameObject.SetActive(false);
 
             // Editor previews build a menu without the scene's materials.
             var panel = panelMaterial != null ? panelMaterial : new Material(Shader.Find("MusicInYourHands/Panel"));

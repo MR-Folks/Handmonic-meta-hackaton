@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -23,7 +24,7 @@ namespace MusicInYourHands
         public static MusicBus Instance { get; private set; }
 
         [SerializeField] SongAsset startSong;
-        [Tooltip("The songs the menu steps through, after the start song. Songs added in the Songs folder on the headset follow them.")]
+        [Tooltip("The songs the menu steps through, after the start song. Songs added in the Songs folder on the headset follow them, then the songs from Audius.")]
         [SerializeField] List<SongAsset> songs = new List<SongAsset>();
         [SerializeField] bool playOnStart = true;
         [SerializeField] bool loop = true;
@@ -54,7 +55,9 @@ namespace MusicInYourHands
         AudioSource source;
         readonly List<SongAsset> playlist = new List<SongAsset>();
         List<SongAsset> added = new List<SongAsset>();
-        SongAsset loading;
+        List<SongAsset> fromAudius = new List<SongAsset>();
+        SongAsset loading, failed;
+        float failedAt, audiusAskedAt;
         float bassAverage;
         float listenTime;
         bool listenPaused, waitingForPermission;
@@ -87,7 +90,19 @@ namespace MusicInYourHands
 
         public SongAsset CurrentSong { get; private set; }
 
-        /// <summary>Every song the menu steps through: the built-in ones, then the ones added on the headset.</summary>
+        /// <summary>The song whose audio is on its way (read from the headset or streaming from Audius), or null.</summary>
+        public SongAsset Loading => loading;
+
+        /// <summary>A song whose audio couldn't be loaded in the last few seconds, so the menu can say so; else null.</summary>
+        public SongAsset Failed => failed != null && Time.unscaledTime - failedAt < 5f ? failed : null;
+
+        /// <summary>Whether the songs from Audius are here yet.</summary>
+        public AudiusSongs.Status AudiusStatus { get; private set; }
+
+        /// <summary>
+        /// Every song the menu steps through: the built-in ones, then the ones added on the headset, then the ones from
+        /// Audius.
+        /// </summary>
         public IReadOnlyList<SongAsset> Songs => playlist;
         public LyricsTrack Lyrics { get; private set; } = LyricsTrack.Empty;
         public NoteTrack Notes { get; private set; } = NoteTrack.Empty;
@@ -149,7 +164,8 @@ namespace MusicInYourHands
 
         void Start()
         {
-            RefreshSongs();
+            // Audius is first asked for its songs when the menu opens, not at launch.
+            ListSongs();
             if (startSource == MusicSource.Listen) Listen();
             else if (playOnStart && startSong != null) Play(startSong);
         }
@@ -157,28 +173,35 @@ namespace MusicInYourHands
         public void Play(SongAsset song)
         {
             if (song == null) return;
-            // An added song's audio is loaded first; the current song keeps playing meanwhile.
-            if (song.IsAdded && song.clip == null)
+            // An added song's audio is read first, and a song from Audius streams in; the current song keeps playing meanwhile.
+            if (song.LoadsOnDemand && song.clip == null)
             {
+                if (loading == song) return;
                 loading = song;
-                StartCoroutine(AddedSongs.Load(song, ok =>
+                StartCoroutine(Load(song, ok =>
                 {
                     if (loading != song)
                     {
-                        if (song != CurrentSong) AddedSongs.Unload(song);
+                        if (song != CurrentSong) Unload(song);
                         return;
                     }
                     loading = null;
                     if (ok) Play(song);
+                    else
+                    {
+                        failed = song;
+                        failedAt = Time.unscaledTime;
+                    }
                 }));
                 return;
             }
             loading = null;
-            if (CurrentSong != null && CurrentSong != song && CurrentSong.IsAdded)
+            if (failed == song) failed = null;
+            if (CurrentSong != null && CurrentSong != song && CurrentSong.LoadsOnDemand)
             {
                 source.Stop();
                 source.clip = null;
-                AddedSongs.Unload(CurrentSong);
+                Unload(CurrentSong);
             }
             StopListening();
             CurrentSong = song;
@@ -203,8 +226,26 @@ namespace MusicInYourHands
             return playlist[((i + step) % playlist.Count + playlist.Count) % playlist.Count];
         }
 
-        /// <summary>Lists the built-in songs, then looks again for songs added in the Songs folder on the headset.</summary>
+        static IEnumerator Load(SongAsset song, Action<bool> done) =>
+            song.IsFromAudius ? AudiusSongs.Load(song, done) : AddedSongs.Load(song, done);
+
+        static void Unload(SongAsset song)
+        {
+            if (song.IsFromAudius) AudiusSongs.Unload(song);
+            else AddedSongs.Unload(song);
+        }
+
+        /// <summary>
+        /// Lists the built-in songs, then looks again for songs added in the Songs folder on the headset, and asks
+        /// Audius for its songs if it hasn't sent them yet (they join the list when it does).
+        /// </summary>
         public void RefreshSongs()
+        {
+            AskAudius();
+            ListSongs();
+        }
+
+        void ListSongs()
         {
             var found = AddedSongs.Scan(added);
             foreach (var old in added)
@@ -216,6 +257,26 @@ namespace MusicInYourHands
             foreach (var song in songs)
                 if (song != null && !playlist.Contains(song)) playlist.Add(song);
             playlist.AddRange(added);
+            playlist.AddRange(fromAudius);
+        }
+
+        /// <summary>
+        /// Asks Audius for its songs, unless it has sent them or is being asked. After Audius couldn't be reached it
+        /// waits a little before asking again, unless <paramref name="now"/> (the song page's Try again button).
+        /// </summary>
+        public void AskAudius(bool now = false)
+        {
+            if (AudiusStatus == AudiusSongs.Status.Ready || AudiusStatus == AudiusSongs.Status.Asking || !isActiveAndEnabled) return;
+            if (AudiusStatus == AudiusSongs.Status.Unreachable && !now && Time.unscaledTime - audiusAskedAt < 20f) return;
+            AudiusStatus = AudiusSongs.Status.Asking;
+            audiusAskedAt = Time.unscaledTime;
+            StartCoroutine(AudiusSongs.Fetch(found =>
+            {
+                AudiusStatus = found != null ? AudiusSongs.Status.Ready : AudiusSongs.Status.Unreachable;
+                if (found == null) return;
+                fromAudius = found;
+                ListSongs();
+            }));
         }
 
         /// <summary>Stops the song and follows music playing in the room through the microphone.</summary>

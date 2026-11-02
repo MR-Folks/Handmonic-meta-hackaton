@@ -44,6 +44,7 @@ namespace MusicInYourHands.EditorTools
             ok &= CheckRainPreview();
             ok &= CheckFirefliesPreview();
             ok &= CheckSongs();
+            ok &= CheckAudiusSongs();
             ok &= CheckLettering();
             ok &= CheckLyricsOption();
             ok &= CheckPickerResults();
