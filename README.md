@@ -43,6 +43,7 @@ If settings drift, run **Music In Your Hands > Configure Project for Quest**. It
 - Bars about a metre ahead bounce with the music, and a sphere above them pulses on each beat.
 - Below them, the current lyric line shows with the sung word in pink.
 - Spheres follow your fingertips: they turn pink when you pinch, and the palm sphere turns yellow when your palm faces up.
+- Meta's menu gesture (left palm up, pinch) opens the world menu 44 cm in front of you, within reach (Meta suggests 42 to 46 cm for UI you touch). Touch a bubble or a button on the song page with your index fingertip, or point at it from farther away and pinch. Within 15 cm of the menu the pointer ray gives way to a dot under your fingertip that shrinks as you close in; a press lands when the fingertip reaches the menu, and the next one needs the finger 2 cm back out. Past 20 cm the ray returns.
 
 ## Listen mode
 Poke the coral microphone bubble below the world menu to follow music playing in the room: Spotify on a phone, a speaker, a live instrument. The headset microphone replaces the song, so the bands, beats and every world follow whatever you hear. There are no lyrics or melody notes while listening: Note rain falls from the bands instead, and Air strings play freely without guide beads. Poke it again ("Play song") to go back to the song. The centre bubble pauses listening.

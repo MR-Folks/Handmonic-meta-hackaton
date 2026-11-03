@@ -1043,11 +1043,11 @@ MonoBehaviour:
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   panelMaterial: {fileID: 2100000, guid: 1ec2655ce64ce480ab7a657b64e3f06c, type: 2}
-  distance: 0.48
+  distance: 0.44
   drop: 0.05
   spacing: 0.086
   bubbleSize: 0.078
-  followAngle: 38
+  followAngle: 44
   pinchThresholds: {x: 0.85, y: 0.5}
 --- !u!4 &1126936837
 Transform:

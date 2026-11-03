@@ -8,10 +8,15 @@ namespace MusicInYourHands
     /// menu gesture. The sound worlds cluster on the left and the lyric worlds on the right, each bubble showing a
     /// small animated emblem; below them a row plays and pauses the song, steps to the previous and next song
     /// (including songs added on the headset and songs from Audius), switches to listening to the room, turns the lyrics
-    /// on and off and opens the song page (SongLibrary), which takes the honeycombs' place. Bubbles near where you look are a little larger, and if you look away the menu glides back in front of you. Each hand casts a soft pointer ray onto the menu (from the shoulder through the pinch);
-    /// the bubble it points at swells and its name shows large above the honeycomb. Pinch to pop into it. Under the
-    /// menu a line says how to choose, or that a song is loading or couldn't play, and while a song from Audius plays,
-    /// a second line gives the credit its license asks for.
+    /// on and off and opens the song page (SongLibrary), which takes the honeycombs' place. Bubbles near where you look
+    /// are a little larger, and if you look away the menu glides back in front of you, but never away from a fingertip
+    /// reaching for it.
+    /// The menu opens within arm's reach, so you can touch a bubble or button with your index fingertip, or point at it
+    /// from farther away and pinch. A pointing hand casts a soft ray onto the menu (from the shoulder through the
+    /// pinch); once its fingertip comes within 15 cm of the menu, the ray gives way to a dot under the fingertip that
+    /// shrinks as the finger nears (Meta's touch specs). The bubble you point at or reach for swells and its name shows
+    /// large above the honeycomb. Under the menu a line says how to choose, or that a song is loading or couldn't play,
+    /// and while a song from Audius plays, a second line gives the credit its license asks for.
     /// </summary>
     [DefaultExecutionOrder(170)]
     public class WorldMenu : MonoBehaviour
@@ -20,14 +25,17 @@ namespace MusicInYourHands
         [SerializeField] Material glowMaterial;
         [SerializeField] Material lineMaterial;
         [SerializeField] Material panelMaterial;
-        [SerializeField] float distance = 0.48f;
+        [Tooltip("How far ahead of your eyes the menu opens (m). Meta suggests 42 to 46 cm for UI you touch.")]
+        [SerializeField] float distance = 0.44f;
         [SerializeField] float drop = 0.05f;
         [SerializeField] float spacing = 0.086f;
         [SerializeField] float bubbleSize = 0.078f;
         [Tooltip("How far (degrees) the menu may be from the centre of your view before it follows you.")]
-        [SerializeField] float followAngle = 38f;
+        [SerializeField] float followAngle = 44f;
         [Tooltip("Pinch strength (0-1) that selects, and the strength the pinch must drop below before it can select again.")]
         [SerializeField] Vector2 pinchThresholds = new Vector2(0.85f, 0.5f);
+        [Tooltip("A fingertip nearer the menu than the first distance (m) touches instead of pointing, until it is farther than the second (Meta's hover zone).")]
+        [SerializeField] Vector2 touchZone = new Vector2(0.15f, 0.2f);
 
         /// <summary>Raised by the menu button feed (Meta's menu gesture); the menu opens or closes.</summary>
         public static event Action ToggleRequested;
@@ -66,7 +74,10 @@ namespace MusicInYourHands
             public float Pop;
         }
 
-        /// <summary>One hand's pointer: a ray from the shoulder through the pinch, and where it meets the menu.</summary>
+        /// <summary>
+        /// One hand's pointer: a ray from the shoulder through the pinch and where it meets the menu, or, within reach,
+        /// the index fingertip touching it.
+        /// </summary>
         sealed class Pointer
         {
             public bool Active;
@@ -82,9 +93,24 @@ namespace MusicInYourHands
             public float Visibility;
             public Renderer Cursor;
             public LineStrip Ray;
+            /// <summary>The fingertip is within reach of the menu, so this hand touches instead of pointing.</summary>
+            public bool Touching;
+            /// <summary>The fingertip has been out in front since its last press, so reaching the menu presses.</summary>
+            public bool TouchArmed;
+            /// <summary>How far the fingertip is in front of the menu's surface (m); negative once through it.</summary>
+            public float Depth;
+            /// <summary>Where the fingertip is over the menu, in the menu's space.</summary>
+            public Vector2 TouchAt;
+            /// <summary>Where the fingertip reached the menu this frame, in the menu's space.</summary>
+            public Vector2? Tapped;
         }
 
-        const string ChooseHint = "Point and pinch to choose";
+        // A touch presses when the index fingertip reaches the surface (Meta's touch specs model the fingertip as a 5 mm
+        // sphere), and the next press needs the finger 2 cm back out first, so a resting or trembling finger presses once.
+        const float TouchContact = 0.005f, TouchRearm = 0.02f;
+        // The song page sits this far behind the bubbles.
+        const float PageDepth = 0.003f;
+        const string ChooseHint = "Touch or pinch to choose";
 
         Bubble[] bubbles = Array.Empty<Bubble>();
         readonly Pointer[] pointers = { new Pointer(), new Pointer() };
@@ -104,6 +130,9 @@ namespace MusicInYourHands
         float honeycomb = 1f;
         bool open, toggleRequested;
         float openTime, closeAt = -1f, cooldown;
+        // Where a fingertip can touch the menu (in its space), and how far behind the bubbles the surface it touches is.
+        Rect touchArea;
+        float surface;
 
         public bool IsOpen => open;
 
@@ -141,8 +170,9 @@ namespace MusicInYourHands
             closeAt = -1f;
             Place(view);
             foreach (var b in bubbles) b.Pop = 0f;
-            // The pinch that opened the menu (Meta's menu gesture) must be let go before a pinch can select.
-            foreach (var p in pointers) p.Armed = false;
+            // The pinch that opened the menu (Meta's menu gesture) must be let go before a pinch can select, and a
+            // fingertip already at the menu must come back out before it can press.
+            foreach (var p in pointers) p.Armed = p.TouchArmed = p.Touching = false;
         }
 
         public void Close()
@@ -174,6 +204,13 @@ namespace MusicInYourHands
         /// </summary>
         void Follow(Camera view, float dt)
         {
+            // Never slide away from a fingertip reaching for a bubble, even an outer one far from the centre of view.
+            if (pointers[0].Touching || pointers[1].Touching)
+            {
+                awayTime = 0f;
+                following = false;
+                return;
+            }
             var toMenu = root.position - view.transform.position;
             float angle = Vector3.Angle(view.transform.forward, toMenu);
             awayTime = angle > followAngle ? awayTime + dt : 0f;
@@ -247,14 +284,17 @@ namespace MusicInYourHands
                 b.Renderer.SetPropertyBlock(block);
             }
 
-            // Pinch to select: the bubble the hand was aiming at just before the pinch closed, so the small jump of
-            // the hand while pinching doesn't change the choice.
+            // Touch or pinch to choose. A touch presses the bubble under the fingertip as it reaches the menu; a pinch,
+            // the bubble the hand was aiming at just before the pinch closed, so the small jump of the hand while
+            // pinching doesn't change the choice.
             if (open && cooldown <= 0f && !library.IsOpen)
             {
                 foreach (var p in pointers)
                 {
-                    if (!p.Active || !p.Pinching || p.Aimed < 0 || p.AimedAge > 0.35f) continue;
-                    var b = bubbles[p.Aimed];
+                    int chosen = p.Tapped is Vector2 tap ? BubbleAt(tap, TouchReach)
+                        : p.Active && p.Pinching && p.AimedAge <= 0.35f ? p.Aimed : -1;
+                    if (chosen < 0) continue;
+                    var b = bubbles[chosen];
                     if (openTime - b.Delay < 0.32f) continue;
                     Press(b, manager, bus);
                     p.Aimed = -1;
@@ -270,12 +310,14 @@ namespace MusicInYourHands
 
         void StepLibrary(MusicBus bus, float dt)
         {
+            bool ready = open && library.IsOpen && cooldown <= 0f;
             for (int s = 0; s < 2; s++)
             {
                 var p = pointers[s];
-                aims[s] = p.Active ? root.InverseTransformPoint(p.Hit) : (Vector2?)null;
-                // As with the bubbles: where the hand was aiming just before the pinch closed.
-                presses[s] = open && library.IsOpen && cooldown <= 0f && p.Active && p.Pinching && p.AimedAge <= 0.35f ? p.AimedAt : (Vector2?)null;
+                // A touching hand aims with its fingertip and presses where it reaches the page. A pointing hand aims
+                // with its ray and, as with the bubbles, presses where it was aiming just before the pinch closed.
+                aims[s] = p.Touching ? p.TouchAt : p.Active ? (Vector2)root.InverseTransformPoint(p.Hit) : (Vector2?)null;
+                presses[s] = !ready ? (Vector2?)null : p.Touching ? p.Tapped : p.Active && p.Pinching && p.AimedAge <= 0.35f ? p.AimedAt : (Vector2?)null;
             }
             library.Step(bus, open, dt, aims, presses);
         }
@@ -331,31 +373,66 @@ namespace MusicInYourHands
         }
 
         /// <summary>
-        /// Finds where each hand points: a ray from an estimated shoulder through the point between thumb and index
-        /// tips, like Meta's own hand pointers, hitting the menu's plane. Also tracks the pinch with hysteresis.
+        /// Finds where each hand touches or points. Within reach of the menu (Meta's hover zone, touchZone) the index
+        /// fingertip touches: a press lands where it reaches the surface coming from the front. Farther away the hand
+        /// points: a ray from an estimated shoulder through the point between thumb and index tips, like Meta's own hand
+        /// pointers, hits the menu's plane, and the pinch is tracked with hysteresis.
         /// </summary>
         void UpdatePointers(HandRig rig, Camera view, float dt)
         {
             var plane = new Plane(root.forward, root.position);
             var head = view.transform.position;
             var side = Vector3.Cross(Vector3.up, Effects.FlatForward(view)).normalized;
+            bool pageOpen = library.IsOpen;
+            surface = pageOpen ? PageDepth : 0f;
             for (int s = 0; s < 2; s++)
             {
                 var p = pointers[s];
                 var hand = rig?.Get(s == 0);
-                p.Pinching = false;
-                p.Active = open && hand != null && hand.IsTracked && !hand.InSystemGesture;
-                if (p.Active)
+                bool pointed = p.Active;
+                p.Active = p.Pinching = false;
+                p.Tapped = null;
+                p.Target = -1;
+                if (!open || hand == null || !hand.IsTracked || hand.InSystemGesture)
+                {
+                    // A lost hand's ray or dot goes at once rather than lingering where the hand was.
+                    p.Touching = p.TouchArmed = false;
+                    p.Visibility = 0f;
+                    continue;
+                }
+
+                // The index fingertip in the menu's space; its depth is how far it is in front of the surface.
+                var tip = hand.TipJoints[1] != null ? hand.TipJoints[1].position : hand.Tips[1];
+                var local = root.InverseTransformPoint(tip);
+                var at = (Vector2)local;
+                float depth = surface - local.z;
+                if (!p.Touching) p.Touching = Over(at, 0.03f) && Mathf.Abs(depth) < touchZone.x;
+                else if (!Over(at, 0.07f) || Mathf.Abs(depth) > touchZone.y) p.Touching = false;
+
+                if (p.Touching)
+                {
+                    // A press lands where the fingertip reached the surface, between last frame and this one.
+                    if (p.TouchArmed && p.Depth > TouchContact && depth <= TouchContact)
+                    {
+                        float k = (p.Depth - TouchContact) / Mathf.Max(p.Depth - depth, 1e-5f);
+                        p.Tapped = Vector2.Lerp(p.TouchAt, at, k);
+                        p.TouchArmed = false;
+                    }
+                    if (!pageOpen) p.Target = BubbleAt(at, TouchReach);
+                    // A pinch made while touching mustn't select once the hand pulls back and points.
+                    p.Armed = false;
+                    p.Pinch = 0f;
+                }
+                else
                 {
                     var thumb = hand.TipJoints[0] != null ? hand.TipJoints[0].position : hand.Tips[0];
-                    var index = hand.TipJoints[1] != null ? hand.TipJoints[1].position : hand.Tips[1];
-                    var pinchPoint = (thumb + index) * 0.5f;
+                    var pinchPoint = (thumb + tip) * 0.5f;
                     var shoulder = head + Vector3.down * 0.17f + side * (s == 0 ? -0.17f : 0.17f);
                     var ray = new Ray(shoulder, pinchPoint - shoulder);
                     p.Active = plane.Raycast(ray, out float enter);
                     var hit = ray.GetPoint(enter);
                     // Smooth the cursor a little; hand tracking jitters more than a controller.
-                    p.Hit = p.Visibility > 0.01f ? Vector3.Lerp(p.Hit, hit, 1f - Mathf.Exp(-25f * dt)) : hit;
+                    p.Hit = pointed ? Vector3.Lerp(p.Hit, hit, 1f - Mathf.Exp(-25f * dt)) : hit;
                     p.Origin = pinchPoint;
 
                     float pinch = p.Pinch = hand.Pinch;
@@ -368,13 +445,7 @@ namespace MusicInYourHands
 
                     // The nearest bubble within reach of the cursor is the target.
                     var localHit = (Vector2)root.InverseTransformPoint(p.Hit);
-                    p.Target = -1;
-                    float best = bubbleSize * 0.62f;
-                    for (int i = 0; i < bubbles.Length; i++)
-                    {
-                        float d = Vector2.Distance(localHit, bubbles[i].Slot);
-                        if (d < best) { best = d; p.Target = i; }
-                    }
+                    if (p.Active) p.Target = BubbleAt(localHit, bubbleSize * 0.62f);
                     // Remember the aim while the pinch is still open.
                     if (pinch < 0.6f)
                     {
@@ -384,12 +455,20 @@ namespace MusicInYourHands
                     }
                     else p.AimedAge += dt;
                 }
-                if (!p.Active) p.Target = -1;
-                p.Visibility = Mathf.MoveTowards(p.Visibility, p.Active ? 1f : 0f, dt * 6f);
+
+                // The next touch needs the fingertip back out in front first.
+                if (depth > TouchRearm) p.TouchArmed = true;
+                p.Depth = depth;
+                p.TouchAt = at;
+                p.Visibility = Mathf.MoveTowards(p.Visibility, p.Active || p.Touching ? 1f : 0f, dt * 6f);
             }
         }
 
-        /// <summary>A soft ray from the pinch to the menu and a glowing cursor where it lands; it tightens as you pinch.</summary>
+        /// <summary>
+        /// A pointing hand shows a soft ray from the pinch to the menu and a glowing cursor where it lands, which tightens
+        /// as you pinch. A touching hand shows only a dot under its fingertip that shrinks and brightens as the finger
+        /// nears the menu, so you can see how close you are to pressing.
+        /// </summary>
         void DrawPointers(Camera view)
         {
             for (int s = 0; s < 2; s++)
@@ -397,23 +476,56 @@ namespace MusicInYourHands
                 var p = pointers[s];
                 bool show = p.Visibility > 0.01f;
                 if (p.Cursor.gameObject.activeSelf != show) p.Cursor.gameObject.SetActive(show);
-                p.Ray.SetVisible(show);
+                p.Ray.SetVisible(show && !p.Touching);
                 if (!show) continue;
-                float pinch = p.Pinch;
-                bool onBubble = p.Target >= 0;
-                p.Cursor.transform.position = p.Hit - root.forward * 0.004f;
-                p.Cursor.transform.localScale = Vector3.one * Mathf.Lerp(0.03f, 0.016f, pinch) * (onBubble ? 1.2f : 1f);
-                Effects.Face(p.Cursor.transform, view);
                 block.Clear();
-                block.SetColor(ColorId, onBubble ? Color.white : new Color(0.85f, 0.9f, 1f));
-                block.SetFloat(IntensityId, p.Visibility * (onBubble ? 1.1f : 0.6f) * (1f + pinch * 0.6f));
+                if (p.Touching)
+                {
+                    // 0 at the surface, 1 at the edge of the touch zone.
+                    float near = Mathf.Clamp01(p.Depth / touchZone.x);
+                    p.Cursor.transform.position = root.TransformPoint(new Vector3(p.TouchAt.x, p.TouchAt.y, surface - 0.004f));
+                    p.Cursor.transform.localScale = Vector3.one * Mathf.Lerp(0.01f, 0.03f, near);
+                    block.SetColor(ColorId, Color.white);
+                    block.SetFloat(IntensityId, p.Visibility * Mathf.Lerp(1.4f, 0.5f, near));
+                }
+                else
+                {
+                    float pinch = p.Pinch;
+                    bool onBubble = p.Target >= 0;
+                    p.Cursor.transform.position = p.Hit - root.forward * 0.004f;
+                    p.Cursor.transform.localScale = Vector3.one * Mathf.Lerp(0.03f, 0.016f, pinch) * (onBubble ? 1.2f : 1f);
+                    block.SetColor(ColorId, onBubble ? Color.white : new Color(0.85f, 0.9f, 1f));
+                    block.SetFloat(IntensityId, p.Visibility * (onBubble ? 1.1f : 0.6f) * (1f + pinch * 0.6f));
+                    rayPath[0] = p.Origin;
+                    rayPath[1] = p.Hit;
+                    p.Ray.Set(rayPath, 2, 0.0025f, new Color(0.85f, 0.9f, 1f, 0.22f * p.Visibility), view.transform.position, false);
+                }
+                Effects.Face(p.Cursor.transform, view);
                 p.Cursor.SetPropertyBlock(block);
-
-                rayPath[0] = p.Origin;
-                rayPath[1] = p.Hit;
-                p.Ray.Set(rayPath, 2, 0.0025f, new Color(0.85f, 0.9f, 1f, 0.22f * p.Visibility), view.transform.position, false);
             }
         }
+
+        float TouchReach => bubbleSize * 0.55f;
+
+        /// <summary>The bubble nearest a point on the menu, if one is within <paramref name="reach"/> of it, else -1.</summary>
+        int BubbleAt(Vector2 at, float reach)
+        {
+            int found = -1;
+            for (int i = 0; i < bubbles.Length; i++)
+            {
+                float d = Vector2.Distance(at, bubbles[i].Slot);
+                if (d < reach)
+                {
+                    reach = d;
+                    found = i;
+                }
+            }
+            return found;
+        }
+
+        /// <summary>Whether a point on the menu is over the part a fingertip can touch, give or take <paramref name="margin"/>.</summary>
+        bool Over(Vector2 at, float margin) =>
+            at.x > touchArea.xMin - margin && at.x < touchArea.xMax + margin && at.y > touchArea.yMin - margin && at.y < touchArea.yMax + margin;
 
         /// <summary>
         /// The name of the bubble you point at, large above the honeycomb (or the current world's when you point at
@@ -597,6 +709,17 @@ namespace MusicInYourHands
             library = new SongLibrary(root, panel, new Vector2(0f, spacing * 0.2f));
             library.Pressed += OnLibraryPressed;
             library.PickerOpened += Close;
+
+            // Where a fingertip can touch: the bubbles, with room for their size, and the song page.
+            Vector2 min = bubbles[0].Slot, max = min;
+            foreach (var b in bubbles)
+            {
+                min = Vector2.Min(min, b.Slot);
+                max = Vector2.Max(max, b.Slot);
+            }
+            var page = library.Area;
+            touchArea = Rect.MinMaxRect(Mathf.Min(min.x - bubbleSize, page.xMin), Mathf.Min(min.y - bubbleSize, page.yMin),
+                Mathf.Max(max.x + bubbleSize, page.xMax), Mathf.Max(max.y + bubbleSize, page.yMax));
 
             for (int s = 0; s < 2; s++)
             {

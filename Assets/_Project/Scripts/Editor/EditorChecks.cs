@@ -39,6 +39,7 @@ namespace MusicInYourHands.EditorTools
             ok &= CheckLivingSkinPreview();
             ok &= CheckOrbPreview();
             ok &= CheckMenuPreview();
+            ok &= CheckMenuTouch();
             ok &= CheckRibbonPreview();
             ok &= CheckStringsPreview();
             ok &= CheckRainPreview();

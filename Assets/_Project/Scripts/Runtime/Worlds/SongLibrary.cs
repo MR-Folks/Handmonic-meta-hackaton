@@ -7,7 +7,7 @@ namespace MusicInYourHands
 {
     /// <summary>
     /// The menu's song page, with a tab for the songs people add themselves and one for the songs from Audius. Your
-    /// songs are listed with whether each has lyrics; pinching a row plays that song, and each row can add or change its
+    /// songs are listed with whether each has lyrics; touching or pinching a row plays that song, and each row can add or change its
     /// lyrics or remove the song. Adding a song is a guided step at a time: pick the song from the headset's files, it
     /// starts playing straight away, then the page offers to add its lyrics. The menu steps aside while the file
     /// picker's window is open and comes back when it is done. The Audius tab lists the songs the app streams, each with
@@ -26,6 +26,8 @@ namespace MusicInYourHands
             public Action Click;
             public Color Fill;
             public float Hover;
+            /// <summary>1 just after a press, fading to 0: the button sinks a little and lights up.</summary>
+            public float Press;
             public bool Shown;
         }
 
@@ -88,6 +90,9 @@ namespace MusicInYourHands
 
         /// <summary>True while the page is showing in the menu.</summary>
         public bool IsOpen { get; private set; }
+
+        /// <summary>The page's rectangle in the menu's space, where a fingertip can touch it.</summary>
+        public Rect Area => new Rect(center.x - Width * 0.5f, center.y - Height * 0.5f, Width, Height);
 
         /// <summary>Raised on any press, for the menu's sound.</summary>
         public event Action Pressed;
@@ -289,8 +294,8 @@ namespace MusicInYourHands
         }
 
         /// <summary>
-        /// One frame of the page. <paramref name="aims"/> are where the two hands point, in the menu's space, and
-        /// <paramref name="presses"/> where each pinched this frame.
+        /// One frame of the page. <paramref name="aims"/> are where the two hands point or hover, in the menu's space,
+        /// and <paramref name="presses"/> where each touched or pinched this frame.
         /// </summary>
         public void Step(MusicBus bus, bool menuOpen, float dt, Vector2?[] aims, Vector2?[] presses)
         {
@@ -314,7 +319,7 @@ namespace MusicInYourHands
             if (toastLeft > 0f && view == View.List) Show(toast, null, new Vector2(0f, -0.14f), Soft);
 
             Style(panel, new Vector2(Width, Height), 0.022f, PanelFill, PanelEdge, 0f);
-            Action clicked = null;
+            var pressed = Topmost(presses[0]) ?? Topmost(presses[1]);
             foreach (var b in buttons)
             {
                 if (b.Back.gameObject.activeSelf != b.Shown)
@@ -324,19 +329,22 @@ namespace MusicInYourHands
                 }
                 if (!b.Shown) continue;
                 b.Hover = Mathf.MoveTowards(b.Hover, Topmost(aims[0]) == b || Topmost(aims[1]) == b ? 1f : 0f, dt * 8f);
-                Style(b.Back, b.Size, Mathf.Min(0.012f, b.Size.y * 0.5f), b.Fill, Color.clear, b.Hover);
+                // A pressed button sinks a little and lights up for a moment, whether touched or pinched.
+                b.Press = Mathf.MoveTowards(b.Press, 0f, dt * 4f);
+                var size = b.Size * (1f - 0.06f * b.Press);
+                b.Back.transform.localScale = new Vector3(size.x, size.y, 1f);
+                Style(b.Back, size, Mathf.Min(0.012f, size.y * 0.5f), b.Fill, Color.clear, Mathf.Max(b.Hover, b.Press));
                 b.Label.Color = new Color(1f, 1f, 1f, fade);
-                var pressed = Topmost(presses[0]) ?? Topmost(presses[1]);
-                if (pressed == b) clicked = b.Click;
             }
             foreach (var t in texts)
             {
                 if (t.Label.GameObject.activeSelf != t.Shown) t.Label.GameObject.SetActive(t.Shown);
                 if (t.Shown) t.Label.Color = new Color(t.Color.r, t.Color.g, t.Color.b, t.Color.a * fade);
             }
-            if (clicked == null) return;
+            if (pressed == null) return;
+            pressed.Press = 1f;
             Pressed?.Invoke();
-            clicked();
+            pressed.Click();
         }
 
         /// <summary>The songs of the open tab: the ones added on the headset, or the ones from Audius.</summary>
