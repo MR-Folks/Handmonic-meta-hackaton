@@ -11,6 +11,12 @@ namespace MusicInYourHands
     /// </summary>
     public class LightTrails : World
     {
+        public override string DisplayName => "Light trails";
+
+        public override Color Color => new Color(1f, 0.83f, 0.42f);
+
+        public override int MenuOrder => 110;
+
         public override int MenuIcon => 17;
 
         public override string Hint => "Pinch and move to draw; two fists clear it";
@@ -26,8 +32,6 @@ namespace MusicInYourHands
 
         [Header("Materials")]
         [SerializeField] Material trailMaterial;
-        [SerializeField] Material glowMaterial;
-        [SerializeField] Material letteringMaterial;
 
         [Header("Strokes")]
         [SerializeField] int maxStrokes = 60;
@@ -60,14 +64,16 @@ namespace MusicInYourHands
         readonly Vector3[] lastPoint = new Vector3[2];
         Renderer[] nibs;
         MaterialPropertyBlock block;
-        WordLayer words;
         float clearHold, clearFade = 1f;
-        bool built;
 
-        public override void Build()
+        protected override int SungWordCount => 6;
+
+        protected override float SungWordHeight => 0.032f;
+
+        protected override float SungWordsAlpha => clearFade;
+
+        protected override void OnBuild()
         {
-            if (built) return;
-            built = true;
             block = new MaterialPropertyBlock();
             for (int i = 0; i < maxStrokes; i++)
             {
@@ -85,22 +91,30 @@ namespace MusicInYourHands
             }
             nibs = new[] { Effects.MakeQuad("Nib L", transform, glowMaterial), Effects.MakeQuad("Nib R", transform, glowMaterial) };
             foreach (var n in nibs) n.gameObject.SetActive(false);
-            if (letteringMaterial != null) words = new WordLayer("Lyric", transform, letteringMaterial, 6, 0.032f);
         }
 
-        protected override void OnDisable()
+        protected override void OnExit()
         {
-            base.OnDisable();
             drawing[0] = drawing[1] = null;
-            if (!built) return;
             foreach (var n in nibs) n.gameObject.SetActive(false);
-            words?.Clear();
         }
 
-        public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
+        /// <summary>
+        /// Each sung word comes off the tip of the light you are drawing, in its colour, and floats slowly up and
+        /// away from it. With no hand drawing, it appears in front of you.
+        /// </summary>
+        protected override void OnWord(string word, bool newLine)
         {
-            Build();
-            if (view == null) return;
+            var eye = View.transform.position;
+            var w = SungWords.Add(word, Color.Lerp(SongColor(Music), Color.white, 0.4f), 2.6f);
+            int side = drawing[1] != null ? 1 : drawing[0] != null ? 0 : -1;
+            var from = side >= 0 ? lastPoint[side] : eye + Effects.FlatForward(View) * 0.55f + Vector3.down * 0.15f;
+            w.Position = from + Vector3.up * 0.03f;
+            w.Velocity = Vector3.up * 0.04f + (from - eye).normalized * 0.03f;
+        }
+
+        protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
+        {
             var color = SongColor(music);
             if (rig != null)
             {
@@ -129,34 +143,17 @@ namespace MusicInYourHands
                     clearFade = 1f;
                 }
             }
-            Sing(music, view, color, dt);
-        }
 
-        /// <summary>
-        /// Each sung word comes off the tip of the light you are drawing, in its colour, and floats slowly up and
-        /// away from it. With no hand drawing, it appears in front of you.
-        /// </summary>
-        void Sing(MusicFrame music, Camera view, Color color, float dt)
-        {
-            if (words == null) return;
+            // The sung words float on from where they came off, turned to you.
+            if (SungWords == null) return;
             var eye = view.transform.position;
-            if (words.Next(music, out var text, out _))
-            {
-                var w = words.Add(text, Color.Lerp(color, Color.white, 0.4f), 2.6f);
-                int side = drawing[1] != null ? 1 : drawing[0] != null ? 0 : -1;
-                var from = side >= 0 ? lastPoint[side] : eye + Effects.FlatForward(view) * 0.55f + Vector3.down * 0.15f;
-                w.Position = from + Vector3.up * 0.03f;
-                w.Velocity = Vector3.up * 0.04f + (from - eye).normalized * 0.03f;
-            }
-            words.Tick(dt);
-            foreach (var w in words.Words)
+            foreach (var w in SungWords.Words)
             {
                 if (!w.Active) continue;
                 w.Position += w.Velocity * dt;
                 w.Rotation = WordLayer.Facing(w.Position, eye);
                 w.Halo = 0.4f + music.Kick * 0.4f;
             }
-            words.Draw(clearFade);
         }
 
         /// <summary>The colour of the moment: it moves round the palette as the song plays, a step every few beats.</summary>

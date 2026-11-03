@@ -6,8 +6,9 @@ namespace MusicInYourHands
     /// <summary>
     /// The sung words for a sound world: a few small 3D words (Glyphs, Lettering material) that the world places and
     /// moves in its own way each frame, by setting each word's Position, Rotation, Size and Color. Words fade in when
-    /// added and fade out at the end of their life. Next tells the world when a new word starts; only real lyrics
-    /// count, so songs without lyrics (and Listen mode) leave the sound worlds as they are.
+    /// added and fade out at the end of their life. World makes one for worlds with a SungWordCount, calls the
+    /// world's OnWord when a new word starts (only real lyrics count for sound worlds), and ages and draws the words
+    /// around the world's OnStep. The layer shares the world's lyric cursor, for each word's index and line.
     /// </summary>
     public sealed class WordLayer
     {
@@ -43,7 +44,7 @@ namespace MusicInYourHands
         static readonly int RimId = Shader.PropertyToID("_Rim");
 
         readonly List<Word> words = new List<Word>();
-        readonly LyricCursor cursor = new LyricCursor();
+        readonly LyricCursor cursor;
         readonly Material material;
         readonly MaterialPropertyBlock block = new MaterialPropertyBlock();
         readonly float letterHeight;
@@ -66,9 +67,10 @@ namespace MusicInYourHands
         /// <summary>The current word's position in its line (0 for the first word).</summary>
         public int Index => cursor.Index;
 
-        public WordLayer(string name, Transform parent, Material lettering, int count, float letterHeight)
+        public WordLayer(string name, Transform parent, Material lettering, int count, float letterHeight, LyricCursor cursor)
         {
             this.letterHeight = letterHeight;
+            this.cursor = cursor;
             material = new Material(lettering) { name = $"{name} Lettering", mainTexture = TypeFace.Bold.Atlas };
             for (int i = 0; i < count; i++)
             {
@@ -77,21 +79,6 @@ namespace MusicInYourHands
                 w.Renderer.gameObject.SetActive(false);
                 words.Add(w);
             }
-        }
-
-        /// <summary>True on the frame a new sung word starts.</summary>
-        public bool Next(MusicFrame music, out string text, out bool newLine)
-        {
-            text = null;
-            newLine = false;
-            if (string.IsNullOrEmpty(music.Word))
-            {
-                cursor.Reset();
-                return false;
-            }
-            if (!cursor.Advance(music, out newLine)) return false;
-            text = cursor.Word;
-            return true;
         }
 
         /// <summary>

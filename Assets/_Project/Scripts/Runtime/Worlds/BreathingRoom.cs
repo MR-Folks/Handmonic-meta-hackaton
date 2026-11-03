@@ -12,6 +12,12 @@ namespace MusicInYourHands
     /// </summary>
     public class BreathingRoom : World
     {
+        public override string DisplayName => "Breathing room";
+
+        public override Color Color => new Color(0.75f, 0.6f, 1f);
+
+        public override int MenuOrder => 100;
+
         public override int MenuIcon => 16;
 
         public override string Hint => "Push your palm towards a wall";
@@ -26,8 +32,8 @@ namespace MusicInYourHands
         };
 
         [Header("Materials")]
+        [WorldMaterial("RoomGrid")]
         [SerializeField] Material gridMaterial;
-        [SerializeField] Material letteringMaterial;
 
         [Header("Room")]
         [Tooltip("Half the width and depth of the stand-in room (m), and its height.")]
@@ -57,98 +63,81 @@ namespace MusicInYourHands
         int nextWave;
         readonly float[] cooldown = new float[2];
         MaterialPropertyBlock block;
-        WordLayer words;
         AudioPool voices;
         MusicFrame frame;
         Vector3 centre, forward, right;
-        float floorY, fade, breath;
-        bool anchored, built, scanned;
+        float floorY, breath;
+        bool scanned;
 
-        public override void Build()
+        protected override float FadeInSeconds => 1f / 1.2f;
+
+        protected override int SungWordCount => 6;
+
+        protected override float SungWordHeight => 0.11f;
+
+        protected override float SungWordsAlpha => FadeIn;
+
+        protected override void OnBuild()
         {
-            if (built) return;
-            built = true;
             block = new MaterialPropertyBlock();
             floor = Effects.MakeQuad("Floor", transform, gridMaterial);
             floor.gameObject.SetActive(false);
             voices = new AudioPool(transform, 4);
             for (int i = 0; i < waves.Length; i++) waves[i] = new Vector4(0f, 0f, 0f, -1f);
-            if (letteringMaterial != null) words = new WordLayer("Lyric", transform, letteringMaterial, 6, 0.11f);
         }
 
-        protected override void OnEnable()
+        protected override void OnExit()
         {
-            base.OnEnable();
-            anchored = false;
-            fade = 0f;
-        }
-
-        protected override void OnDisable()
-        {
-            base.OnDisable();
-            if (!built) return;
             foreach (var w in walls) w.gameObject.SetActive(false);
             floor.gameObject.SetActive(false);
-            words?.Clear();
         }
 
-        public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
+        /// <summary>Finds the walls and floor around where you stand and shows the grid on them.</summary>
+        protected override void OnPlace(Camera view)
         {
-            Build();
-            if (view == null) return;
-            if (anchored && ShouldReanchor(view, dt)) anchored = false;
-            if (!anchored)
-            {
-                centre = view.transform.position;
-                forward = Effects.FlatForward(view);
-                right = Vector3.Cross(Vector3.up, forward).normalized;
-                floorY = Effects.FloorY(view);
-                MeasureRoom();
-                for (int i = 0; i < walls.Count; i++) walls[i].gameObject.SetActive(i < surfaces.Count);
-                floor.gameObject.SetActive(true);
-                MarkAnchored(view);
-                anchored = true;
-            }
-            frame = music;
-            fade = Mathf.MoveTowards(fade, 1f, dt * 1.2f);
-            breath = Mathf.Lerp(breath, Mathf.Clamp01(music.Band(1) * 0.8f + music.Kick * 0.5f), 1f - Mathf.Exp(-8f * dt));
-
-            for (int i = 0; i < waves.Length; i++) if (waves[i].w >= 0f) waves[i].w += dt;
-            // Each kick sends a soft ring out from under your feet.
-            if (music.Beat) AddWave(new Vector3(centre.x, floorY, centre.z), false);
-            if (rig != null) Push(rig, dt);
-            Place(music);
-            Sing(music, view, dt);
+            centre = view.transform.position;
+            forward = Effects.FlatForward(view);
+            right = Vector3.Cross(Vector3.up, forward).normalized;
+            floorY = Effects.FloorY(view);
+            MeasureRoom();
+            for (int i = 0; i < walls.Count; i++) walls[i].gameObject.SetActive(i < surfaces.Count);
+            floor.gameObject.SetActive(true);
         }
+
+        /// <summary>Each kick sends a soft ring out from under your feet.</summary>
+        protected override void OnBeat(MusicFrame music) => AddWave(new Vector3(centre.x, floorY, centre.z), false);
 
         /// <summary>
         /// Each sung word lights up on the wall in front of you, a little further along for each word of the line,
         /// and sends a wave out across the wall from where it lands.
         /// </summary>
-        void Sing(MusicFrame music, Camera view, float dt)
+        protected override void OnWord(string word, bool newLine)
         {
-            if (words == null) return;
-            var eye = view.transform.position;
-            if (words.Next(music, out var text, out _))
-            {
-                float angle = ((words.Index % 5) - 2) * 11f;
-                var dir = Quaternion.AngleAxis(angle, Vector3.up) * Effects.FlatForward(view);
-                if (Hit(eye + Vector3.down * 0.1f, dir, out var hit, out float distance))
-                {
-                    var wall = surfaces[0];
-                    foreach (var su in surfaces)
-                        if (Mathf.Abs(Vector3.Dot(hit - su.Center, su.Normal)) < Mathf.Abs(Vector3.Dot(hit - wall.Center, wall.Normal))) wall = su;
-                    var w = words.Add(text, Color.Lerp(new Color(1f, 0.45f, 0.75f), Color.white, 0.35f), 3.2f);
-                    w.Position = hit + wall.Normal * 0.02f;
-                    w.Rotation = Quaternion.LookRotation(-wall.Normal, Vector3.up);
-                    w.Size = Mathf.Clamp(distance / 1.8f, 0.6f, 1.8f);
-                    AddWave(hit, false);
-                }
-            }
-            words.Tick(dt);
-            foreach (var w in words.Words)
+            var eye = View.transform.position;
+            float angle = ((Sung.Index % 5) - 2) * 11f;
+            var dir = Quaternion.AngleAxis(angle, Vector3.up) * Effects.FlatForward(View);
+            if (!Hit(eye + Vector3.down * 0.1f, dir, out var hit, out float distance)) return;
+            var wall = surfaces[0];
+            foreach (var su in surfaces)
+                if (Mathf.Abs(Vector3.Dot(hit - su.Center, su.Normal)) < Mathf.Abs(Vector3.Dot(hit - wall.Center, wall.Normal))) wall = su;
+            var w = SungWords.Add(word, Color.Lerp(new Color(1f, 0.45f, 0.75f), Color.white, 0.35f), 3.2f);
+            w.Position = hit + wall.Normal * 0.02f;
+            w.Rotation = Quaternion.LookRotation(-wall.Normal, Vector3.up);
+            w.Size = Mathf.Clamp(distance / 1.8f, 0.6f, 1.8f);
+            AddWave(hit, false);
+        }
+
+        protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
+        {
+            frame = music;
+            breath = Mathf.Lerp(breath, Mathf.Clamp01(music.Band(1) * 0.8f + music.Kick * 0.5f), 1f - Mathf.Exp(-8f * dt));
+
+            for (int i = 0; i < waves.Length; i++) if (waves[i].w >= 0f) waves[i].w += dt;
+            if (rig != null) Push(rig, dt);
+            Place(music);
+            if (SungWords == null) return;
+            foreach (var w in SungWords.Words)
                 if (w.Active) w.Halo = 0.3f + breath * 0.5f;
-            words.Draw(fade);
         }
 
         /// <summary>
@@ -197,7 +186,7 @@ namespace MusicInYourHands
             block.SetVector(CenterId, centre);
             block.SetFloat(BreathId, breath);
             block.SetFloat(ClockId, Now);
-            block.SetFloat(AlphaId, fade);
+            block.SetFloat(AlphaId, FadeIn);
             block.SetVectorArray(WavesId, waves);
             r.SetPropertyBlock(block);
         }

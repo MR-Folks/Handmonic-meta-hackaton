@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
@@ -55,6 +56,29 @@ namespace MusicInYourHands.EditorTools
         {
             ConfigureAll();
             RunMetaFixAll(exitWhenDone: true);
+        }
+
+        /// <summary>
+        /// Adds any new World class to the main scene in menu order and refreshes every world's materials, without the
+        /// rest of the project setup. Run it after adding or renaming a world.
+        /// Batch mode: -executeMethod MusicInYourHands.EditorTools.ProjectSetup.UpdateWorldsBatch
+        /// </summary>
+        [MenuItem("Music In Your Hands/Update Worlds in Main Scene")]
+        public static void UpdateWorlds()
+        {
+            if (!Application.isBatchMode && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+            var scene = EditorSceneManager.OpenScene(MainScenePath, OpenSceneMode.Single);
+            EnsureWorlds();
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            AssetDatabase.SaveAssets();
+            Debug.Log("[Setup] The main scene's worlds are up to date.");
+        }
+
+        public static void UpdateWorldsBatch()
+        {
+            UpdateWorlds();
+            EditorApplication.Exit(0);
         }
 
         static void ConfigureAll()
@@ -372,98 +396,37 @@ namespace MusicInYourHands.EditorTools
 #endif
 
         /// <summary>
-        /// The worlds and the menu: a "Worlds" object with WorldManager, one child per world in menu order, the bubble
-        /// WorldMenu and the menu button feed. Existing objects are kept and only their references and names are refreshed.
+        /// The worlds and the menu: a "Worlds" object with WorldManager and one child per World class in the code, in
+        /// MenuOrder, each with its Material fields filled from Materials/ by name; then the bubble WorldMenu and the
+        /// menu button feed. Existing objects are kept and only their references are refreshed, so a new world needs
+        /// nothing but its class: run Configure Project (or Rebuild Main Scene) and it joins the scene and the menu.
         /// </summary>
-        static void EnsureWorlds()
+        internal static void EnsureWorlds()
         {
-            var glow = EnsureMaterial(GlowMaterialPath, "MusicInYourHands/Glow");
-
             var manager = Object.FindAnyObjectByType<WorldManager>(FindObjectsInactive.Include);
             if (manager == null) manager = new GameObject("Worlds", typeof(WorldManager)).GetComponent<WorldManager>();
 
-            // Every world shows the sung words, so every world gets the lettering material.
-            var lettering = EnsureMaterial(LetteringMaterialPath, "MusicInYourHands/Lettering");
-
-            var livingSkin = EnsureWorld<LivingSkin>(manager.transform, "LivingSkin", "Living skin", new Color(1f, 0.37f, 0.68f));
-            SetReferences(livingSkin, ("glowMaterial", glow), ("shellMaterial", EnsureMaterial(ShellMaterialPath, "MusicInYourHands/Shell")),
-                ("lineMaterial", EnsureMaterial(LineMaterialPath, "MusicInYourHands/Line")),
-                ("wallMaterial", EnsureMaterial(LivingWallsMaterialPath, "MusicInYourHands/LivingWalls")));
-
-            var orb = EnsureWorld<HeartbeatOrb>(manager.transform, "HeartbeatOrb", "Heartbeat orb", new Color(1f, 0.83f, 0.42f));
-            SetReferences(orb, ("glowMaterial", glow), ("orbMaterial", EnsureMaterial(OrbMaterialPath, "MusicInYourHands/Orb")),
-                ("dotsMaterial", EnsureMaterial(OrbDotsMaterialPath, "MusicInYourHands/OrbDots")),
-                ("lineMaterial", EnsureMaterial(LineMaterialPath, "MusicInYourHands/Line")));
-
-            var line = EnsureMaterial(LineMaterialPath, "MusicInYourHands/Line");
-            var ring = EnsureMaterial(RingMaterialPath, "MusicInYourHands/Ring");
-
-            var ribbon = EnsureWorld<WaveformRibbon>(manager.transform, "WaveformRibbon", "Waveform ribbon", new Color(1f, 0.7f, 0.42f));
-            SetReferences(ribbon, ("lineMaterial", line), ("glowMaterial", glow), ("silkMaterial", EnsureMaterial(SilkMaterialPath, "MusicInYourHands/Silk")));
-
-            var strings = EnsureWorld<AirStrings>(manager.transform, "AirStrings", "Air strings", new Color(0.49f, 0.95f, 0.79f));
-            SetReferences(strings, ("lineMaterial", line), ("glowMaterial", glow), ("ringMaterial", ring));
-
-            var rain = EnsureWorld<NoteRain>(manager.transform, "NoteRain", "Note rain", new Color(0.5f, 0.72f, 1f));
-            SetReferences(rain, ("glowMaterial", glow), ("streakMaterial", EnsureMaterial(StreakMaterialPath, "MusicInYourHands/Streak")), ("ringMaterial", ring));
-
-            var fireflies = EnsureWorld<FireflyChoir>(manager.transform, "FireflyChoir", "Firefly choir", new Color(0.79f, 0.61f, 1f));
-            SetReferences(fireflies, ("glowMaterial", glow), ("lineMaterial", line));
-
-            var pool = EnsureWorld<SoundPool>(manager.transform, "SoundPool", "Sound pool", new Color(0.37f, 0.83f, 1f));
-            SetReferences(pool, ("waterMaterial", EnsureMaterial(WaterMaterialPath, "MusicInYourHands/Water")), ("glowMaterial", glow),
-                ("causticsMaterial", EnsureMaterial(CausticsMaterialPath, "MusicInYourHands/Caustics")));
-
-            var wind = EnsureWorld<SoundWind>(manager.transform, "SoundWind", "Sound wind", new Color(0.49f, 0.95f, 0.79f));
-            SetReferences(wind, ("glowMaterial", glow));
-
-            var bubbles = EnsureWorld<BubbleNotes>(manager.transform, "BubbleNotes", "Bubble notes", new Color(1f, 0.6f, 0.85f));
-            SetReferences(bubbles, ("bubbleMaterial", EnsureMaterial(BubbleMaterialPath, "MusicInYourHands/Bubble")), ("ringMaterial", ring),
-                ("glowMaterial", glow));
-
-            var sand = EnsureWorld<SandTable>(manager.transform, "SandTable", "Sand table", new Color(1f, 0.86f, 0.68f));
-            SetReferences(sand, ("plateMaterial", EnsureMaterial(PlateMaterialPath, "MusicInYourHands/Plate")), ("glowMaterial", glow));
-
+            var worlds = new List<World>();
+            foreach (var type in WorldCatalog.Types())
+            {
+                var world = (World)Object.FindAnyObjectByType(type, FindObjectsInactive.Include);
+                if (world == null) world = (World)new GameObject(type.Name, type).GetComponent(type);
+                world.transform.SetParent(manager.transform, false);
+                world.gameObject.SetActive(true);
+                AssignMaterials(world);
+                worlds.Add(world);
+            }
+            worlds.Sort(WorldCatalog.Compare);
+            // The hierarchy reads in menu order too.
+            for (int i = 0; i < worlds.Count; i++) worlds[i].transform.SetSiblingIndex(i);
             var so = new SerializedObject(manager);
             var list = so.FindProperty("worlds");
-            var orbitType = EnsureWorld<OrbitType>(manager.transform, "OrbitType", "Orbit type", new Color(0.88f, 0.89f, 0.93f));
-            SetReferences(orbitType, ("letteringMaterial", lettering), ("lineMaterial", line), ("glowMaterial", glow));
-
-            var graffiti = EnsureWorld<Graffiti>(manager.transform, "Graffiti", "Graffiti", new Color(1f, 0.7f, 0.42f));
-            SetReferences(graffiti, ("letteringMaterial", lettering), ("lineMaterial", line), ("glowMaterial", glow), ("ringMaterial", ring),
-                ("paintMaterial", EnsureMaterial(PaintMaterialPath, "MusicInYourHands/PaintStroke")));
-
-            var breathing = EnsureWorld<BreathingRoom>(manager.transform, "BreathingRoom", "Breathing room", new Color(0.75f, 0.6f, 1f));
-            SetReferences(breathing, ("gridMaterial", EnsureMaterial(RoomGridMaterialPath, "MusicInYourHands/RoomGrid")));
-
-            var trails = EnsureWorld<LightTrails>(manager.transform, "LightTrails", "Light trails", new Color(1f, 0.83f, 0.42f));
-            SetReferences(trails, ("trailMaterial", EnsureMaterial(TrailMaterialPath, "MusicInYourHands/Trail")), ("glowMaterial", glow));
-            foreach (World soundWorld in new World[] { livingSkin, orb, ribbon, strings, rain, fireflies, pool, wind, bubbles, sand, breathing, trails })
-                SetReferences(soundWorld, ("letteringMaterial", lettering));
-
-            var neon = EnsureWorld<NeonSign>(manager.transform, "NeonSign", "Neon sign", new Color(1f, 0.3f, 0.62f));
-            SetReferences(neon, ("letteringMaterial", lettering), ("glowMaterial", glow), ("lineMaterial", line));
-
-            var drift = EnsureWorld<WordDrift>(manager.transform, "WordDrift", "Word drift", new Color(0.8f, 0.88f, 1f));
-            SetReferences(drift, ("letteringMaterial", lettering), ("glowMaterial", glow));
-
-            var rising = EnsureWorld<RisingFloor>(manager.transform, "RisingFloor", "Rising floor", new Color(0.5f, 0.88f, 1f));
-            SetReferences(rising, ("letteringMaterial", lettering), ("ringMaterial", ring), ("glowMaterial", glow));
-
-            var wordSnow = EnsureWorld<WordSnow>(manager.transform, "WordSnow", "Word snow", new Color(0.88f, 0.94f, 1f));
-            SetReferences(wordSnow, ("letteringMaterial", lettering), ("glowMaterial", glow));
-
-            var stars = EnsureWorld<CeilingStars>(manager.transform, "CeilingStars", "Ceiling stars", new Color(0.78f, 0.7f, 1f));
-            SetReferences(stars, ("letteringMaterial", lettering), ("glowMaterial", glow), ("lineMaterial", line), ("skyMaterial", EnsureSkyMaterial()));
-
-            World[] order =
-            {
-                livingSkin, orb, ribbon, strings, rain, fireflies, pool, wind, bubbles, sand, breathing, trails,
-                orbitType, graffiti, neon, drift, rising, wordSnow, stars
-            };
-            list.arraySize = order.Length;
-            for (int i = 0; i < order.Length; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = order[i];
+            list.arraySize = worlds.Count;
+            for (int i = 0; i < worlds.Count; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = worlds[i];
             so.ApplyModifiedPropertiesWithoutUndo();
+
+            var glow = EnsureMaterial(GlowMaterialPath, "MusicInYourHands/Glow");
+            var line = EnsureMaterial(LineMaterialPath, "MusicInYourHands/Line");
 
             // The palm-up wheel was replaced by the bubble menu.
             var oldWheel = GameObject.Find("WorldWheel");
@@ -489,17 +452,23 @@ namespace MusicInYourHands.EditorTools
 #endif
         }
 
-        static T EnsureWorld<T>(Transform parent, string objectName, string displayName, Color color) where T : World
+        /// <summary>Fills a world's Material fields from Materials/ by name (see WorldCatalog.MaterialName).</summary>
+        public static void AssignMaterials(World world)
         {
-            var world = Object.FindAnyObjectByType<T>(FindObjectsInactive.Include);
-            if (world == null) world = new GameObject(objectName, typeof(T)).GetComponent<T>();
-            world.transform.SetParent(parent, false);
-            world.gameObject.SetActive(true);
             var so = new SerializedObject(world);
-            so.FindProperty("displayName").stringValue = displayName;
-            so.FindProperty("color").colorValue = color;
+            foreach (var field in WorldCatalog.MaterialFields(world.GetType()))
+            {
+                var property = so.FindProperty(field.Name);
+                if (property != null) property.objectReferenceValue = WorldMaterial(world.GetType(), field.Name);
+            }
             so.ApplyModifiedPropertiesWithoutUndo();
-            return world;
+        }
+
+        /// <summary>The material asset a world's Material field gets, made from its shader if it doesn't exist yet.</summary>
+        public static Material WorldMaterial(System.Type type, string field)
+        {
+            var name = WorldCatalog.MaterialName(type, field);
+            return name == "Sky" ? EnsureSkyMaterial() : EnsureMaterial($"{Root}/Materials/{name}.mat", $"MusicInYourHands/{name}");
         }
 
         static void SetReferences(Object target, params (string property, Object value)[] values)

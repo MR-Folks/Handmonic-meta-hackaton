@@ -13,6 +13,12 @@ namespace MusicInYourHands
     /// </summary>
     public class OrbitType : World
     {
+        public override string DisplayName => "Orbit type";
+
+        public override Color Color => new Color(0.88f, 0.89f, 0.93f);
+
+        public override int MenuOrder => 120;
+
         public override int MenuIcon => 12;
 
         public override bool IsLyric => true;
@@ -29,9 +35,7 @@ namespace MusicInYourHands
         };
 
         [Header("Materials")]
-        [SerializeField] Material letteringMaterial;
         [SerializeField] Material lineMaterial;
-        [SerializeField] Material glowMaterial;
 
         [Header("Type")]
         [Tooltip("How far in front of the eyes the sung word stands (m), and its height relative to the eyes.")]
@@ -94,13 +98,9 @@ namespace MusicInYourHands
         Vector3 head, forward, right;
         string word = "", wordKey = "";
         int wordCount, line = -1, fallbackIndex = -1;
-        float clock, fade;
-        bool anchored, built;
 
-        public override void Build()
+        protected override void OnBuild()
         {
-            if (built) return;
-            built = true;
             block = new MaterialPropertyBlock();
             material = new Material(letteringMaterial) { name = "Orbit Lettering", mainTexture = TypeFace.Bold.Atlas };
             material.SetFloat("_Rim", 0f);
@@ -135,25 +135,18 @@ namespace MusicInYourHands
             beadOut = new ParticleSystem.Particle[ringCount * BeadsPerRing];
         }
 
-        protected override void OnEnable()
+        protected override void OnEnter()
         {
-            base.OnEnable();
-            anchored = false;
-            fade = 0f;
             word = wordKey = "";
             line = -1;
-            if (built) foreach (var l in letters) Hide(l);
+            foreach (var l in letters) Hide(l);
         }
 
-        protected override void OnDisable()
+        protected override void OnExit()
         {
-            base.OnDisable();
-            if (built)
-            {
-                foreach (var l in letters) Hide(l);
-                foreach (var r in rings) r.SetVisible(false);
-                beads.Clear();
-            }
+            foreach (var l in letters) Hide(l);
+            foreach (var r in rings) r.SetVisible(false);
+            beads.Clear();
         }
 
         static void Hide(Letter l)
@@ -162,27 +155,22 @@ namespace MusicInYourHands
             l.Renderer.gameObject.SetActive(false);
         }
 
-        public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
+        /// <summary>The orbits circle your head where you are, and the sung word stands in front of you.</summary>
+        protected override void OnPlace(Camera view)
         {
-            Build();
-            if (view == null) return;
-            if (anchored && ShouldReanchor(view, dt)) anchored = false;
-            if (!anchored)
-            {
-                head = view.transform.position;
-                forward = Effects.FlatForward(view);
-                right = Vector3.Cross(Vector3.up, forward).normalized;
-                MarkAnchored(view);
-                anchored = true;
-            }
-            clock += dt;
-            fade = Mathf.MoveTowards(fade, 1f, dt * 1.5f);
+            head = view.transform.position;
+            forward = Effects.FlatForward(view);
+            right = Vector3.Cross(Vector3.up, forward).normalized;
+        }
+
+        protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
+        {
 
             UpdateWord(music);
             SpinRings(rig, dt);
             DrawRings(music, view);
             PlaceLetters(rig, music, view, dt);
-            material.SetFloat(AlphaId, fade);
+            material.SetFloat(AlphaId, FadeIn);
         }
 
         /// <summary>The sung word in capitals; without lyrics, the song title's words change every four beats.</summary>
@@ -323,7 +311,7 @@ namespace MusicInYourHands
                 bool touched = l.Push.sqrMagnitude > 0.0001f;
                 block.Clear();
                 block.SetColor(ColorId, touched ? Color.Lerp(Color.white, Touch, 0.6f) : Color.white);
-                block.SetFloat(AlphaId, l.Alpha * fade);
+                block.SetFloat(AlphaId, l.Alpha * FadeIn);
                 l.Renderer.SetPropertyBlock(block);
             }
         }
@@ -405,14 +393,14 @@ namespace MusicInYourHands
                 for (int i = 0; i < ringPath.Length; i++)
                     ringPath[i] = RingPoint(r, i / (float)(ringPath.Length - 1) * Mathf.PI * 2f);
                 var c = Color.Lerp(new Color(0.86f, 0.87f, 0.92f), Touch, ringTouch[r]);
-                c.a = (0.28f + music.Kick * 0.15f + ringTouch[r] * 0.4f) * fade;
+                c.a = (0.28f + music.Kick * 0.15f + ringTouch[r] * 0.4f) * FadeIn;
                 rings[r].Set(ringPath, ringPath.Length, 0.0025f * (1f + music.Kick * 0.5f), c, view.transform.position, false);
 
                 for (int b = 0; b < BeadsPerRing; b++)
                 {
                     var p = RingPoint(r, b / (float)BeadsPerRing * Mathf.PI * 2f + ringSpin[r] * 3f);
                     var bc = Color.Lerp(new Color(0.93f, 0.94f, 0.97f), Touch, ringTouch[r]);
-                    bc.a = (b % 3 == 0 ? 0.9f : 0.5f) * fade;
+                    bc.a = (b % 3 == 0 ? 0.9f : 0.5f) * FadeIn;
                     beadOut[n++] = new ParticleSystem.Particle
                     {
                         position = p,

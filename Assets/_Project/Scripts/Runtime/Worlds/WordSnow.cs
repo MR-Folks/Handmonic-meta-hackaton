@@ -11,6 +11,12 @@ namespace MusicInYourHands
     /// </summary>
     public class WordSnow : World
     {
+        public override string DisplayName => "Word snow";
+
+        public override Color Color => new Color(0.88f, 0.94f, 1f);
+
+        public override int MenuOrder => 170;
+
         public override int MenuIcon => 21;
 
         public override bool IsLyric => true;
@@ -25,10 +31,6 @@ namespace MusicInYourHands
             Pattern = HandTheme.Effect.Specks,
             PatternColor = new Color(0.85f, 0.95f, 1f)
         };
-
-        [Header("Materials")]
-        [SerializeField] Material letteringMaterial;
-        [SerializeField] Material glowMaterial;
 
         [Header("Snow")]
         [SerializeField] float letterHeight = 0.075f;
@@ -59,18 +61,14 @@ namespace MusicInYourHands
         }
 
         readonly List<Flake> flakes = new List<Flake>();
-        readonly LyricCursor cursor = new LyricCursor();
         Material material;
         MaterialPropertyBlock block;
         ParticleSystem snow;
         Vector3 head, forward;
-        float floorY, ceiling, snowDebt, fade;
-        bool anchored, built;
+        float floorY, ceiling, snowDebt;
 
-        public override void Build()
+        protected override void OnBuild()
         {
-            if (built) return;
-            built = true;
             block = new MaterialPropertyBlock();
             material = new Material(letteringMaterial) { name = "Snow Lettering", mainTexture = TypeFace.Bold.Atlas };
             for (int i = 0; i < maxWords; i++)
@@ -86,19 +84,13 @@ namespace MusicInYourHands
             main.maxParticles = 600;
         }
 
-        protected override void OnEnable()
+        protected override void OnEnter()
         {
-            base.OnEnable();
-            anchored = false;
-            fade = 0f;
-            cursor.Reset();
-            if (built) foreach (var f in flakes) Melt(f);
+            foreach (var f in flakes) Melt(f);
         }
 
-        protected override void OnDisable()
+        protected override void OnExit()
         {
-            base.OnDisable();
-            if (!built) return;
             foreach (var f in flakes) Melt(f);
             snow.Clear();
         }
@@ -109,22 +101,19 @@ namespace MusicInYourHands
             f.Renderer.gameObject.SetActive(false);
         }
 
-        public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
+        /// <summary>The snow falls from above your head (below the ceiling, once scanned) onto the floor around you.</summary>
+        protected override void OnPlace(Camera view)
         {
-            Build();
-            if (view == null) return;
-            if (anchored && ShouldReanchor(view, dt)) anchored = false;
-            if (!anchored)
-            {
-                head = view.transform.position;
-                forward = Effects.FlatForward(view);
-                floorY = Effects.FloorY(view);
-                ceiling = Mathf.Min(Mathf.Max(head.y + 0.7f, floorY + 2.3f), Room.Ceiling(float.MaxValue) - 0.05f);
-                MarkAnchored(view);
-                anchored = true;
-            }
-            fade = Mathf.MoveTowards(fade, 1f, dt * 1.5f);
-            if (cursor.Advance(music, out _)) Drop(cursor.Word);
+            head = view.transform.position;
+            forward = Effects.FlatForward(view);
+            floorY = Effects.FloorY(view);
+            ceiling = Mathf.Min(Mathf.Max(head.y + 0.7f, floorY + 2.3f), Room.Ceiling(float.MaxValue) - 0.05f);
+        }
+
+        protected override void OnWord(string word, bool newLine) => Drop(word);
+
+        protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
+        {
             Fall(rig, music, view, dt);
             Flurry(music, dt);
         }
@@ -211,7 +200,7 @@ namespace MusicInYourHands
                 f.Renderer.transform.localScale = Vector3.one * letterHeight;
                 block.Clear();
                 block.SetColor(ColorId, f.State == State.Held ? new Color(1f, 0.95f, 0.85f) : new Color(0.92f, 0.96f, 1f));
-                block.SetFloat(AlphaId, alpha * fade * Mathf.Clamp01(f.Age / 0.6f + (f.State == State.Falling ? 0f : 1f)));
+                block.SetFloat(AlphaId, alpha * FadeIn * Mathf.Clamp01(f.Age / 0.6f + (f.State == State.Falling ? 0f : 1f)));
                 f.Renderer.SetPropertyBlock(block);
             }
         }

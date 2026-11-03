@@ -13,15 +13,20 @@ namespace MusicInYourHands
     [DefaultExecutionOrder(150)]
     public class LivingSkin : World
     {
+        public override string DisplayName => "Living skin";
+
+        public override Color Color => new Color(1f, 0.37f, 0.68f);
+
+        public override int MenuOrder => 0;
+
         public override int MenuIcon => 0;
 
         public override string Hint => "Hold up your hands and spread your fingers";
 
         [Header("Materials")]
-        [SerializeField] Material glowMaterial;
         [SerializeField] Material shellMaterial;
         [SerializeField] Material lineMaterial;
-        [SerializeField] Material letteringMaterial;
+        [WorldMaterial("LivingWalls")]
         [SerializeField] Material wallMaterial;
 
         [Header("Fingertip lights")]
@@ -97,7 +102,6 @@ namespace MusicInYourHands
         int waveHue;
         ParticleSystem sparks;
         MaterialPropertyBlock block;
-        WordLayer words;
         // Where each word of the current line lands: metres right of and above the line's spot on the wall.
         readonly List<Vector2> lineSlots = new List<Vector2>();
         Vector3 lineAt, lineRight;
@@ -105,19 +109,14 @@ namespace MusicInYourHands
         float lineSize = 1f;
         bool lineShowing;
         LivingWalls walls;
-        bool anchored;
         int beats;
-        bool built;
 
-        protected override void OnEnable()
-        {
-            base.OnEnable();
-            anchored = false;
-        }
+        protected override int SungWordCount => 24;
 
-        protected override void OnDisable()
+        protected override float SungWordHeight => LetterHeight;
+
+        protected override void OnExit()
         {
-            base.OnDisable();
             // Fingertip lights ride on the hand joints, outside this object, so take them back and hide them.
             for (int i = 0; i < tipLights.Length; i++)
             {
@@ -130,16 +129,13 @@ namespace MusicInYourHands
             foreach (var trail in trails) trail?.SetVisible(false);
             System.Array.Clear(trailStrength, 0, trailStrength.Length);
             if (sparks != null) sparks.Clear();
-            words?.Clear();
             lineShowing = false;
             walls?.Hide();
         }
 
-        /// <summary>Creates the lights, the wave pool and the spark system. Also called by the editor preview.</summary>
-        public override void Build()
+        /// <summary>Creates the lights, the wave pool and the spark system. Also run by the editor preview, through Build.</summary>
+        protected override void OnBuild()
         {
-            if (built) return;
-            built = true;
             block = new MaterialPropertyBlock();
 
             // Fingertip lights are drawn on top of the hand: the finger's own surface is closer to the viewer than
@@ -175,58 +171,61 @@ namespace MusicInYourHands
             }
 
             sparks = Effects.MakeSparkSystem("Sparks", transform, glowMaterial);
-            if (letteringMaterial != null)
-            {
-                words = new WordLayer("Lyric", transform, letteringMaterial, 24, LetterHeight);
-                words.Rim = 0.9f;
-            }
+            if (SungWords != null) SungWords.Rim = 0.9f;
             if (wallMaterial != null) walls = new LivingWalls(transform, wallMaterial, halfSize, roomHeight);
         }
 
-        public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
+        /// <summary>Lays the room's walls around where you stand, for the waves and the sung words to land on.</summary>
+        protected override void OnPlace(Camera view)
         {
-            Build();
-            if (walls != null && view != null && (!anchored || ShouldReanchor(view, dt)))
-            {
-                walls.Place(view.transform.position, Effects.FlatForward(view), Effects.FloorY(view));
-                MarkAnchored(view);
-                anchored = true;
-            }
-            UpdateHand(rig.Left, 0, music.Bands, music.Kick, view, dt, music.Beat);
-            UpdateHand(rig.Right, 1, music.Bands, music.Kick, view, dt, music.Beat);
-            if (music.Beat && ++beats % Mathf.Max(1, waveEveryBeats) == 0)
-            {
-                waveHue = (waveHue + 1) % fingerColors.Length;
-                float strength = 0.6f + 0.4f * music.Kick;
-                if (rig.Left.IsTracked) SpawnWave(rig.Left, view, strength);
-                if (rig.Right.IsTracked) SpawnWave(rig.Right, view, strength);
-            }
-            AdvanceWaves(dt);
-            walls?.Step(music, dt);
-            Sing(rig, music, view, dt);
+            if (walls != null) walls.Place(view.transform.position, Effects.FlatForward(view), Effects.FloorY(view));
+        }
+
+        /// <summary>Every few beats a wave leaves each palm in the next finger's colour and carries on across the room.</summary>
+        protected override void OnBeat(MusicFrame music)
+        {
+            if (++beats % Mathf.Max(1, waveEveryBeats) != 0) return;
+            waveHue = (waveHue + 1) % fingerColors.Length;
+            float strength = 0.6f + 0.4f * music.Kick;
+            if (Rig.Left.IsTracked) SpawnWave(Rig.Left, View, strength);
+            if (Rig.Right.IsTracked) SpawnWave(Rig.Right, View, strength);
         }
 
         /// <summary>
         /// Each sung word leaves a palm, turns as it flies and lands in its place on the wall ahead of you. The line's
         /// place is chosen when its first word starts and then stays put, so the row builds up word by word and is still
-        /// to read. The word being sung takes the wave's colour; the rest settle to white.
+        /// to read.
         /// </summary>
-        void Sing(HandRig rig, MusicFrame music, Camera view, float dt)
+        protected override void OnWord(string word, bool newLine)
         {
-            if (words == null || walls == null || view == null) return;
-            if (words.Next(music, out var text, out bool newLine))
-            {
-                if (newLine) PlanLine(music.LineWords, view);
-                Launch(rig, text, view);
-            }
-            words.Tick(dt);
+            if (walls == null) return;
+            if (newLine) PlanLine(Music.LineWords, View);
+            Launch(Rig, word, View);
+        }
+
+        protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
+        {
+            UpdateHand(rig.Left, 0, music.Bands, music.Kick, view, dt, music.Beat);
+            UpdateHand(rig.Right, 1, music.Bands, music.Kick, view, dt, music.Beat);
+            AdvanceWaves(dt);
+            walls?.Step(music, dt);
+            Sing(music, view, dt);
+        }
+
+        /// <summary>
+        /// The line's words fly to their places on the wall, and the line fades once it is over. The word being sung
+        /// takes the wave's colour; the rest settle to white.
+        /// </summary>
+        void Sing(MusicFrame music, Camera view, float dt)
+        {
+            if (SungWords == null || walls == null) return;
             var sung = music.LineWords;
             if (lineShowing && (sung == null || music.SongTime > sung[sung.Length - 1].Time + lineHold)) FadeLine();
 
             var eye = view.transform.position;
             var bright = Color.Lerp(fingerColors[waveHue], Color.white, 0.2f);
             float step = 1f - Mathf.Exp(-4.5f * dt);
-            foreach (var w in words.Words)
+            foreach (var w in SungWords.Words)
             {
                 // Words of an earlier line stay where they landed while they fade.
                 if (!w.Active || w.Line != music.Lyric.Line) continue;
@@ -238,7 +237,6 @@ namespace MusicInYourHands
                 // Glowing in flight; the glow gives way to the dark edge that makes it readable on the wall.
                 w.Halo = Mathf.Max(0f, 0.4f - w.Age * 0.5f);
             }
-            words.Draw(1f);
         }
 
         /// <summary>Picks the line's spot on the wall ahead of you and where each of its words will land.</summary>
@@ -294,8 +292,8 @@ namespace MusicInYourHands
         /// <summary>Sends a word off from a palm, taking turns when both hands are tracked.</summary>
         void Launch(HandRig rig, string text, Camera view)
         {
-            int index = words.Index;
-            var w = words.Add(text, Color.white, LineLife);
+            int index = Sung.Index;
+            var w = SungWords.Add(text, Color.white, LineLife);
             w.Slot = index;
             w.Spot = index < lineSlots.Count ? lineSlots[index] : Vector2.zero;
             w.Size = 0.7f;
@@ -307,7 +305,7 @@ namespace MusicInYourHands
 
         void FadeLine()
         {
-            foreach (var w in words.Words)
+            foreach (var w in SungWords.Words)
                 if (w.Active) w.Life = Mathf.Min(w.Life, w.Age + 0.6f);
             lineShowing = false;
         }

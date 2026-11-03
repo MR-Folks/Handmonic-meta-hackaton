@@ -13,6 +13,12 @@ namespace MusicInYourHands
     /// </summary>
     public class HeartbeatOrb : World
     {
+        public override string DisplayName => "Heartbeat orb";
+
+        public override Color Color => new Color(1f, 0.83f, 0.42f);
+
+        public override int MenuOrder => 10;
+
         public override int MenuIcon => 1;
 
         public override string Hint => "Hold your palms facing each other, then turn them like a ball";
@@ -27,11 +33,10 @@ namespace MusicInYourHands
         };
 
         [Header("Materials")]
+        [WorldMaterial("OrbDots")]
         [SerializeField] Material dotsMaterial;
         [SerializeField] Material orbMaterial;
-        [SerializeField] Material glowMaterial;
         [SerializeField] Material lineMaterial;
-        [SerializeField] Material letteringMaterial;
 
         [Header("Orb")]
         [SerializeField] float minRadius = 0.05f;
@@ -106,24 +111,27 @@ namespace MusicInYourHands
         readonly float[] tendrilFlow = new float[10];
         ParticleSystem motes;
         MaterialPropertyBlock block;
-        WordLayer words;
         Vector3 center, lastAxis;
         Quaternion spin = Quaternion.identity;
         Vector3 angularVelocity;
         float radius, visibility, moteDebt, morph = -1f, energy, waveAge = 9f;
         int beats;
-        bool built, hasCenter, hasAxis;
+        bool hasCenter, hasAxis;
         float savedVolume = -1f;
 
-        protected override void OnEnable()
+        protected override int SungWordCount => 3;
+
+        protected override float SungWordHeight => 0.036f;
+
+        protected override float SungWordsAlpha => visibility;
+
+        protected override void OnEnter()
         {
-            base.OnEnable();
             if (MusicBus.Instance != null) savedVolume = MusicBus.Instance.Volume;
         }
 
-        protected override void OnDisable()
+        protected override void OnExit()
         {
-            base.OnDisable();
             if (MusicBus.Instance != null && savedVolume >= 0f) MusicBus.Instance.Volume = savedVolume;
             savedVolume = -1f;
             hasCenter = hasAxis = false;
@@ -137,13 +145,14 @@ namespace MusicInYourHands
             if (tendrils != null) foreach (var t in tendrils) t.SetVisible(false);
             if (knots != null) foreach (var k in knots) k.SetVisible(false);
             if (motes != null) motes.Clear();
-            words?.Clear();
         }
 
-        public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
+        /// <summary>Each sung word takes the front of the orb on its own; the one before it fades out quickly.</summary>
+        protected override void OnWord(string word, bool newLine) => SungWords.Add(word, new Color(0.55f, 0.08f, 0.22f), 1.6f, alone: true);
+
+        protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
         {
             if (rig == null) return;
-            Build();
             float kick = music.Kick;
             var left = rig.Left;
             var right = rig.Right;
@@ -209,7 +218,7 @@ namespace MusicInYourHands
 
             PushHand(left, kick * visibility);
             PushHand(right, kick * visibility);
-            Sing(music, view, size, dt);
+            Sing(music, view, size);
 
             var bus = music.Bus;
             if (bus != null && holding)
@@ -220,21 +229,18 @@ namespace MusicInYourHands
         }
 
         /// <summary>The sung word beats on the front of the orb, over its heart, swelling with each kick.</summary>
-        void Sing(MusicFrame music, Camera view, float size, float dt)
+        void Sing(MusicFrame music, Camera view, float size)
         {
-            if (words == null || view == null) return;
-            if (words.Next(music, out var text, out _)) words.Add(text, new Color(0.55f, 0.08f, 0.22f), 1.6f, alone: true);
-            words.Tick(dt);
+            if (SungWords == null) return;
             var eye = view.transform.position;
-            foreach (var w in words.Words)
+            foreach (var w in SungWords.Words)
             {
                 if (!w.Active) continue;
                 w.Size = Mathf.Clamp(size / 0.24f, 0.7f, 1.5f) * (1f + music.Kick * 0.2f);
-                w.Position = center + (eye - center).normalized * (size * 0.55f) + Vector3.down * (words.Height(w) * 0.4f);
+                w.Position = center + (eye - center).normalized * (size * 0.55f) + Vector3.down * (SungWords.Height(w) * 0.4f);
                 w.Rotation = WordLayer.Facing(w.Position, eye);
                 w.Halo = 0.1f;
             }
-            words.Draw(visibility);
         }
 
         /// <summary>
@@ -525,14 +531,12 @@ namespace MusicInYourHands
             return mesh;
         }
 
-        public override void Build()
+        protected override void OnBuild()
         {
-            if (built) return;
-            built = true;
             block = new MaterialPropertyBlock();
-            if (letteringMaterial != null)
+            if (SungWords != null)
                 // Drawn after the orb, so its glow does not wash the word out.
-                words = new WordLayer("Lyric", transform, letteringMaterial, 3, 0.036f) { RenderQueue = 3200 };
+                SungWords.RenderQueue = 3200;
 
             orb = new GameObject("Orb").transform;
             orb.SetParent(transform, false);

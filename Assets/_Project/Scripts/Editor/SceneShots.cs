@@ -353,28 +353,7 @@ namespace MusicInYourHands.EditorTools
             PushHand(rig, hands[0]);
 
             var managerGo = new GameObject("Worlds");
-            var worlds = new World[]
-            {
-                MakePreviewWorld<LivingSkin>(managerGo.transform, "Living skin", new Color(1f, 0.37f, 0.68f)),
-                MakePreviewWorld<HeartbeatOrb>(managerGo.transform, "Heartbeat orb", new Color(1f, 0.83f, 0.42f)),
-                MakePreviewWorld<WaveformRibbon>(managerGo.transform, "Waveform ribbon", new Color(1f, 0.7f, 0.42f)),
-                MakePreviewWorld<AirStrings>(managerGo.transform, "Air strings", new Color(0.49f, 0.95f, 0.79f)),
-                MakePreviewWorld<NoteRain>(managerGo.transform, "Note rain", new Color(0.5f, 0.72f, 1f)),
-                MakePreviewWorld<FireflyChoir>(managerGo.transform, "Firefly choir", new Color(0.79f, 0.61f, 1f)),
-                MakePreviewWorld<SoundPool>(managerGo.transform, "Sound pool", new Color(0.37f, 0.83f, 1f)),
-                MakePreviewWorld<SoundWind>(managerGo.transform, "Sound wind", new Color(0.49f, 0.95f, 0.79f)),
-                MakePreviewWorld<BubbleNotes>(managerGo.transform, "Bubble notes", new Color(1f, 0.6f, 0.85f)),
-                MakePreviewWorld<SandTable>(managerGo.transform, "Sand table", new Color(1f, 0.86f, 0.68f)),
-                MakePreviewWorld<OrbitType>(managerGo.transform, "Orbit type", new Color(0.88f, 0.89f, 0.93f)),
-                MakePreviewWorld<BreathingRoom>(managerGo.transform, "Breathing room", new Color(0.75f, 0.6f, 1f)),
-                MakePreviewWorld<LightTrails>(managerGo.transform, "Light trails", new Color(1f, 0.83f, 0.42f)),
-                MakePreviewWorld<Graffiti>(managerGo.transform, "Graffiti", new Color(1f, 0.7f, 0.42f)),
-                MakePreviewWorld<NeonSign>(managerGo.transform, "Neon sign", new Color(1f, 0.3f, 0.62f)),
-                MakePreviewWorld<WordDrift>(managerGo.transform, "Word drift", new Color(0.8f, 0.88f, 1f)),
-                MakePreviewWorld<RisingFloor>(managerGo.transform, "Rising floor", new Color(0.5f, 0.88f, 1f)),
-                MakePreviewWorld<WordSnow>(managerGo.transform, "Word snow", new Color(0.88f, 0.94f, 1f)),
-                MakePreviewWorld<CeilingStars>(managerGo.transform, "Ceiling stars", new Color(0.78f, 0.7f, 1f))
-            };
+            var worlds = WorldCatalog.MakePreviews(managerGo.transform);
             var manager = managerGo.AddComponent<WorldManager>();
             var mso = new SerializedObject(manager);
             var list = mso.FindProperty("worlds");

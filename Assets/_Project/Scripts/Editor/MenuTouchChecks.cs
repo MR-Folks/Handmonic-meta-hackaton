@@ -20,10 +20,10 @@ namespace MusicInYourHands.EditorTools
             var managerGo = new GameObject("Worlds");
             var worlds = new World[]
             {
-                MakePreviewWorld<HeartbeatOrb>(managerGo.transform, "Heartbeat orb", new Color(1f, 0.83f, 0.42f)),
-                MakePreviewWorld<NoteRain>(managerGo.transform, "Note rain", new Color(0.5f, 0.72f, 1f)),
-                MakePreviewWorld<FireflyChoir>(managerGo.transform, "Firefly choir", new Color(0.79f, 0.61f, 1f)),
-                MakePreviewWorld<SoundPool>(managerGo.transform, "Sound pool", new Color(0.37f, 0.83f, 1f))
+                MakePreviewWorld<HeartbeatOrb>(managerGo.transform),
+                MakePreviewWorld<NoteRain>(managerGo.transform),
+                MakePreviewWorld<FireflyChoir>(managerGo.transform),
+                MakePreviewWorld<SoundPool>(managerGo.transform)
             };
             var manager = managerGo.AddComponent<WorldManager>();
             var mso = new SerializedObject(manager);
