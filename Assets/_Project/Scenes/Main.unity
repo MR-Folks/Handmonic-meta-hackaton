@@ -1698,6 +1698,7 @@ MonoBehaviour:
   - {fileID: 2137090334}
   - {fileID: 4160533}
   - {fileID: 1234591346}
+  - {fileID: 1520291934}
   - {fileID: 1456184137}
   - {fileID: 2124485061}
   - {fileID: 2026124819}
@@ -1731,6 +1732,7 @@ Transform:
   - {fileID: 2137090335}
   - {fileID: 4160534}
   - {fileID: 1234591347}
+  - {fileID: 1520291935}
   - {fileID: 1456184138}
   - {fileID: 2124485062}
   - {fileID: 2026124820}
@@ -1963,6 +1965,79 @@ MonoBehaviour:
   edgeRenderingEnabled_: 0
   edgeColor_: {r: 1, g: 1, b: 1, a: 1}
   colorMapType: 0
+--- !u!1 &1520291933
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1520291935}
+  - component: {fileID: 1520291934}
+  m_Layer: 0
+  m_Name: CubeField
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1520291934
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1520291933}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f85e7ae0ffb75db46875304902fc92e3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.CubeField
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  cubeFieldMaterial: {fileID: 2100000, guid: 226cc3d2ab53aed4b9325202e5f4659b, type: 2}
+  radius: 4.2
+  spacing: 0.3
+  blockWidth: 0.17
+  clearing: 0.45
+  growSeconds: 1.4
+  nearHeight: 0.02
+  farHeight: 1.5
+  growDistance: {x: 0.7, y: 4}
+  steepness: 1.75
+  riseSpeed: 9
+  fallSpeed: 3.5
+  maxHeight: 2.5
+  rippleSpeed: 3.4
+  rippleWidth: 0.45
+  rippleLift: 0.3
+  liftRange: {x: 0.3, y: 2}
+  hipsBelowEyes: 0.75
+  overHead: 0.12
+  liftResponse: 3
+  chimeVolume: 0.22
+  wordDistance: 2
+  wordStagger: 0.3
+  wordSpread: 12
+  lineSpread: 32
+  wordStand: 0.5
+  wordLife: 4.5
+--- !u!4 &1520291935
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1520291933}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1608310292
 GameObject:
   m_ObjectHideFlags: 0
