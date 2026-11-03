@@ -157,8 +157,12 @@ namespace MusicInYourHands
         {
             var url = $"{Api}/tracks/{Uri.EscapeDataString(song.audiusId)}/stream?app_name={AppName}" + (countPlay ? "" : "&skip_play_count=true");
             using var request = UnityWebRequestMultimedia.GetAudioClip(url, AudioType.MPEG);
+            // Keep the MP3 compressed and decode it as it plays: decoding a whole song as it arrived froze the
+            // headset for about 0.7 s each time one started.
+            ((DownloadHandlerAudioClip)request.downloadHandler).compressed = true;
             // A song is 5 to 15 MB, so allow for slow Wi-Fi.
             request.timeout = 120;
+            double asked = Time.realtimeSinceStartupAsDouble;
             yield return request.SendWebRequest();
             var clip = request.result == UnityWebRequest.Result.Success ? DownloadHandlerAudioClip.GetContent(request) : null;
             if (song == null)
@@ -173,6 +177,7 @@ namespace MusicInYourHands
                 done(false);
                 yield break;
             }
+            Debug.Log($"[Audius] Streamed {song.title}: {request.downloadedBytes / 1048576.0:0.0} MB in {Time.realtimeSinceStartupAsDouble - asked:0.0} s.");
             // Stepping away and back while it streams starts a second load; keep whichever audio arrived first.
             if (song.clip != null) Free(clip);
             else

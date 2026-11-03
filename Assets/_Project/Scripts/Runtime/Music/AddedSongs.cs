@@ -75,6 +75,9 @@ namespace MusicInYourHands
         {
             var url = new UriBuilder { Scheme = Uri.UriSchemeFile, Host = "", Path = song.audioPath.Replace('\\', '/') }.Uri.AbsoluteUri;
             using var request = UnityWebRequestMultimedia.GetAudioClip(url, TypeOf(song.audioPath));
+            // Keep MP3 and OGG audio compressed and decode it as it plays: decoding a whole song as it loads stalls
+            // the headset for most of a second.
+            ((DownloadHandlerAudioClip)request.downloadHandler).compressed = true;
             yield return request.SendWebRequest();
             var clip = request.result == UnityWebRequest.Result.Success ? DownloadHandlerAudioClip.GetContent(request) : null;
             if (song == null)

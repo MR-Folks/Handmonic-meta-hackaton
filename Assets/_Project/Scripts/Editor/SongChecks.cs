@@ -150,22 +150,36 @@ namespace MusicInYourHands.EditorTools
 
             var song = found[found.Count - 1];
             bool loaded = false;
-            RunRoutine(AudiusSongs.Load(song, success => loaded = success, countPlay: false), 120);
+            double stall = RunRoutine(AudiusSongs.Load(song, success => loaded = success, countPlay: false), 120);
             bool ok = loaded && song.clip != null && song.clip.length > 60f;
-            if (ok) Debug.Log($"[Check] Audius sent {found.Count} picked songs, and {song.title} by {song.artist} streamed in: {song.clip.length:0.0} s at {song.clip.frequency} Hz.");
+            // Decoding a whole song as it arrived froze the headset for 0.7 s, so the audio stays compressed.
+            bool smooth = stall < 100;
+            if (ok && smooth) Debug.Log($"[Check] Audius sent {found.Count} picked songs, and {song.title} by {song.artist} streamed in: {song.clip.length:0.0} s at {song.clip.frequency} Hz, ready in {stall:0} ms.");
+            else if (ok) Debug.LogError($"[Check] {song.title} took {stall:0} ms to get ready after it streamed in, which would freeze the headset; keep streamed audio compressed (DownloadHandlerAudioClip.compressed).");
             else Debug.LogError($"[Check] {song.title} by {song.artist} didn't stream in from Audius.");
             AudiusSongs.Unload(song);
             foreach (var each in found) Object.DestroyImmediate(each);
-            return ok;
+            return ok && smooth;
         }
 
-        /// <summary>Runs a coroutine to its end by hand, waiting on its web requests for at most <paramref name="seconds"/> in all.</summary>
-        static void RunRoutine(IEnumerator routine, double seconds)
+        /// <summary>
+        /// Runs a coroutine to its end by hand, waiting on its web requests for at most <paramref name="seconds"/> in
+        /// all. Returns the longest the coroutine ran in one go, in milliseconds: how long it would hold up a frame.
+        /// </summary>
+        static double RunRoutine(IEnumerator routine, double seconds)
         {
             var timer = Stopwatch.StartNew();
-            while (routine.MoveNext())
+            var step = new Stopwatch();
+            double longest = 0;
+            while (true)
+            {
+                step.Restart();
+                bool more = routine.MoveNext();
+                longest = System.Math.Max(longest, step.Elapsed.TotalMilliseconds);
+                if (!more) return longest;
                 if (routine.Current is AsyncOperation operation)
                     while (!operation.isDone && timer.Elapsed.TotalSeconds < seconds) System.Threading.Thread.Sleep(5);
+            }
         }
     }
 }
