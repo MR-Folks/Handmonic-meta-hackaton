@@ -1829,6 +1829,7 @@ MonoBehaviour:
   - {fileID: 403129349}
   - {fileID: 1410341793}
   - {fileID: 1520291934}
+  - {fileID: 1710719217}
   - {fileID: 1456184137}
   - {fileID: 2124485061}
   - {fileID: 2026124819}
@@ -1865,6 +1866,7 @@ Transform:
   - {fileID: 403129350}
   - {fileID: 1410341794}
   - {fileID: 1520291935}
+  - {fileID: 1710719218}
   - {fileID: 1456184138}
   - {fileID: 2124485062}
   - {fileID: 2026124820}
@@ -2403,6 +2405,73 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1512639469}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1710719216
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1710719218}
+  - component: {fileID: 1710719217}
+  m_Layer: 0
+  m_Name: FourElements
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1710719217
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1710719216}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 254a59e9358625c41b9eb44a5c3cec4b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.FourElements
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  flameMaterial: {fileID: 2100000, guid: 4b69662b1c571324f8ca1470c0aaaf40, type: 2}
+  streamMaterial: {fileID: 2100000, guid: 7327eebd354a15e46b255d74bbab6fbd, type: 2}
+  orbMaterial: {fileID: 2100000, guid: 3054415a80d0b1f4b97ba004aafc2530, type: 2}
+  rockMaterial: {fileID: 2100000, guid: 7846ed23d691a3142a651964bb5b3223, type: 2}
+  crackMaterial: {fileID: 2100000, guid: a77e1695ff2b6104fb9ad6ca8f9af11f, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
+  ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
+  bubbleMaterial: {fileID: 2100000, guid: fa89d5024587b4c8e83405b9bccf5a04, type: 2}
+  beatsPerElement: 32
+  beatsAfterPick: 64
+  fistSeconds: 0.35
+  flameHeight: 0.16
+  throwSpeed: 1.3
+  fireballSpeed: 3.2
+  streamWidth: 0.032
+  orbSpread: {x: 0.07, y: 0.55}
+  rockCount: 6
+  liftReach: 0.3
+  rockDistance: {x: 1, y: 1.35}
+  turnsToSpin: 1.25
+  windPerHand: 36
+--- !u!4 &1710719218
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1710719216}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1715105673
 GameObject:

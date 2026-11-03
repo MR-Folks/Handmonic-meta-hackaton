@@ -433,7 +433,57 @@ Shader "MusicInYourHands/Bubble"
                 else
                 {
                     // BEGIN emblem 28 (Four elements)
-                    e = Line(abs(length(p) - 0.45), 0.04);
+                    // The four elements in turn, each fading into the next: a flickering flame, a drop of water, a rock
+                    // with two peaks, and lines of wind. Four dots round it, one per element, show which is up.
+                    float phase = t / 1.6;
+                    float lit = fmod(floor(phase), 4);
+                    float blend = smoothstep(0.8, 1.0, frac(phase));
+                    float4 show = (1 - step(0.5, abs(lit - float4(0, 1, 2, 3)))) * (1 - blend)
+                                + (1 - step(0.5, abs(fmod(lit + 1, 4) - float4(0, 1, 2, 3)))) * blend;
+                    // A flame: one tall tongue and two small ones leaning out beside it, flickering towards their tips.
+                    float flame = 0;
+                    [unroll] for (int f = 0; f < 3; f++)
+                    {
+                        float side = f == 0 ? 0 : (f == 1 ? -1 : 1);
+                        float2 g = p - float2(side * 0.16, f == 0 ? -0.36 : -0.33);
+                        float tall = f == 0 ? 0.78 : 0.36;
+                        float u = g.y / tall;
+                        g.x -= side * g.y * 0.45;
+                        g.x += 0.035 * sin(g.y * 14 - t * 9 + f * 2) * saturate(u);
+                        float cap = saturate(1 - u / 0.28);
+                        float width = (f == 0 ? 0.22 : 0.1) * (u < 0.28 ? sqrt(1 - cap * cap) : pow(saturate((1 - u) / 0.72), 1.15));
+                        flame = max(flame, smoothstep(0.015, -0.01, abs(g.x) - width) * step(0, u) * step(u, 1));
+                    }
+                    // A drop of water with a ripple spreading under it.
+                    float2 gd = p - float2(0, -0.16);
+                    float ud = gd.y / 0.62;
+                    float bottom = saturate(1 - ud / 0.42);
+                    float drop = smoothstep(0.015, -0.01, abs(gd.x) - 0.25 * (ud < 0.42 ? sqrt(1 - bottom * bottom) : pow(saturate((1 - ud) / 0.58), 0.85))) * step(0, ud) * step(ud, 1);
+                    float2 shine = (p - float2(-0.1, 0.13)) * float2(1.6, 1);
+                    drop *= 1 - 0.8 * smoothstep(0.015, 0, length(shine) - 0.05);
+                    float2 rr = (p - float2(0, -0.3)) * float2(1, 3.2);
+                    drop = max(drop, Line(abs(length(rr) - 0.32 - 0.04 * frac(t)), 0.06) * step(0.03, abs(rr.x)) * (1 - frac(t) * 0.5));
+                    // A rock with two peaks.
+                    float peaks = max(0.36 - abs(p.x + 0.08) * 1.15, 0.13 - abs(p.x - 0.25) * 1.15) - p.y;
+                    float rock = smoothstep(-0.01, 0.02, min(peaks, p.y + 0.3));
+                    // Lines of wind, rippling.
+                    float wind = 0;
+                    [unroll] for (int k = 0; k < 3; k++)
+                    {
+                        float yk = (1 - k) * 0.18 - 0.02;
+                        float reach = k == 1 ? 0.36 : (k == 0 ? 0.26 : 0.2);
+                        float x0 = k == 1 ? 0.0 : (k == 0 ? -0.08 : 0.1);
+                        float2 s = float2(p.x, p.y - 0.035 * sin(p.x * 11 - t * 5 + k * 2.1));
+                        wind += Line(Segment(s, float2(x0 - reach, yk), float2(x0 + reach, yk)), 0.045);
+                    }
+                    e = flame * show.x + drop * show.y + rock * show.z + saturate(wind) * show.w;
+                    // The four dots: fire at the top, then water, earth and air round to the left.
+                    [unroll] for (int j = 0; j < 4; j++)
+                    {
+                        float angle = 1.5708 - j * 1.5708;
+                        float2 d = p - float2(cos(angle), sin(angle)) * 0.68;
+                        e += smoothstep(0.05, 0.03, length(d)) * (0.35 + 0.65 * show[j]);
+                    }
                     // END emblem 28
                 }
                 return saturate(e);
