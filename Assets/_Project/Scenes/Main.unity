@@ -1463,6 +1463,67 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1410341792
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1410341794}
+  - component: {fileID: 1410341793}
+  m_Layer: 0
+  m_Name: FlowerDance
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1410341793
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1410341792}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 404fa359a6cf9da4892d3f650a80d0e1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.FlowerDance
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  flowerDanceMaterial: {fileID: 2100000, guid: c99be98716737cf46af6981b406d6e7b, type: 2}
+  flowerCount: 40
+  rowDistance: {x: 1.2, y: 2.05}
+  arc: 100
+  onFurniture: 8
+  furnitureSize: 0.6
+  steadyBeat: 0.6
+  sway: 0.26
+  ripple: 0.35
+  boldPerBeat: 3
+  leanReach: 0.6
+  overReach: 0.2
+  maxStretch: 0.7
+  wordLife: 3.4
+  wordRise: 0.12
+--- !u!4 &1410341794
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1410341792}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1414445809
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1698,6 +1759,7 @@ MonoBehaviour:
   - {fileID: 2137090334}
   - {fileID: 4160533}
   - {fileID: 1234591346}
+  - {fileID: 1410341793}
   - {fileID: 1520291934}
   - {fileID: 1456184137}
   - {fileID: 2124485061}
@@ -1732,6 +1794,7 @@ Transform:
   - {fileID: 2137090335}
   - {fileID: 4160534}
   - {fileID: 1234591347}
+  - {fileID: 1410341794}
   - {fileID: 1520291935}
   - {fileID: 1456184138}
   - {fileID: 2124485062}

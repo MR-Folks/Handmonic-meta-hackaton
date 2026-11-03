@@ -351,7 +351,47 @@ Shader "MusicInYourHands/Bubble"
                 else if (icon < 26.5)
                 {
                     // BEGIN emblem 26 (Flower dance)
-                    e = Line(abs(length(p) - 0.45), 0.04);
+                    // A flower bopping from side to side on the beat, its leaves lifting like arms; every fourth beat
+                    // its head pops open bigger.
+                    float2 g = (p - float2(0, 0.06)) / 1.2;
+                    float beat = t * 1.6;
+                    float hit = frac(beat);
+                    float lean = (fmod(floor(beat), 2) < 0.5 ? 1 : -1) * cos(3.1416 * smoothstep(0.1, 0.9, hit));
+                    float pop = 1 + 0.22 * exp(-frac(beat * 0.25) * 10);
+                    float2 head = float2(lean * 0.2, 0.17 - 0.05 * exp(-hit * 7));
+                    // The stem: a curve from the ground, upright at first, bending over to the head.
+                    float stem = 9;
+                    float2 s0 = float2(0, -0.72);
+                    [unroll] for (int k = 1; k <= 6; k++)
+                    {
+                        float u = k / 6.0;
+                        float2 s1 = float2(head.x * u * u, lerp(-0.72, head.y, u));
+                        stem = min(stem, Segment(g, s0, s1));
+                        s0 = s1;
+                    }
+                    e = Line(stem, 0.032);
+                    // Two leaves low on the stem, lifting on the beat.
+                    float lift = 0.35 + 0.45 * exp(-hit * 4);
+                    [unroll] for (int j = 0; j < 2; j++)
+                    {
+                        float side = j == 0 ? -1 : 1;
+                        float y = -0.56 + j * 0.1;
+                        float2 root = float2(head.x * pow((y + 0.72) / (head.y + 0.72), 2), y);
+                        float2 axis = float2(side * cos(lift), sin(lift));
+                        float2 q = g - root - axis * 0.13;
+                        float along = dot(q, axis), across = dot(q, float2(-axis.y, axis.x));
+                        e += smoothstep(1.0, 0.8, length(float2(along / 0.13, across / 0.06)));
+                    }
+                    // The head: five round petals, a ring of space, and the centre.
+                    float2 c = g - head;
+                    float petals = 0;
+                    [unroll] for (int m = 0; m < 5; m++)
+                    {
+                        float a = m * 1.2566 + 1.5708 + lean * 0.35;
+                        petals = max(petals, smoothstep(0.12, 0.095, length(c - float2(cos(a), sin(a)) * 0.15 * pop) / pop));
+                    }
+                    float r = length(c) / pop;
+                    e = max(saturate(e), max(petals * smoothstep(0.075, 0.1, r), smoothstep(0.07, 0.05, r)));
                     // END emblem 26
                 }
                 else if (icon < 27.5)
