@@ -1,0 +1,92 @@
+using UnityEngine;
+
+namespace MusicInYourHands
+{
+    /// <summary>
+    /// The #SCRIPTNAME# world: say in a sentence or two what the player sees and does. Run Music In Your Hands >
+    /// Update Worlds in Main Scene to add it to the scene and the menu, then Run Editor Checks.
+    /// </summary>
+    public class #SCRIPTNAME# : World
+    {
+        public override string DisplayName => "#SCRIPTNAME#";
+
+        public override Color Color => new Color(0.6f, 0.85f, 1f);
+
+        // Lowest first within its group of the menu (sound worlds, or lyric worlds with IsLyric); the built-in worlds
+        // use 0 to 180 in steps of 10, and each world needs its own number.
+        public override int MenuOrder => 1000;
+
+        // An emblem the Bubble shader draws; the built-in worlds use 0 to 22.
+        public override int MenuIcon => 6;
+
+        public override string Hint => "Pinch to send a ring";
+
+        // Material fields are filled from Materials/ by name: ringMaterial gets Ring.mat, lineMaterial Line.mat, and
+        // so on (or [WorldMaterial("Name")] on the field). glowMaterial and letteringMaterial come with World.
+        [SerializeField] Material ringMaterial;
+
+        [SerializeField] int sparksPerBeat = 24;
+
+        // Shows up to four sung words at a time in SungWords; delete these two lines to show none.
+        protected override int SungWordCount => 4;
+        protected override float SungWordHeight => 0.04f;
+
+        ParticleSystem sparks;
+        Vector3 center;
+
+        protected override void OnBuild()
+        {
+            sparks = Effects.MakeSparkSystem("Sparks", transform, glowMaterial);
+        }
+
+        protected override void OnPlace(Camera view)
+        {
+            // A metre in front of you, at chest height; called again when you move somewhere else.
+            center = view.transform.position + Effects.FlatForward(view) * 1f + Vector3.down * 0.3f;
+        }
+
+        protected override void OnBeat(MusicFrame music)
+        {
+            Ring(0.3f + music.Kick * 0.4f);
+        }
+
+        protected override void OnWord(string word, bool newLine)
+        {
+            var w = SungWords.Add(word, Color.Lerp(Color, Color.white, 0.4f), 3f);
+            w.Position = center + Vector3.up * (0.25f + (Sung.Index % 3) * 0.06f);
+            w.Rotation = WordLayer.Facing(w.Position, View.transform.position);
+        }
+
+        protected override void OnPinch(HandRig.Hand hand, bool left)
+        {
+            Ring(0.8f);
+        }
+
+        protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
+        {
+            // Continuous things go here: follow the hands, swell with music.Bands, fade in with FadeIn.
+        }
+
+        protected override void OnExit()
+        {
+            sparks.Clear();
+        }
+
+        /// <summary>A ring of sparks bursting out from the centre.</summary>
+        void Ring(float speed)
+        {
+            for (int i = 0; i < sparksPerBeat; i++)
+            {
+                float a = i * Mathf.PI * 2f / sparksPerBeat;
+                sparks.Emit(new ParticleSystem.EmitParams
+                {
+                    position = center,
+                    velocity = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * speed,
+                    startColor = Color,
+                    startSize = 0.012f,
+                    startLifetime = 1.2f
+                }, 1);
+            }
+        }
+    }
+}

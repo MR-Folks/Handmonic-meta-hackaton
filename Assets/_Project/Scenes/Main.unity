@@ -148,10 +148,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f7abdc01ce3544bfc9ef6fd546a9e36e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.BreathingRoom
-  displayName: Breathing room
-  color: {r: 0.75, g: 0.6, b: 1, a: 1}
-  gridMaterial: {fileID: 2100000, guid: 1eadb9ea8933e4bf3998274e22b8ff30, type: 2}
   letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  gridMaterial: {fileID: 2100000, guid: 1eadb9ea8933e4bf3998274e22b8ff30, type: 2}
   halfSize: {x: 1.8, y: 1.8}
   roomHeight: 2.6
   breathe: 0.04
@@ -276,12 +275,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4823f3cda12e2469dbac910f638f567a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.NoteRain
-  displayName: Note rain
-  color: {r: 0.5, g: 0.72, b: 1, a: 1}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   streakMaterial: {fileID: 2100000, guid: 141076a49ca5548e9a16f7ac49f7d207, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
-  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   areaWidth: 0.9
   areaDepth: 0.4
   distance: 0.5
@@ -337,13 +334,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6c20fb67fd1bd457da74dcb13ebd148e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.FireflyChoir
-  displayName: Firefly choir
-  color: {r: 0.79, g: 0.61, b: 1, a: 1}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
-  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   count: 88
   flySize: 0.016
+  cloudReach: {x: 0.08, y: 0.16}
+  tailWidth: 1.8
   startle: 0.4
   waveSpeed: 1.1
 --- !u!4 &128519274
@@ -436,12 +433,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 592ed8b61fb3a4179bd1b463fe1e35ea, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.AirStrings
-  displayName: Air strings
-  color: {r: 0.49, g: 0.95, b: 0.79, a: 1}
-  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
-  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
-  ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
   letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
+  ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
   stringCount: 8
   distance: 0.42
   width: 0.62
@@ -493,8 +488,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2f86e0187ecdc44a0a800627adbb24bc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.CeilingStars
-  displayName: Ceiling stars
-  color: {r: 0.78, g: 0.7, b: 1, a: 1}
   letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
@@ -579,8 +572,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: aec8a76d2e5d2473e93d18c1b818673b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.WordSnow
-  displayName: Word snow
-  color: {r: 0.88, g: 0.94, b: 1, a: 1}
   letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   letterHeight: 0.075
@@ -594,6 +585,73 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 377810159}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &403129348
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 403129350}
+  - component: {fileID: 403129349}
+  m_Layer: 0
+  m_Name: SolarSystem
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &403129349
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 403129348}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bf81a81aaff973a41b5d16e8448b45d3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.SolarSystem
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  planetMaterial: {fileID: 2100000, guid: 3af51bd879543c74497dbc385679367f, type: 2}
+  coronaMaterial: {fileID: 2100000, guid: d3bac847be9109d4e8c8caf75830ece3, type: 2}
+  orbitMaterial: {fileID: 2100000, guid: a1995aeef6652d34c86bbd2e32742ff3, type: 2}
+  beltMaterial: {fileID: 2100000, guid: 3f265d426879e7446b51c8328fc65730, type: 2}
+  ringsMaterial: {fileID: 2100000, guid: 24dd6462e955ec54a8715367bdb02cd6, type: 2}
+  ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
+  distance: 0.68
+  drop: 0.27
+  tilt: 24
+  scaleRange: {x: 0.5, y: 2}
+  earthYear: 16
+  speedSwell: 0.8
+  orbitRange: {x: 0.075, y: 0.62}
+  asteroids: 520
+  reach: 0.035
+  warmReach: 0.17
+  warmUp: 1.5
+  cometLife: 3.6
+  cometReach: {x: 0.27, y: 0.42}
+  cometSwing: 60
+--- !u!4 &403129350
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 403129348}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -807,11 +865,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dae76b68d0ba0430ca02b7ab5fce800a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.RisingFloor
-  displayName: Rising floor
-  color: {r: 0.5, g: 0.88, b: 1, a: 1}
   letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
-  ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
   distance: 1.3
   letterHeight: 0.22
   spread: 38
@@ -859,12 +915,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1ebd9641922704e69a7cb94707f98db5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.LivingSkin
-  displayName: Living skin
-  color: {r: 1, g: 0.37, b: 0.68, a: 1}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   shellMaterial: {fileID: 2100000, guid: 7d7d84a573d046f798dcc6662578ac1a, type: 2}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
-  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   wallMaterial: {fileID: 2100000, guid: b3d1b3af32f949bd9006b316dc20a6fd, type: 2}
   tipSize: 0.045
   fingerColors:
@@ -876,6 +930,12 @@ MonoBehaviour:
   waveRadius: 0.15
   waveLife: 1.1
   maxWaves: 6
+  waveEveryBeats: 2
+  halfSize: {x: 1.8, y: 1.8}
+  roomHeight: 2.6
+  lineSpot: {x: 0.9, y: 0.09}
+  lineWidth: 0.62
+  lineHold: 2.5
   trailSpeed: {x: 0.35, y: 1.1}
   sparksPerMetre: 70
   sparksPerBeat: 3
@@ -938,16 +998,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1e77e548c19f547ef915769fd4cd0600, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.WaveformRibbon
-  displayName: Waveform ribbon
-  color: {r: 1, g: 0.7, b: 0.42, a: 1}
-  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
-  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
-  silkMaterial: {fileID: 2100000, guid: 6a8303df8baf04a3c8de8da833d88525, type: 2}
   letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
+  silkMaterial: {fileID: 2100000, guid: 6a8303df8baf04a3c8de8da833d88525, type: 2}
   points: 96
   amplitude: 0.07
   strandWidth: 0.007
   silkHalfWidth: 0.024
+  beatsPerLook: 8
+  secondsPerColor: 5
   grabPinch: 0.75
   releasePinch: 0.45
   tug: 0.007
@@ -1049,6 +1109,7 @@ MonoBehaviour:
   bubbleSize: 0.078
   followAngle: 44
   pinchThresholds: {x: 0.85, y: 0.5}
+  touchZone: {x: 0.15, y: 0.2}
 --- !u!4 &1126936837
 Transform:
   m_ObjectHideFlags: 0
@@ -1143,10 +1204,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cac449c98bf1b4c9b8ee7c553f527bea, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.SoundWind
-  displayName: Sound wind
-  color: {r: 0.49, g: 0.95, b: 0.79, a: 1}
-  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   count: 360
   orbit: 0.72
   thickness: 0.22
@@ -1244,11 +1303,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f3d93cb6c28d246d09480d064c988675, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.LightTrails
-  displayName: Light trails
-  color: {r: 1, g: 0.83, b: 0.42, a: 1}
-  trailMaterial: {fileID: 2100000, guid: e9a8e89f7016d46359271f8be3b012fd, type: 2}
-  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  trailMaterial: {fileID: 2100000, guid: e9a8e89f7016d46359271f8be3b012fd, type: 2}
   maxStrokes: 60
   pointsPerStroke: 320
   halfWidth: {x: 0.008, y: 0.02}
@@ -1473,6 +1530,67 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1410341792
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1410341794}
+  - component: {fileID: 1410341793}
+  m_Layer: 0
+  m_Name: FlowerDance
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1410341793
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1410341792}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 404fa359a6cf9da4892d3f650a80d0e1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.FlowerDance
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  flowerDanceMaterial: {fileID: 2100000, guid: c99be98716737cf46af6981b406d6e7b, type: 2}
+  flowerCount: 40
+  rowDistance: {x: 1.2, y: 2.05}
+  arc: 100
+  onFurniture: 8
+  furnitureSize: 0.6
+  steadyBeat: 0.6
+  sway: 0.26
+  ripple: 0.35
+  boldPerBeat: 3
+  leanReach: 0.6
+  overReach: 0.2
+  maxStretch: 0.7
+  wordLife: 3.4
+  wordRise: 0.12
+--- !u!4 &1410341794
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1410341792}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1414445809
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1633,11 +1751,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 13b353353b0e64982af0dbeb84f1f13d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.OrbitType
-  displayName: Orbit type
-  color: {r: 0.88, g: 0.89, b: 0.93, a: 1}
   letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
-  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   distance: 0.95
   height: -0.08
   letterHeight: 0.24
@@ -1710,6 +1826,10 @@ MonoBehaviour:
   - {fileID: 2137090334}
   - {fileID: 4160533}
   - {fileID: 1234591346}
+  - {fileID: 403129349}
+  - {fileID: 1410341793}
+  - {fileID: 1520291934}
+  - {fileID: 1710719217}
   - {fileID: 1456184137}
   - {fileID: 2124485061}
   - {fileID: 2026124819}
@@ -1741,10 +1861,14 @@ Transform:
   - {fileID: 1153605163}
   - {fileID: 1715105675}
   - {fileID: 2137090335}
-  - {fileID: 1456184138}
-  - {fileID: 2124485062}
   - {fileID: 4160534}
   - {fileID: 1234591347}
+  - {fileID: 403129350}
+  - {fileID: 1410341794}
+  - {fileID: 1520291935}
+  - {fileID: 1710719218}
+  - {fileID: 1456184138}
+  - {fileID: 2124485062}
   - {fileID: 2026124820}
   - {fileID: 1970306283}
   - {fileID: 683420574}
@@ -1975,6 +2099,79 @@ MonoBehaviour:
   edgeRenderingEnabled_: 0
   edgeColor_: {r: 1, g: 1, b: 1, a: 1}
   colorMapType: 0
+--- !u!1 &1520291933
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1520291935}
+  - component: {fileID: 1520291934}
+  m_Layer: 0
+  m_Name: CubeField
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1520291934
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1520291933}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f85e7ae0ffb75db46875304902fc92e3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.CubeField
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  cubeFieldMaterial: {fileID: 2100000, guid: 226cc3d2ab53aed4b9325202e5f4659b, type: 2}
+  radius: 4.2
+  spacing: 0.3
+  blockWidth: 0.17
+  clearing: 0.45
+  growSeconds: 1.4
+  nearHeight: 0.02
+  farHeight: 1.5
+  growDistance: {x: 0.7, y: 4}
+  steepness: 1.75
+  riseSpeed: 9
+  fallSpeed: 3.5
+  maxHeight: 2.5
+  rippleSpeed: 3.4
+  rippleWidth: 0.45
+  rippleLift: 0.3
+  liftRange: {x: 0.3, y: 2}
+  hipsBelowEyes: 0.75
+  overHead: 0.12
+  liftResponse: 3
+  chimeVolume: 0.22
+  wordDistance: 2
+  wordStagger: 0.3
+  wordSpread: 12
+  lineSpread: 32
+  wordStand: 0.5
+  wordLife: 4.5
+--- !u!4 &1520291935
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1520291933}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1608310292
 GameObject:
   m_ObjectHideFlags: 0
@@ -2209,6 +2406,73 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1512639469}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1710719216
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1710719218}
+  - component: {fileID: 1710719217}
+  m_Layer: 0
+  m_Name: FourElements
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1710719217
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1710719216}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 254a59e9358625c41b9eb44a5c3cec4b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.FourElements
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  flameMaterial: {fileID: 2100000, guid: 4b69662b1c571324f8ca1470c0aaaf40, type: 2}
+  streamMaterial: {fileID: 2100000, guid: 7327eebd354a15e46b255d74bbab6fbd, type: 2}
+  orbMaterial: {fileID: 2100000, guid: 3054415a80d0b1f4b97ba004aafc2530, type: 2}
+  rockMaterial: {fileID: 2100000, guid: 7846ed23d691a3142a651964bb5b3223, type: 2}
+  crackMaterial: {fileID: 2100000, guid: a77e1695ff2b6104fb9ad6ca8f9af11f, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
+  ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
+  bubbleMaterial: {fileID: 2100000, guid: fa89d5024587b4c8e83405b9bccf5a04, type: 2}
+  beatsPerElement: 32
+  beatsAfterPick: 64
+  fistSeconds: 0.35
+  flameHeight: 0.16
+  throwSpeed: 1.3
+  fireballSpeed: 3.2
+  streamWidth: 0.032
+  orbSpread: {x: 0.07, y: 0.55}
+  rockCount: 6
+  liftReach: 0.3
+  rockDistance: {x: 1, y: 1.35}
+  turnsToSpin: 1.25
+  windPerHand: 36
+--- !u!4 &1710719218
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1710719216}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1462377328}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1715105673
 GameObject:
   m_ObjectHideFlags: 0
@@ -2238,12 +2502,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9b4a6879bb0404df28c7b029e5f2d607, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.BubbleNotes
-  displayName: Bubble notes
-  color: {r: 1, g: 0.6, b: 0.85, a: 1}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   bubbleMaterial: {fileID: 2100000, guid: fa89d5024587b4c8e83405b9bccf5a04, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
-  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
-  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   distance: 0.5
   width: 0.7
   heightRange: {x: -0.5, y: 0.35}
@@ -2338,13 +2600,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 34d21acf897c542de92facfeb3ef4aed, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.HeartbeatOrb
-  displayName: Heartbeat orb
-  color: {r: 1, g: 0.83, b: 0.42, a: 1}
+  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   dotsMaterial: {fileID: 2100000, guid: 5f5a3574773b64e07bd701ebdd150db1, type: 2}
   orbMaterial: {fileID: 2100000, guid: 670281a42a551438a91dfccad4c42bad, type: 2}
-  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
-  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   minRadius: 0.05
   maxRadius: 0.2
   radiusPerSpread: 0.5
@@ -2356,6 +2616,7 @@ MonoBehaviour:
   volumeRange: {x: 0.3, y: 1}
   motesPerBeat: 16
   motesPerSecond: 12
+  threadReach: {x: 0.7, y: 0.9}
 --- !u!4 &1788851836
 Transform:
   m_ObjectHideFlags: 0
@@ -2481,8 +2742,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a2b6bf2fbc31b46f4a4335c1a298af54, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.WordDrift
-  displayName: Word drift
-  color: {r: 0.8, g: 0.88, b: 1, a: 1}
   letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   startDistance: 3.2
@@ -2533,12 +2792,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b687e5615a6e14fbbb8680a104ac977d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.SoundPool
-  displayName: Sound pool
-  color: {r: 0.37, g: 0.83, b: 1, a: 1}
-  waterMaterial: {fileID: 2100000, guid: 5a8cb478aa2674256bde3519ded63635, type: 2}
-  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
-  causticsMaterial: {fileID: 2100000, guid: 630e4af74708d49b4b4e1a22e4c476d3, type: 2}
   letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  waterMaterial: {fileID: 2100000, guid: 5a8cb478aa2674256bde3519ded63635, type: 2}
+  causticsMaterial: {fileID: 2100000, guid: 630e4af74708d49b4b4e1a22e4c476d3, type: 2}
   size: {x: 0.7, y: 0.48}
   distance: 0.5
   belowEyes: 0.52
@@ -2592,8 +2849,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7555c7e9dbad9481382f2d528f777f5b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.NeonSign
-  displayName: Neon sign
-  color: {r: 1, g: 0.3, b: 0.62, a: 1}
   letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
@@ -2645,11 +2900,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 995b0d3ebfff349298e61ddd21767934, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.Graffiti
-  displayName: Graffiti
-  color: {r: 1, g: 0.7, b: 0.42, a: 1}
   letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
-  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
   paintMaterial: {fileID: 2100000, guid: 9527ccac3e9d14c0d948501ee821f887, type: 2}
   wallRadius: 1.6
@@ -2702,11 +2955,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bf11b7f97ea4e47909fed5d42a2a34f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.SandTable
-  displayName: Sand table
-  color: {r: 1, g: 0.86, b: 0.68, a: 1}
-  plateMaterial: {fileID: 2100000, guid: 8a2b5c99e3f8449c2968547889d421aa, type: 2}
-  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  plateMaterial: {fileID: 2100000, guid: 8a2b5c99e3f8449c2968547889d421aa, type: 2}
   plateSize: 0.5
   distance: 0.46
   belowEyes: 0.52

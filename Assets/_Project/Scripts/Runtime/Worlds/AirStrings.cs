@@ -12,6 +12,12 @@ namespace MusicInYourHands
     /// </summary>
     public class AirStrings : World
     {
+        public override string DisplayName => "Air strings";
+
+        public override Color Color => new Color(0.49f, 0.95f, 0.79f);
+
+        public override int MenuOrder => 30;
+
         public override int MenuIcon => 3;
 
         public override string Hint => "Brush your fingers across the strings";
@@ -27,9 +33,7 @@ namespace MusicInYourHands
 
         [Header("Materials")]
         [SerializeField] Material lineMaterial;
-        [SerializeField] Material glowMaterial;
         [SerializeField] Material ringMaterial;
-        [SerializeField] Material letteringMaterial;
 
         [Header("Harp")]
         [SerializeField] int stringCount = 8;
@@ -78,18 +82,18 @@ namespace MusicInYourHands
         AudioPool voices;
         ParticleSystem sparks, notes;
         MaterialPropertyBlock block;
-        WordLayer words;
         readonly float[,] lastSide = new float[10, 8];
         readonly bool[,] hadSide = new bool[10, 8];
         readonly float[] shiver = new float[2];
         float beatTime = -10f;
         MusicFrame frame;
-        bool anchored, built;
 
-        public override void Build()
+        protected override int SungWordCount => 4;
+
+        protected override float SungWordHeight => 0.032f;
+
+        protected override void OnBuild()
         {
-            if (built) return;
-            built = true;
             block = new MaterialPropertyBlock();
             path = new Vector3[points];
             strings = new HarpString[stringCount];
@@ -108,29 +112,15 @@ namespace MusicInYourHands
             notes = Effects.MakeSparkSystem("Notes", transform, glowMaterial);
             var main = notes.main;
             main.gravityModifier = -0.02f;
-            if (letteringMaterial != null) words = new WordLayer("Lyric", transform, letteringMaterial, 4, 0.032f);
         }
 
-        protected override void OnEnable()
+        protected override void OnEnter()
         {
-            base.OnEnable();
-            anchored = false;
             System.Array.Clear(hadSide, 0, hadSide.Length);
         }
 
-        protected override void OnDisable()
-        {
-            base.OnDisable();
-            if (HandRig.Instance != null)
-            {
-                Effects.OffsetHand(HandRig.Instance.Left, Vector3.zero);
-                Effects.OffsetHand(HandRig.Instance.Right, Vector3.zero);
-            }
-            words?.Clear();
-        }
-
         /// <summary>Stands the strings in an arc in front of where you look, curving towards you at the ends.</summary>
-        void Place(Camera view)
+        protected override void OnPlace(Camera view)
         {
             var forward = Effects.FlatForward(view);
             var side = Vector3.Cross(Vector3.up, forward).normalized;
@@ -148,19 +138,25 @@ namespace MusicInYourHands
             }
         }
 
-        public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
+        /// <summary>Each beat sends a pulse up the strings, one after the other.</summary>
+        protected override void OnBeat(MusicFrame music) => beatTime = Now;
+
+        /// <summary>
+        /// Each sung word appears beside the string that hums its note (or the next string along) and glides up it,
+        /// glowing with the string's light.
+        /// </summary>
+        protected override void OnWord(string word, bool newLine)
         {
-            Build();
-            if (view == null) return;
-            if (anchored && ShouldReanchor(view, dt)) anchored = false;
-            if (!anchored)
-            {
-                Place(view);
-                MarkAnchored(view);
-                anchored = true;
-            }
+            int pick = Sung.Index % stringCount;
+            for (int i = 0; i < stringCount; i++)
+                if (strings[i].Hum > 0.3f && strings[i].Hum >= strings[pick].Hum) pick = i;
+            var w = SungWords.Add(word, Color.Lerp(Colors[pick % Colors.Length], Color.white, 0.3f), 2.4f);
+            w.Slot = pick;
+        }
+
+        protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
+        {
             frame = music;
-            if (music.Beat) beatTime = Now;
             float t = Now;
             float pulseAge = t - beatTime;
 
@@ -186,38 +182,20 @@ namespace MusicInYourHands
                 var hand = rig != null ? rig.Get(side == 0) : null;
                 if (hand != null) Effects.OffsetHand(hand, Random.insideUnitSphere * (0.0025f * shiver[side]));
             }
-            Sing(music, view, dt);
-        }
 
-        /// <summary>
-        /// Each sung word appears beside the string that hums its note (or the next string along) and glides up it,
-        /// glowing with the string's light.
-        /// </summary>
-        void Sing(MusicFrame music, Camera view, float dt)
-        {
-            if (words == null) return;
-            if (words.Next(music, out var text, out _))
-            {
-                int pick = words.Index % stringCount;
-                for (int i = 0; i < stringCount; i++)
-                    if (strings[i].Hum > 0.3f && strings[i].Hum >= strings[pick].Hum) pick = i;
-                var w = words.Add(text, Color.Lerp(Colors[pick % Colors.Length], Color.white, 0.3f), 2.4f);
-                w.Slot = pick;
-            }
-            words.Tick(dt);
+            // The sung words glide up beside their strings.
             var eye = view.transform.position;
-            foreach (var w in words.Words)
+            foreach (var w in SungWords.Words)
             {
                 if (!w.Active) continue;
                 var s = strings[w.Slot];
                 float up = Mathf.Lerp(0.6f, 0.85f, w.Age / w.Life);
                 var side = Vector3.Cross(Vector3.up, (s.Bottom - eye).normalized).normalized;
                 var along = Vector3.Lerp(s.Bottom, s.Top, up);
-                w.Position = along + side * (0.02f + words.Height(w) * 0.2f + w.Width * words.Height(w) * 0.5f) + (eye - along).normalized * 0.02f;
+                w.Position = along + side * (0.02f + SungWords.Height(w) * 0.2f + w.Width * SungWords.Height(w) * 0.5f) + (eye - along).normalized * 0.02f;
                 w.Rotation = WordLayer.Facing(w.Position, eye);
                 w.Halo = 0.2f + s.Hum * 0.4f + s.Glow * 0.5f;
             }
-            words.Draw(1f);
         }
 
         /// <summary>

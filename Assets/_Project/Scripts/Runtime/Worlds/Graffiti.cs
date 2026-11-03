@@ -14,6 +14,12 @@ namespace MusicInYourHands
     /// </summary>
     public class Graffiti : World
     {
+        public override string DisplayName => "Graffiti";
+
+        public override Color Color => new Color(1f, 0.7f, 0.42f);
+
+        public override int MenuOrder => 130;
+
         public override int MenuIcon => 13;
 
         public override bool IsLyric => true;
@@ -30,10 +36,9 @@ namespace MusicInYourHands
         };
 
         [Header("Materials")]
-        [SerializeField] Material letteringMaterial;
         [SerializeField] Material lineMaterial;
-        [SerializeField] Material glowMaterial;
         [SerializeField] Material ringMaterial;
+        [WorldMaterial("PaintStroke")]
         [SerializeField] Material paintMaterial;
 
         [Header("Walls")]
@@ -92,13 +97,11 @@ namespace MusicInYourHands
         float floorY, sprayDebt;
         string lastKey = "";
         Stroke current;
-        bool wasPinching, anchored, built;
+        bool wasPinching;
         Color paint = Effects.Orange;
 
-        public override void Build()
+        protected override void OnBuild()
         {
-            if (built) return;
-            built = true;
             block = new MaterialPropertyBlock();
             material = new Material(letteringMaterial) { name = "Graffiti Lettering", mainTexture = TypeFace.Marker.Atlas };
             material.SetFloat(RimId, 0f);
@@ -143,16 +146,13 @@ namespace MusicInYourHands
             foreach (var d in tag.Drips) d.SetVisible(visible && tag.OnWall);
         }
 
-        protected override void OnEnable()
+        protected override void OnEnter()
         {
-            base.OnEnable();
-            anchored = false;
             lastKey = "";
         }
 
-        protected override void OnDisable()
+        protected override void OnExit()
         {
-            base.OnDisable();
             foreach (var t in tags) { t.Age = -1f; SetVisible(t, false); }
             foreach (var s in strokes) { s.Age = -1f; s.Line.SetVisible(false); }
             current = null;
@@ -162,19 +162,15 @@ namespace MusicInYourHands
             if (hiss != null) hiss.Stop();
         }
 
-        public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
+        /// <summary>Finds the floor, and until the room is scanned rings the stand-in walls around where you stand.</summary>
+        protected override void OnPlace(Camera view)
         {
-            Build();
-            if (view == null) return;
-            if (anchored && ShouldReanchor(view, dt)) anchored = false;
-            if (!anchored)
-            {
-                center = view.transform.position;
-                floorY = Effects.FloorY(view);
-                MarkAnchored(view);
-                anchored = true;
-            }
+            center = view.transform.position;
+            floorY = Effects.FloorY(view);
+        }
 
+        protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
+        {
             // Aim with the pinching hand, else the right, else the left, else the head.
             HandRig.Hand aimHand = null;
             if (rig != null)

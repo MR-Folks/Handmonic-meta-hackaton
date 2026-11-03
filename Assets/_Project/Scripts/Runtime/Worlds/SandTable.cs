@@ -12,6 +12,12 @@ namespace MusicInYourHands
     /// </summary>
     public class SandTable : World
     {
+        public override string DisplayName => "Sand table";
+
+        public override Color Color => new Color(1f, 0.86f, 0.68f);
+
+        public override int MenuOrder => 90;
+
         public override int MenuIcon => 11;
 
         public override string Hint => "Touch the sand, hover to change the pattern, pinch to pour";
@@ -27,8 +33,6 @@ namespace MusicInYourHands
 
         [Header("Materials")]
         [SerializeField] Material plateMaterial;
-        [SerializeField] Material glowMaterial;
-        [SerializeField] Material letteringMaterial;
 
         [Header("Plate")]
         [SerializeField] float plateSize = 0.5f;
@@ -67,16 +71,20 @@ namespace MusicInYourHands
         MaterialPropertyBlock block;
         System.Random random;
         AudioPool voices;
-        WordLayer words;
         MusicFrame frame;
         int mode = -1, beats, pourNext;
-        float shake, fade, half;
-        bool anchored, built;
+        float shake, half;
 
-        public override void Build()
+        protected override float FadeInSeconds => 1f / 2f;
+
+        protected override int SungWordCount => 5;
+
+        protected override float SungWordHeight => 0.03f;
+
+        protected override float SungWordsAlpha => FadeIn;
+
+        protected override void OnBuild()
         {
-            if (built) return;
-            built = true;
             block = new MaterialPropertyBlock();
             random = new System.Random(5);
             grain = new Vector2[grains];
@@ -120,7 +128,6 @@ namespace MusicInYourHands
 
             voices = new AudioPool(transform, 3);
             plate.gameObject.SetActive(false);
-            if (letteringMaterial != null) words = new WordLayer("Lyric", transform, letteringMaterial, 5, 0.03f);
         }
 
         void ScatterSand()
@@ -133,49 +140,54 @@ namespace MusicInYourHands
             }
         }
 
-        protected override void OnEnable()
+        protected override void OnEnter()
         {
-            base.OnEnable();
-            anchored = false;
-            fade = 0f;
             mode = -1;
             System.Array.Clear(hadContact, 0, hadContact.Length);
-            if (grain != null) ScatterSand();
+            ScatterSand();
         }
 
-        protected override void OnDisable()
+        protected override void OnExit()
         {
-            base.OnDisable();
-            if (plate != null) plate.gameObject.SetActive(false);
-            if (sand != null) sand.Clear();
-            words?.Clear();
+            plate.gameObject.SetActive(false);
+            sand.Clear();
         }
 
-        public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
+        /// <summary>Sets the plate down at table height in front of you.</summary>
+        protected override void OnPlace(Camera view)
         {
-            Build();
-            if (view == null) return;
-            if (anchored && ShouldReanchor(view, dt)) anchored = false;
-            if (!anchored)
-            {
-                var forward = Effects.FlatForward(view);
-                var center = view.transform.position + forward * distance + Vector3.down * belowEyes;
-                center.y = Mathf.Max(center.y, Effects.FloorY(view) + 0.45f);
-                // With a room scan, the plate rests on the real table in front of you.
-                if (Room.TableAhead(view.transform.position, forward, 1.1f, plateSize * 0.5f, out _, out var spot))
-                    center = spot + Vector3.up * 0.02f;
-                plate.SetPositionAndRotation(center, Quaternion.LookRotation(forward, Vector3.up));
-                plate.gameObject.SetActive(true);
-                MarkAnchored(view);
-                anchored = true;
-            }
+            var forward = Effects.FlatForward(view);
+            var center = view.transform.position + forward * distance + Vector3.down * belowEyes;
+            center.y = Mathf.Max(center.y, Effects.FloorY(view) + 0.45f);
+            // With a room scan, the plate rests on the real table in front of you.
+            if (Room.TableAhead(view.transform.position, forward, 1.1f, plateSize * 0.5f, out _, out var spot))
+                center = spot + Vector3.up * 0.02f;
+            plate.SetPositionAndRotation(center, Quaternion.LookRotation(forward, Vector3.up));
+            plate.gameObject.SetActive(true);
+        }
+
+        /// <summary>Counts the beats: without a hovering hand, the music moves the pattern on every eighth beat.</summary>
+        protected override void OnBeat(MusicFrame music) => beats++;
+
+        /// <summary>
+        /// Each sung word appears written in the sand along the plate's near edge, the line's words side by side,
+        /// and shivers as the plate rings.
+        /// </summary>
+        protected override void OnWord(string word, bool newLine)
+        {
+            if (newLine)
+                foreach (var o in SungWords.Words) if (o.Active) o.Life = Mathf.Min(o.Life, o.Age + 0.5f);
+            var w = SungWords.Add(word, Sand, 5f);
+            w.Spot = new Vector2(-0.6f + (Sung.Index % 4) * 0.4f, -0.72f);
+        }
+
+        protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
+        {
             frame = music;
             half = plateSize * 0.5f * 0.95f;
-            fade = Mathf.MoveTowards(fade, 1f, dt * 2f);
 
             // A hovering hand picks the mode by where it is across the plate; otherwise the music moves it on.
             float press = Hover(rig, out float across);
-            if (music.Beat) beats++;
             int wanted = press > 0f
                 ? Mathf.Clamp(Mathf.FloorToInt((across * 0.5f + 0.5f) * Modes.Length), 0, Modes.Length - 1)
                 : (beats / 8) % Modes.Length;
@@ -190,7 +202,7 @@ namespace MusicInYourHands
             }
             shake *= Mathf.Exp(-dt * 1.8f);
             HandSkin.FocusPosition = plate.position;
-            HandSkin.FocusStrength = Mathf.Max(press, 0.25f) * fade;
+            HandSkin.FocusStrength = Mathf.Max(press, 0.25f) * FadeIn;
 
             float amp = 0.018f + music.Kick * 0.06f + music.Band(1) * 0.04f + shake * 0.06f;
             Shake(Modes[mode], amp, dt);
@@ -206,30 +218,14 @@ namespace MusicInYourHands
             block.SetFloat(NId, Modes[mode].x);
             block.SetFloat(MId, Modes[mode].y);
             block.SetFloat(KickId, music.Kick);
-            block.SetFloat(AlphaId, fade);
+            block.SetFloat(AlphaId, FadeIn);
             plateRenderer.SetPropertyBlock(block);
             label.Text = $"mode {Modes[mode].x}:{Modes[mode].y}";
-            label.Color = new Color(Sand.r, Sand.g, Sand.b, 0.75f * fade);
-            Sing(music, view, amp, dt);
-        }
+            label.Color = new Color(Sand.r, Sand.g, Sand.b, 0.75f * FadeIn);
 
-        /// <summary>
-        /// Each sung word appears written in the sand along the plate's near edge, the line's words side by side,
-        /// and shivers as the plate rings.
-        /// </summary>
-        void Sing(MusicFrame music, Camera view, float amp, float dt)
-        {
-            if (words == null || view == null) return;
-            if (words.Next(music, out var text, out bool newLine))
-            {
-                if (newLine)
-                    foreach (var o in words.Words) if (o.Active) o.Life = Mathf.Min(o.Life, o.Age + 0.5f);
-                var w = words.Add(text, Sand, 5f);
-                w.Spot = new Vector2(-0.6f + (words.Index % 4) * 0.4f, -0.72f);
-            }
-            words.Tick(dt);
+            // The sung words lie in the sand and shiver as the plate rings.
             var eye = view.transform.position;
-            foreach (var w in words.Words)
+            foreach (var w in SungWords.Words)
             {
                 if (!w.Active) continue;
                 var jitter = Random.insideUnitCircle * (amp * 0.04f);
@@ -237,7 +233,6 @@ namespace MusicInYourHands
                 w.Rotation = WordLayer.Lying(w.Position, eye);
                 w.Halo = 0.1f + music.Kick * 0.15f;
             }
-            words.Draw(fade);
         }
 
         /// <summary>How strongly a hand hovers over the plate (0-1, lower is stronger), and where across it (-1..1).</summary>
@@ -396,7 +391,7 @@ namespace MusicInYourHands
                     settled = 1f - Mathf.Clamp01(hop[i] / Mathf.Max(amp, 1e-4f) * 2f);
                 }
                 var c = Color.Lerp(Sand * 0.75f, Color.Lerp(Sand, Color.white, 0.35f), tone[i] * 0.5f + settled * 0.5f);
-                c.a = (0.55f + settled * 0.4f + music.Kick * 0.1f) * fade;
+                c.a = (0.55f + settled * 0.4f + music.Kick * 0.1f) * FadeIn;
                 output[i] = new ParticleSystem.Particle
                 {
                     position = world,

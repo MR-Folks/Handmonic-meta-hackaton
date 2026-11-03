@@ -12,6 +12,12 @@ namespace MusicInYourHands
     /// </summary>
     public class NeonSign : World
     {
+        public override string DisplayName => "Neon sign";
+
+        public override Color Color => new Color(1f, 0.3f, 0.62f);
+
+        public override int MenuOrder => 140;
+
         public override int MenuIcon => 18;
 
         public override bool IsLyric => true;
@@ -28,8 +34,6 @@ namespace MusicInYourHands
         };
 
         [Header("Materials")]
-        [SerializeField] Material letteringMaterial;
-        [SerializeField] Material glowMaterial;
         [SerializeField] Material lineMaterial;
 
         [Header("Sign")]
@@ -62,7 +66,6 @@ namespace MusicInYourHands
         }
 
         readonly List<Word> words = new List<Word>();
-        readonly LyricCursor cursor = new LyricCursor();
         readonly Vector3[] framePath = new Vector3[5];
         Material material;
         MaterialPropertyBlock block;
@@ -74,13 +77,10 @@ namespace MusicInYourHands
         Vector2 frameSize;
         Color lineColor = LineColors[0];
         int lineNumber;
-        float floorY, clock, fade, scale = 1f;
-        bool anchored, built;
+        float floorY, scale = 1f;
 
-        public override void Build()
+        protected override void OnBuild()
         {
-            if (built) return;
-            built = true;
             block = new MaterialPropertyBlock();
             material = new Material(letteringMaterial) { name = "Neon Lettering", mainTexture = TypeFace.Bold.Atlas };
             for (int i = 0; i < MaxWords; i++)
@@ -105,57 +105,46 @@ namespace MusicInYourHands
             frame.SetVisible(visible);
         }
 
-        protected override void OnEnable()
+        protected override void OnEnter()
         {
-            base.OnEnable();
-            anchored = false;
-            fade = 0f;
-            cursor.Reset();
-            if (built) foreach (var w in words) { w.Used = false; w.Renderer.gameObject.SetActive(false); }
+            foreach (var w in words) { w.Used = false; w.Renderer.gameObject.SetActive(false); }
         }
 
-        protected override void OnDisable()
+        protected override void OnExit()
         {
-            base.OnDisable();
-            if (!built) return;
             foreach (var w in words) w.Renderer.gameObject.SetActive(false);
             SetSignVisible(false);
         }
 
-        public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
+        /// <summary>Puts the sign about a metre in front of you, or on a wall within reach.</summary>
+        protected override void OnPlace(Camera view)
         {
-            Build();
-            if (view == null) return;
-            if (anchored && ShouldReanchor(view, dt)) anchored = false;
-            if (!anchored)
+            forward = Effects.FlatForward(view);
+            right = Vector3.Cross(Vector3.up, forward).normalized;
+            anchor = view.transform.position + forward * distance + Vector3.up * height;
+            scale = 1f;
+            // Once the room is scanned, a wall within reach takes the sign, a few centimetres off it, and the
+            // letters grow with the distance. Farther walls are out of reach for touching words, so the sign
+            // stays in front of you.
+            if (Room.WallAhead(view.transform.position, forward, distance * 1.6f, out var wall, out var onWall))
             {
-                forward = Effects.FlatForward(view);
+                forward = -wall.Normal;
                 right = Vector3.Cross(Vector3.up, forward).normalized;
-                anchor = view.transform.position + forward * distance + Vector3.up * height;
-                scale = 1f;
-                // Once the room is scanned, a wall within reach takes the sign, a few centimetres off it, and the
-                // letters grow with the distance. Farther walls are out of reach for touching words, so the sign
-                // stays in front of you.
-                if (Room.WallAhead(view.transform.position, forward, distance * 1.6f, out var wall, out var onWall))
-                {
-                    forward = -wall.Normal;
-                    right = Vector3.Cross(Vector3.up, forward).normalized;
-                    anchor = onWall + wall.Normal * 0.05f + Vector3.up * height;
-                    scale = Mathf.Max(1f, Vector3.Distance(view.transform.position, anchor) / distance);
-                }
-                floorY = Effects.FloorY(view);
-                SetSignVisible(true);
-                MarkAnchored(view);
-                anchored = true;
+                anchor = onWall + wall.Normal * 0.05f + Vector3.up * height;
+                scale = Mathf.Max(1f, Vector3.Distance(view.transform.position, anchor) / distance);
             }
-            clock += dt;
-            fade = Mathf.MoveTowards(fade, 1f, dt * 1.5f);
+            floorY = Effects.FloorY(view);
+            SetSignVisible(true);
+        }
 
-            if (cursor.Advance(music, out bool newLine))
-            {
-                if (newLine) LayOut(music);
-                LightUp(cursor.Index);
-            }
+        protected override void OnWord(string word, bool newLine)
+        {
+            if (newLine) LayOut(Music);
+            LightUp(Sung.Index);
+        }
+
+        protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
+        {
             if (rig != null) Touch(rig);
             Draw(music, view);
         }
@@ -164,8 +153,8 @@ namespace MusicInYourHands
         void LayOut(MusicFrame music)
         {
             lineColor = LineColors[lineNumber++ % LineColors.Length];
-            var texts = new List<string>(cursor.LineTexts);
-            if (texts.Count == 0) texts.Add(cursor.Word);
+            var texts = new List<string>(Sung.LineTexts);
+            if (texts.Count == 0) texts.Add(Sung.Word);
 
             float lh = letterHeight * scale;
             float space = lh * 0.45f;
@@ -215,7 +204,7 @@ namespace MusicInYourHands
         {
             if (index < 0 || index >= words.Count || !words[index].Used) return;
             var w = words[index];
-            w.LitAt = clock;
+            w.LitAt = Clock;
             if (Application.isPlaying) voices.Play(Synth.Buzz(), w.Centre, 0.18f);
         }
 
@@ -236,7 +225,7 @@ namespace MusicInYourHands
                         if (Mathf.Abs(Vector3.Dot(d, forward)) > 0.08f) continue;
                         if (Mathf.Abs(Vector3.Dot(d, right)) > w.Size.x * 0.5f + 0.02f || Mathf.Abs(d.y) > w.Size.y * 0.5f + 0.02f) continue;
                         w.Buzz = 1f;
-                        if (w.LitAt < 0f) w.LitAt = clock;
+                        if (w.LitAt < 0f) w.LitAt = Clock;
                         voices.Play(Synth.Buzz(), tip, 0.3f);
                         for (int s = 0; s < 14; s++)
                             sparks.Emit(new ParticleSystem.EmitParams
@@ -263,17 +252,17 @@ namespace MusicInYourHands
                 float on = 0f;
                 if (w.LitAt >= 0f)
                 {
-                    float age = clock - w.LitAt;
+                    float age = Clock - w.LitAt;
                     // Switching on: a few stutters, then steady, with a faint hum flicker after.
-                    on = age < 0.3f ? (Mathf.Sin(age * 90f) > 0.2f ? 1f : 0.15f) : 0.93f + 0.07f * Mathf.Sin(clock * 50f + w.Centre.x * 30f);
+                    on = age < 0.3f ? (Mathf.Sin(age * 90f) > 0.2f ? 1f : 0.15f) : 0.93f + 0.07f * Mathf.Sin(Clock * 50f + w.Centre.x * 30f);
                     lit++;
                 }
-                if (w.Buzz > 0f) on *= Mathf.Sin(clock * 70f) > -0.3f ? 1f : 0.2f;
+                if (w.Buzz > 0f) on *= Mathf.Sin(Clock * 70f) > -0.3f ? 1f : 0.2f;
                 var tube = Color.Lerp(new Color(0.42f, 0.4f, 0.46f), lineColor, on);
                 block.Clear();
                 block.SetColor(ColorId, new Color(tube.r * (0.5f + on), tube.g * (0.5f + on), tube.b * (0.5f + on), 0.35f + on * 0.65f));
                 block.SetFloat(HaloId, on * (0.85f + music.Kick * 0.3f));
-                block.SetFloat(AlphaId, fade);
+                block.SetFloat(AlphaId, FadeIn);
                 w.Renderer.SetPropertyBlock(block);
             }
 
@@ -282,7 +271,7 @@ namespace MusicInYourHands
             wallGlow.transform.localScale = new Vector3(frameSize.x * 3.2f, frameSize.y * 3.6f, 1f);
             block.Clear();
             block.SetColor(ColorId, lineColor);
-            block.SetFloat(IntensityId, (0.12f + glow * 0.3f + music.Kick * 0.08f) * fade);
+            block.SetFloat(IntensityId, (0.12f + glow * 0.3f + music.Kick * 0.08f) * FadeIn);
             wallGlow.SetPropertyBlock(block);
 
             var below = new Vector3(anchor.x, floorY + 0.004f, anchor.z) - forward * 0.3f;
@@ -290,7 +279,7 @@ namespace MusicInYourHands
             floorGlow.transform.localScale = new Vector3(frameSize.x * 3.5f, 1.4f, 1f);
             block.Clear();
             block.SetColor(ColorId, lineColor);
-            block.SetFloat(IntensityId, (0.1f + glow * 0.35f + music.Kick * 0.12f) * fade);
+            block.SetFloat(IntensityId, (0.1f + glow * 0.35f + music.Kick * 0.12f) * FadeIn);
             floorGlow.SetPropertyBlock(block);
 
             // A thin tube frame around the sign, lit with the line.
@@ -301,7 +290,7 @@ namespace MusicInYourHands
             framePath[3] = c + right * -frameSize.x - Vector3.up * frameSize.y;
             framePath[4] = framePath[0];
             var fc = lineColor;
-            fc.a = (0.25f + glow * 0.5f) * fade;
+            fc.a = (0.25f + glow * 0.5f) * FadeIn;
             frame.Set(framePath, framePath.Length, 0.006f, fc, view.transform.position, false);
         }
     }

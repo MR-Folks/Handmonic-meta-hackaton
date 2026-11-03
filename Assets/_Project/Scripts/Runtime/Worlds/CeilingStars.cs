@@ -13,6 +13,12 @@ namespace MusicInYourHands
     /// </summary>
     public class CeilingStars : World
     {
+        public override string DisplayName => "Ceiling stars";
+
+        public override Color Color => new Color(0.78f, 0.7f, 1f);
+
+        public override int MenuOrder => 180;
+
         public override int MenuIcon => 22;
 
         public override bool IsLyric => true;
@@ -29,8 +35,6 @@ namespace MusicInYourHands
         };
 
         [Header("Materials")]
-        [SerializeField] Material letteringMaterial;
-        [SerializeField] Material glowMaterial;
         [SerializeField] Material lineMaterial;
         [SerializeField] Material skyMaterial;
 
@@ -74,7 +78,6 @@ namespace MusicInYourHands
         }
 
         readonly Constellation[] skies = new Constellation[Sets];
-        readonly LyricCursor cursor = new LyricCursor();
         readonly Vector3[] linePath = new Vector3[StarsPerLine * 8];
         readonly Color[] lineColors = new Color[StarsPerLine * 8];
         Material material;
@@ -88,15 +91,14 @@ namespace MusicInYourHands
         LineStrip pointer;
         readonly Vector3[] pointerPath = new Vector3[2];
         int current = -1;
-        float clock, fade, readFade, readHold;
+        float readFade, readHold;
         Vector3 head, forward;
         float ceiling;
-        bool anchored, built;
 
-        public override void Build()
+        protected override float FadeInSeconds => 1f;
+
+        protected override void OnBuild()
         {
-            if (built) return;
-            built = true;
             block = new MaterialPropertyBlock();
             material = new Material(letteringMaterial) { name = "Star Lettering", mainTexture = TypeFace.Bold.Atlas };
             for (int s = 0; s < Sets; s++)
@@ -124,20 +126,14 @@ namespace MusicInYourHands
             pointer.SetVisible(false);
         }
 
-        protected override void OnEnable()
+        protected override void OnEnter()
         {
-            base.OnEnable();
-            anchored = false;
-            fade = 0f;
-            cursor.Reset();
             current = -1;
-            if (built) foreach (var sky in skies) Clear(sky);
+            foreach (var sky in skies) Clear(sky);
         }
 
-        protected override void OnDisable()
+        protected override void OnExit()
         {
-            base.OnDisable();
-            if (!built) return;
             foreach (var sky in skies) Clear(sky);
             reading.gameObject.SetActive(false);
             pointer.SetVisible(false);
@@ -157,34 +153,30 @@ namespace MusicInYourHands
             }
         }
 
-        public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
+        /// <summary>Opens the sky over where you stand: on the scanned ceiling, or a little above your head.</summary>
+        protected override void OnPlace(Camera view)
         {
-            Build();
-            if (view == null) return;
-            if (anchored && ShouldReanchor(view, dt)) anchored = false;
-            if (!anchored)
-            {
-                head = view.transform.position;
-                forward = Effects.FlatForward(view);
-                ceiling = Room.Ceiling(Mathf.Max(head.y + 0.85f, Effects.FloorY(view) + 2.4f));
-                PlaceSky();
-                MarkAnchored(view);
-                anchored = true;
-            }
-            clock += dt;
-            fade = Mathf.MoveTowards(fade, 1f, dt);
+            head = view.transform.position;
+            forward = Effects.FlatForward(view);
+            ceiling = Room.Ceiling(Mathf.Max(head.y + 0.85f, Effects.FloorY(view) + 2.4f));
+            PlaceSky();
+        }
 
-            if (cursor.Advance(music, out bool newLine))
+        /// <summary>Each sung word adds a star; a new line starts a new constellation while the last one fades.</summary>
+        protected override void OnWord(string word, bool newLine)
+        {
+            if (newLine || current < 0)
             {
-                if (newLine || current < 0)
-                {
-                    if (current >= 0) skies[current].Fading = clock;
-                    current = (current + 1) % Sets;
-                    Clear(skies[current]);
-                    skies[current].Turn = Random.Range(-spread * 0.4f, spread * 0.4f);
-                }
-                AddStar(skies[current], cursor.Word);
+                if (current >= 0) skies[current].Fading = Clock;
+                current = (current + 1) % Sets;
+                Clear(skies[current]);
+                skies[current].Turn = Random.Range(-spread * 0.4f, spread * 0.4f);
             }
+            AddStar(skies[current], word);
+        }
+
+        protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
+        {
             Point(rig, view, dt);
             foreach (var sky in skies) Draw(sky, music, view);
             DrawNightSky(music);
@@ -229,7 +221,7 @@ namespace MusicInYourHands
             block.Clear();
             block.SetVector(SizeId, skySize);
             block.SetFloat(SoftId, skySoft);
-            block.SetFloat(AlphaId, fade);
+            block.SetFloat(AlphaId, FadeIn);
             block.SetFloat(PulseId, music.Kick * 0.5f + music.Band(5) * 0.5f);
             nightSky.SetPropertyBlock(block);
         }
@@ -246,7 +238,7 @@ namespace MusicInYourHands
             var dir = Quaternion.AngleAxis(angle, Vector3.up) * forward;
             star.Position = new Vector3(head.x, ceiling, head.z) + dir * distance;
             star.Text = text;
-            star.Born = clock;
+            star.Born = Clock;
             star.Twinkle = Random.value * 6.28f;
             Glyphs.BuildWord(star.Mesh, TypeFace.Bold, text, 1f, 1, 0f, Color.white, Color.white);
             star.Light.gameObject.SetActive(true);
@@ -303,7 +295,7 @@ namespace MusicInYourHands
 
         void Draw(Constellation sky, MusicFrame music, Camera view)
         {
-            float skyFade = sky.Fading >= 0f ? 1f - Mathf.Clamp01((clock - sky.Fading) / 3f) : 1f;
+            float skyFade = sky.Fading >= 0f ? 1f - Mathf.Clamp01((Clock - sky.Fading) / 3f) : 1f;
             if (sky.Fading >= 0f && skyFade <= 0f) { Clear(sky); return; }
             var eye = view.transform.position;
             float hat = music.Band(5);
@@ -311,16 +303,16 @@ namespace MusicInYourHands
             for (int i = 0; i < sky.Count; i++)
             {
                 var star = sky.Stars[i];
-                float age = clock - star.Born;
+                float age = Clock - star.Born;
                 float appear = Mathf.Clamp01(age / 0.4f);
-                float twinkle = 0.7f + 0.3f * Mathf.Sin(clock * (3f + i % 3) + star.Twinkle) + hat * 0.3f;
+                float twinkle = 0.7f + 0.3f * Mathf.Sin(Clock * (3f + i % 3) + star.Twinkle) + hat * 0.3f;
                 bool picked = star == pointed;
                 star.Light.transform.position = star.Position;
                 star.Light.transform.localScale = Vector3.one * (0.07f + music.Kick * 0.03f + (picked ? 0.05f : 0f)) * appear;
                 Effects.Face(star.Light.transform, view);
                 block.Clear();
                 block.SetColor(ColorId, picked ? new Color(1f, 0.9f, 0.6f) : new Color(0.85f, 0.82f, 1f));
-                block.SetFloat(IntensityId, (1.1f * twinkle + (picked ? 0.8f : 0f)) * skyFade * fade);
+                block.SetFloat(IntensityId, (1.1f * twinkle + (picked ? 0.8f : 0f)) * skyFade * FadeIn);
                 star.Light.SetPropertyBlock(block);
 
                 // The word beside its star, turned to you.
@@ -330,7 +322,7 @@ namespace MusicInYourHands
                 star.Label.transform.localScale = Vector3.one * labelHeight;
                 block.Clear();
                 block.SetColor(ColorId, new Color(0.88f, 0.86f, 1f));
-                block.SetFloat(AlphaId, appear * 0.85f * skyFade * fade);
+                block.SetFloat(AlphaId, appear * 0.85f * skyFade * FadeIn);
                 star.Label.SetPropertyBlock(block);
 
                 // The line from the previous star draws itself across as the word arrives.
@@ -346,7 +338,7 @@ namespace MusicInYourHands
             }
             bool showLines = n >= 2;
             sky.Lines.SetVisible(showLines);
-            if (showLines) sky.Lines.Set(linePath, lineColors, n, 0.003f, new Color(1f, 1f, 1f, skyFade * fade), view.transform.position, false);
+            if (showLines) sky.Lines.Set(linePath, lineColors, n, 0.003f, new Color(1f, 1f, 1f, skyFade * FadeIn), view.transform.position, false);
         }
 
         /// <summary>The word of the star you point at, floating in front of you to read.</summary>
@@ -363,7 +355,7 @@ namespace MusicInYourHands
             reading.transform.localScale = Vector3.one * readHeight * (1f + music.Kick * 0.05f);
             block.Clear();
             block.SetColor(ColorId, new Color(1f, 0.92f, 0.75f));
-            block.SetFloat(AlphaId, readFade * fade);
+            block.SetFloat(AlphaId, readFade * FadeIn);
             reading.SetPropertyBlock(block);
         }
     }

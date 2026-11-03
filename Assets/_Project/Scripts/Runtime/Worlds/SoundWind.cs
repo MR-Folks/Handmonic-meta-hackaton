@@ -12,6 +12,12 @@ namespace MusicInYourHands
     /// </summary>
     public class SoundWind : World
     {
+        public override string DisplayName => "Sound wind";
+
+        public override Color Color => new Color(0.49f, 0.95f, 0.79f);
+
+        public override int MenuOrder => 70;
+
         public override int MenuIcon => 9;
 
         public override string Hint => "Put your hand in the school and spread your fingers";
@@ -24,10 +30,6 @@ namespace MusicInYourHands
             Pattern = HandTheme.Effect.Flow,
             PatternColor = new Color(0.6f, 0.95f, 0.9f)
         };
-
-        [Header("Materials")]
-        [SerializeField] Material glowMaterial;
-        [SerializeField] Material letteringMaterial;
 
         [Header("School")]
         [SerializeField] int count = 420;
@@ -58,14 +60,18 @@ namespace MusicInYourHands
         readonly Vector3[] obstacles = new Vector3[12];
         readonly float[] radii = new float[12];
         Vector3 centre;
-        float surge, flashTime = -10f, fade;
-        WordLayer words;
-        bool anchored, built;
+        float surge, flashTime = -10f;
 
-        public override void Build()
+        protected override float FadeInSeconds => 1f / 1.2f;
+
+        protected override int SungWordCount => 4;
+
+        protected override float SungWordHeight => 0.034f;
+
+        protected override float SungWordsAlpha => FadeIn;
+
+        protected override void OnBuild()
         {
-            if (built) return;
-            built = true;
             position = new Vector3[count];
             velocity = new Vector3[count];
             lane = new float[count];
@@ -104,79 +110,69 @@ namespace MusicInYourHands
             renderer.lengthScale = 2.2f;
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             renderer.receiveShadows = false;
-            if (letteringMaterial != null) words = new WordLayer("Lyric", transform, letteringMaterial, 4, 0.034f);
         }
 
-        protected override void OnEnable()
+        protected override void OnExit()
         {
-            base.OnEnable();
-            anchored = false;
-            fade = 0f;
-        }
-
-        protected override void OnDisable()
-        {
-            base.OnDisable();
             if (system != null) system.Clear();
-            words?.Clear();
         }
 
-        public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
+        /// <summary>The school circles you at chest height, starting out spread around the ring.</summary>
+        protected override void OnPlace(Camera view)
         {
-            Build();
-            if (view == null) return;
-            if (anchored && ShouldReanchor(view, dt)) anchored = false;
-            if (!anchored)
-            {
-                centre = view.transform.position + Vector3.up * height;
-                Scatter();
-                MarkAnchored(view);
-                anchored = true;
-            }
-            fade = Mathf.MoveTowards(fade, 1f, dt * 1.2f);
-            HandSkin.FocusPosition = centre;
-            HandSkin.FocusStrength = 0.7f * fade;
+            centre = view.transform.position + Vector3.up * height;
+            Scatter();
+        }
 
-            if (music.Beat)
-            {
-                surge = 1f;
-                flashTime = Now;
-            }
-            surge *= Mathf.Exp(-dt * 2.5f);
-
-            CollectObstacles(rig);
-            Swim(music, Mathf.Min(dt, 0.05f));
-            Draw(music);
-            Sing(music, view, dt);
+        /// <summary>On each beat a flash runs through the school and it surges forward.</summary>
+        protected override void OnBeat(MusicFrame music)
+        {
+            surge = 1f;
+            flashTime = Now;
         }
 
         /// <summary>
         /// Each sung word is carried by a fish swimming past in front of you: it rides just above the fish around the
         /// ring, turning to face you, until it fades.
         /// </summary>
-        void Sing(MusicFrame music, Camera view, float dt)
+        protected override void OnWord(string word, bool newLine)
         {
-            if (words == null) return;
-            var eye = view.transform.position;
-            if (words.Next(music, out var text, out _))
+            var eye = View.transform.position;
+            // The fish nearest to where you look, a little to the side the school swims from.
+            var look = Quaternion.AngleAxis(-20f, Vector3.up) * Effects.FlatForward(View);
+            int best = 0;
+            float bestScore = float.MinValue;
+            for (int k = 0; k < 60; k++)
             {
-                // The fish nearest to where you look, a little to the side the school swims from.
-                var look = Quaternion.AngleAxis(-20f, Vector3.up) * Effects.FlatForward(view);
-                int best = 0;
-                float bestScore = float.MinValue;
-                for (int k = 0; k < 60; k++)
-                {
-                    int i = Random.Range(0, count);
-                    var to = position[i] - eye;
-                    float score = Vector3.Dot(to.normalized, look) - Mathf.Abs(to.magnitude - 0.5f);
-                    if (score > bestScore) { bestScore = score; best = i; }
-                }
-                var w = words.Add(text, new Color(0.85f, 1f, 0.97f), 3f);
-                w.Slot = best;
-                w.Position = position[best];
+                int i = Random.Range(0, count);
+                var to = position[i] - eye;
+                float score = Vector3.Dot(to.normalized, look) - Mathf.Abs(to.magnitude - 0.5f);
+                if (score > bestScore) { bestScore = score; best = i; }
             }
-            words.Tick(dt);
-            foreach (var w in words.Words)
+            var w = SungWords.Add(word, new Color(0.85f, 1f, 0.97f), 3f);
+            w.Slot = best;
+            w.Position = position[best];
+        }
+
+        protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
+        {
+            HandSkin.FocusPosition = centre;
+            HandSkin.FocusStrength = 0.7f * FadeIn;
+
+            surge *= Mathf.Exp(-dt * 2.5f);
+
+            CollectObstacles(rig);
+            Swim(music, Mathf.Min(dt, 0.05f));
+            Draw(music);
+            Sing(view, dt);
+        }
+
+        /// <summary>The sung words ride along just above their fish, turned to face you.</summary>
+        void Sing(Camera view, float dt)
+        {
+            if (SungWords == null) return;
+            var eye = view.transform.position;
+            foreach (var w in SungWords.Words)
             {
                 if (!w.Active) continue;
                 var target = position[w.Slot] + Vector3.up * 0.025f;
@@ -184,7 +180,6 @@ namespace MusicInYourHands
                 w.Rotation = WordLayer.Facing(w.Position, eye);
                 w.Halo = 0.25f + surge * 0.35f;
             }
-            words.Draw(fade);
         }
 
         /// <summary>Starts the school spread around the ring, each fish already swimming its way.</summary>
@@ -317,7 +312,7 @@ namespace MusicInYourHands
                 float front = Mathf.Repeat(angle - age * 5f, Mathf.PI * 2f);
                 float flash = Mathf.Exp(-front * front * 6f) * Mathf.Exp(-age * 1.5f);
                 var c = Color.Lerp(Shades[shade[i]], Color.white, flash * 0.7f);
-                c.a = Mathf.Clamp01((0.75f + flash * 0.4f + music.Band(1 + shade[i] % 5) * 0.25f) * fade);
+                c.a = Mathf.Clamp01((0.75f + flash * 0.4f + music.Band(1 + shade[i] % 5) * 0.25f) * FadeIn);
                 float wiggle = 1f + Mathf.Sin(t * 14f + phase[i]) * 0.12f;
                 output[i] = new ParticleSystem.Particle
                 {

@@ -18,6 +18,7 @@ Assets/_Project/
     Runtime/Music/   MusicBus (bands, beats, song time), SongAsset, AddedSongs, AudiusSongs
     Runtime/Lyrics/  LyricsTrack (LRC parser and current line/word lookup)
     Runtime/Hands/   HandRig (palm, fingertips, pinch, fist, palm-up for every world)
+    Runtime/Worlds/  World (the base every world builds on), the worlds, the menu and its song page
     Runtime/Debug/   MusicDebugView and HandDebugView (in-headset checks)
     Meta/            OVRHandFeed (Meta hand tracking into HandRig)
     Editor/          Quest setup, scene builder, APK build, LRC importer
@@ -82,6 +83,30 @@ The app also streams a short, hand-picked list of songs from [Audius](https://au
 - **Credits.** Audius's [Open Music License](https://openaudiofoundation.org/open-music-license.pdf) lets music players stream its tracks. For commercial use (§1.5) it asks for the publisher's name, a copyright notice, a mention of the license and a link to the track. Each song on the Audius tab shows "© publisher", its **Credits** page shows all four, and while a song from Audius plays the menu shows a credit line under the song row. If an artist asks to be left out, take their song off the list.
 - Without internet, the Audius tab says it couldn't reach Audius and offers **Try again**, and a song that can't stream says so in the menu. Everything else works offline. If an artist removes or locks a track, it drops off the list; **Run Editor Checks** warns when a picked song can't play any more, and fails if a streamed song takes 100 ms or more to get ready.
 - The app sends Audius nothing about the person, but Audius and the servers its music comes from see each request, including the headset's IP address, so the app's privacy policy should mention it. The `INTERNET` permission this needs is in `Assets/Plugins/Android/AndroidManifest.xml`.
+
+## Adding a world
+Each world is one class in `Assets/_Project/Scripts/Runtime/Worlds` that extends `World`. The base class runs what every world shares, so a world describes itself and overrides the hooks it needs:
+
+| Hook | When it runs |
+| --- | --- |
+| `OnBuild()` | Once, to create the world's objects. |
+| `OnEnter()` / `OnExit()` | When the world is switched to, or away. Undo in `OnExit` anything it changed outside itself. |
+| `OnPlace(view)` | When the world starts, and again after you sit, stand, walk away or recenter, or the room scan changes. |
+| `OnBeat(music)` | On each beat. `Beats` counts them since the world started. |
+| `OnNote(note)` | When a note of the song's melody starts. |
+| `OnWord(word, newLine)` | When a sung word starts. Lyric worlds also get the title's words when a song has no lyrics. |
+| `OnPinch(hand, left)` / `OnRelease(hand, left)` | When a hand closes or opens a pinch. |
+| `OnStep(rig, music, view, dt)` | Every frame, after the hooks above. |
+
+A world can also read `FadeIn` (0 to 1 as it starts), `Sung` (the current word and where it is in its line), and `View`, `Rig` and `Music` (this frame's camera, hands and music). Setting `SungWordCount` gives it `SungWords`, a ready-made layer of sung words it only has to place.
+
+To add one:
+1. In the Project window, right-click `Assets/_Project/Scripts/Runtime/Worlds`, choose **Create > Music In Your Hands > World** and name it, say `PulseRings`. The new class already works: a ring of sparks on each beat and each pinch, with the sung words above it.
+2. Set its `DisplayName`, `Color`, `MenuOrder` (its place in the menu; the built-in worlds use 0 to 180 in steps of 10), `MenuIcon`, `Hint`, and `IsLyric` if it is built around the lyrics.
+3. Give it `Material` fields named after materials in `Assets/_Project/Materials` (`ringMaterial` gets `Ring.mat`), or name one with `[WorldMaterial("OrbDots")]`. `glowMaterial` and `letteringMaterial` come with `World`.
+4. Run **Music In Your Hands > Update Worlds in Main Scene** (Configure Project for Quest does it too, with the rest of the setup). It finds every World class, adds the new one to the scene in menu order, fills its materials and saves the scene. Then **Run Editor Checks**: it confirms every world is in the scene with its materials, and that the hooks fire as described.
+
+Nothing else keeps a list of worlds: the menu, the hints, the demo tour and the menu previews pick a new world up by themselves.
 
 ## Adding built-in songs
 1. Put the audio file and its `.lrc` lyrics in `Assets/_Project/Audio`.

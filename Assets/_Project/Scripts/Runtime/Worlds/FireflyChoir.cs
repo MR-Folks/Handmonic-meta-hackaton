@@ -13,6 +13,12 @@ namespace MusicInYourHands
     /// </summary>
     public class FireflyChoir : World
     {
+        public override string DisplayName => "Firefly choir";
+
+        public override Color Color => new Color(0.79f, 0.61f, 1f);
+
+        public override int MenuOrder => 50;
+
         public override int MenuIcon => 5;
 
         public override string Hint => "Hold out a hand and the fireflies gather around it";
@@ -27,9 +33,7 @@ namespace MusicInYourHands
         };
 
         [Header("Materials")]
-        [SerializeField] Material glowMaterial;
         [SerializeField] Material lineMaterial;
-        [SerializeField] Material letteringMaterial;
 
         [Header("Swarm")]
         [SerializeField] int count = 88;
@@ -83,19 +87,19 @@ namespace MusicInYourHands
         Color[] trailColors;
         float[] trailWidths, trailFlown;
         Renderer[] palmGlows;
-        WordLayer words;
         MaterialPropertyBlock block;
         Vector3 center, waveOrigin;
         float waveTime = -10f;
-        bool anchored, built;
         readonly bool[] open = new bool[2];
         readonly bool[] fist = new bool[2];
         readonly float[] landedOn = new float[2];
 
-        public override void Build()
+        protected override int SungWordCount => 5;
+
+        protected override float SungWordHeight => 0.04f;
+
+        protected override void OnBuild()
         {
-            if (built) return;
-            built = true;
             block = new MaterialPropertyBlock();
             flies = new Fly[count];
             trailPath = new Vector3[DrawPoints];
@@ -127,7 +131,6 @@ namespace MusicInYourHands
             }
             palmGlows = new[] { Effects.MakeQuad("Palm Glow L", transform, glowMaterial), Effects.MakeQuad("Palm Glow R", transform, glowMaterial) };
             foreach (var g in palmGlows) g.gameObject.SetActive(false);
-            if (letteringMaterial != null) words = new WordLayer("Lyric", transform, letteringMaterial, 5, 0.04f);
         }
 
         static void SetVisible(Fly f, bool visible)
@@ -137,56 +140,57 @@ namespace MusicInYourHands
             f.Trail.SetVisible(visible);
         }
 
-        protected override void OnEnable()
+        protected override void OnExit()
         {
-            base.OnEnable();
-            anchored = false;
-        }
-
-        protected override void OnDisable()
-        {
-            base.OnDisable();
-            if (flies == null) return;
             foreach (var f in flies) SetVisible(f, false);
             foreach (var g in palmGlows) g.gameObject.SetActive(false);
-            words?.Clear();
         }
 
-        public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
+        /// <summary>The swarm lives around you, centred a little below your eyes.</summary>
+        protected override void OnPlace(Camera view)
         {
-            Build();
-            if (view == null) return;
-            float t = Now;
-            if (anchored && ShouldReanchor(view, dt)) anchored = false;
-            if (!anchored)
+            center = view.transform.position + Vector3.down * 0.25f;
+            var nearby = new List<Room.Surface>();
+            foreach (var top in Room.Tops)
+                if (Vector3.ProjectOnPlane(top.Center - center, Vector3.up).magnitude < 2.4f) nearby.Add(top);
+            var perch = new System.Random(5);
+            for (int i = 0; i < flies.Length; i++)
             {
-                // The swarm lives around you, centred a little below your eyes.
-                center = view.transform.position + Vector3.down * 0.25f;
-                var nearby = new List<Room.Surface>();
-                foreach (var top in Room.Tops)
-                    if (Vector3.ProjectOnPlane(top.Center - center, Vector3.up).magnitude < 2.4f) nearby.Add(top);
-                var perch = new System.Random(5);
-                for (int i = 0; i < flies.Length; i++)
+                var f = flies[i];
+                f.Home = f.FreeHome;
+                // With a room scan, some fireflies settle just above your table, sofa and shelves.
+                if (nearby.Count > 0 && i % 3 == 1)
                 {
-                    var f = flies[i];
-                    f.Home = f.FreeHome;
-                    // With a room scan, some fireflies settle just above your table, sofa and shelves.
-                    if (nearby.Count > 0 && i % 3 == 1)
-                    {
-                        var top = nearby[i / 3 % nearby.Count];
-                        var spot = top.Center + top.Right * (((float)perch.NextDouble() - 0.5f) * top.Size.x * 0.8f)
-                            + top.Up * (((float)perch.NextDouble() - 0.5f) * top.Size.y * 0.8f) + Vector3.up * (0.06f + (float)perch.NextDouble() * 0.2f);
-                        f.Home = spot - center;
-                    }
-                    f.Position = center + f.Home;
-                    f.Velocity = Vector3.zero;
-                    for (int k = 0; k < TrailPoints; k++) f.History[k] = f.Position;
-                    SetVisible(f, true);
+                    var top = nearby[i / 3 % nearby.Count];
+                    var spot = top.Center + top.Right * (((float)perch.NextDouble() - 0.5f) * top.Size.x * 0.8f)
+                        + top.Up * (((float)perch.NextDouble() - 0.5f) * top.Size.y * 0.8f) + Vector3.up * (0.06f + (float)perch.NextDouble() * 0.2f);
+                    f.Home = spot - center;
                 }
-                MarkAnchored(view);
-                anchored = true;
+                f.Position = center + f.Home;
+                f.Velocity = Vector3.zero;
+                for (int k = 0; k < TrailPoints; k++) f.History[k] = f.Position;
+                SetVisible(f, true);
             }
+        }
 
+        /// <summary>
+        /// Each sung word lights up among the fireflies in front of you, glowing in their gold, and floats slowly up
+        /// as it fades, the line spreading from left to right.
+        /// </summary>
+        protected override void OnWord(string word, bool newLine)
+        {
+            var eye = View.transform.position;
+            // A new line clears the last one, whose words would otherwise land on top of the new ones.
+            var w = SungWords.Add(word, Color.Lerp(Effects.Gold, Color.white, 0.25f), 2.8f, newLine);
+            float angle = ((Sung.Index % 5) - 2) * 14f + (w.Seed - 0.5f) * 8f;
+            var dir = Quaternion.AngleAxis(angle, Vector3.up) * Effects.FlatForward(View);
+            w.Position = eye + dir * 0.75f + Vector3.down * (0.12f - (w.Seed - 0.5f) * 0.1f);
+            w.Velocity = Vector3.up * 0.025f;
+        }
+
+        protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
+        {
+            float t = Now;
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
@@ -238,28 +242,10 @@ namespace MusicInYourHands
             }
 
             DrawPalms(rig, view);
-            Sing(music, view, dt);
-        }
 
-        /// <summary>
-        /// Each sung word lights up among the fireflies in front of you, glowing in their gold, and floats slowly up
-        /// as it fades, the line spreading from left to right.
-        /// </summary>
-        void Sing(MusicFrame music, Camera view, float dt)
-        {
-            if (words == null) return;
+            // The sung words float slowly up.
             var eye = view.transform.position;
-            if (words.Next(music, out var text, out bool newLine))
-            {
-                // A new line clears the last one, whose words would otherwise land on top of the new ones.
-                var w = words.Add(text, Color.Lerp(Effects.Gold, Color.white, 0.25f), 2.8f, newLine);
-                float angle = ((words.Index % 5) - 2) * 14f + (w.Seed - 0.5f) * 8f;
-                var dir = Quaternion.AngleAxis(angle, Vector3.up) * Effects.FlatForward(view);
-                w.Position = eye + dir * 0.75f + Vector3.down * (0.12f - (w.Seed - 0.5f) * 0.1f);
-                w.Velocity = Vector3.up * 0.025f;
-            }
-            words.Tick(dt);
-            foreach (var w in words.Words)
+            foreach (var w in SungWords.Words)
             {
                 if (!w.Active) continue;
                 w.Position += w.Velocity * dt;
@@ -267,7 +253,6 @@ namespace MusicInYourHands
                 // A firefly's flicker.
                 w.Halo = 0.5f + Mathf.Sin(Now * 7f + w.Seed * 20f) * 0.15f + music.Kick * 0.25f;
             }
-            words.Draw(1f);
         }
 
         Vector3 Target(HandRig rig, Fly f, int i, int side, float t, out float pull)

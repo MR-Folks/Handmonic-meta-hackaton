@@ -12,6 +12,12 @@ namespace MusicInYourHands
     /// </summary>
     public class WaveformRibbon : World
     {
+        public override string DisplayName => "Waveform ribbon";
+
+        public override Color Color => new Color(1f, 0.7f, 0.42f);
+
+        public override int MenuOrder => 20;
+
         public override int MenuIcon => 2;
 
         public override string Hint => "Pinch with both hands and pull them apart";
@@ -27,9 +33,7 @@ namespace MusicInYourHands
 
         [Header("Materials")]
         [SerializeField] Material lineMaterial;
-        [SerializeField] Material glowMaterial;
         [SerializeField] Material silkMaterial;
-        [SerializeField] Material letteringMaterial;
 
         [Header("Ribbon")]
         [SerializeField] int points = 96;
@@ -142,17 +146,22 @@ namespace MusicInYourHands
         Renderer[] grips;
         Vector3[] path, pathB;
         MaterialPropertyBlock block;
-        WordLayer words;
         Color colorA = Effects.Gold, colorB = Effects.Pink;
         Vector3 lastA, lastB;
         float hold, ribbonLength, look;
         int beats, lookTarget;
-        bool held, built;
+        bool held;
+        // Whether the ribbon is drawn this frame (set in OnStep), for the sung words' fade.
+        bool showing;
 
-        public override void Build()
+        protected override int SungWordCount => 4;
+
+        protected override float SungWordHeight => 0.028f;
+
+        protected override float SungWordsAlpha => showing ? hold : 0f;
+
+        protected override void OnBuild()
         {
-            if (built) return;
-            built = true;
             block = new MaterialPropertyBlock();
             path = new Vector3[points];
             pathB = new Vector3[points];
@@ -163,13 +172,11 @@ namespace MusicInYourHands
             for (int i = 0; i < Ghosts; i++) ghosts[i] = new Silk($"Silk Trail {i}", transform, silkMaterial, points);
             grips = new Renderer[2];
             for (int i = 0; i < grips.Length; i++) grips[i] = Effects.MakeQuad($"Grip {i}", transform, glowMaterial);
-            if (letteringMaterial != null) words = new WordLayer("Lyric", transform, letteringMaterial, 4, 0.028f);
             Hide();
         }
 
-        protected override void OnDisable()
+        protected override void OnExit()
         {
-            base.OnDisable();
             held = false;
             hold = 0f;
             if (HandRig.Instance != null)
@@ -177,7 +184,7 @@ namespace MusicInYourHands
                 Effects.OffsetHand(HandRig.Instance.Left, Vector3.zero);
                 Effects.OffsetHand(HandRig.Instance.Right, Vector3.zero);
             }
-            if (built) Hide();
+            Hide();
         }
 
         void Hide()
@@ -186,7 +193,6 @@ namespace MusicInYourHands
             foreach (var g in grips) g.gameObject.SetActive(false);
             silk.SetVisible(false);
             foreach (var g in ghosts) { g.Age = -1f; g.SetVisible(false); }
-            words?.Clear();
         }
 
         static Vector3 PinchPoint(HandRig.Hand hand)
@@ -196,9 +202,23 @@ namespace MusicInYourHands
             return (thumb + index) * 0.5f;
         }
 
-        public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
+        /// <summary>The silk's inside moves on to its next look every few beats.</summary>
+        protected override void OnBeat(MusicFrame music)
         {
-            Build();
+            if (++beats % Mathf.Max(1, beatsPerLook) == 0) lookTarget++;
+        }
+
+        /// <summary>Each sung word rides along the ribbon from your left hand to your right, just above the silk.</summary>
+        protected override void OnWord(string word, bool newLine)
+        {
+            // In the left and the right hand's colours by turns. OnStep moves those (colorA, colorB) along the palette
+            // only after the words, so work out this frame's from the clock.
+            float colorStep = Now / Mathf.Max(0.1f, secondsPerColor);
+            SungWords.Add(word, PaletteColor(Sung.Index % 2 == 0 ? colorStep : colorStep + ColorSpread), 2.6f);
+        }
+
+        protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
+        {
             var left = rig.Left;
             var right = rig.Right;
             bool tracked = left.IsTracked && right.IsTracked;
@@ -206,8 +226,7 @@ namespace MusicInYourHands
             held = tracked && left.Pinch > need && right.Pinch > need && !left.InSystemGesture && !right.InSystemGesture;
             hold = Mathf.MoveTowards(hold, held ? 1f : 0f, dt * (held ? 6f : 2.5f));
 
-            // The silk's inside moves on every few beats, taking two seconds over each change.
-            if (music.Beat && ++beats % Mathf.Max(1, beatsPerLook) == 0) lookTarget++;
+            // The silk's inside moves on every few beats (OnBeat), taking two seconds over each change.
             look = Mathf.MoveTowards(look, lookTarget, dt * 0.5f);
 
             float colorStep = Now / Mathf.Max(0.1f, secondsPerColor);
@@ -227,10 +246,10 @@ namespace MusicInYourHands
 
             UpdateGrips(rig, music, view);
 
-            bool show = hold > 0.001f && view != null;
-            foreach (var s in strands) s.SetVisible(show);
-            silk.SetVisible(show);
-            if (show) DrawRibbon(music, view, dt);
+            showing = hold > 0.001f && view != null;
+            foreach (var s in strands) s.SetVisible(showing);
+            silk.SetVisible(showing);
+            if (showing) DrawRibbon(music, view, dt);
             UpdateGhosts(music, dt);
 
             // Fake resistance: on each beat the ribbon tugs the visible hands towards each other.
@@ -238,7 +257,7 @@ namespace MusicInYourHands
             float amount = held ? tug * music.Kick : 0f;
             Effects.OffsetHand(left, pull * amount);
             Effects.OffsetHand(right, -pull * amount);
-            Sing(music, view, show, dt);
+            Sing(music, view);
         }
 
         /// <summary>The palette's colour at a step along it, easing from each colour into the next and round again.</summary>
@@ -249,14 +268,12 @@ namespace MusicInYourHands
             return Color.Lerp(Palette[from], Palette[(from + 1) % Palette.Length], Mathf.SmoothStep(0f, 1f, step - from));
         }
 
-        /// <summary>Each sung word rides along the ribbon from your left hand to your right, just above the silk.</summary>
-        void Sing(MusicFrame music, Camera view, bool show, float dt)
+        /// <summary>Carries each sung word along the ribbon over its life, from the left hand to the right, turned to you.</summary>
+        void Sing(MusicFrame music, Camera view)
         {
-            if (words == null || view == null) return;
-            if (words.Next(music, out var text, out _)) words.Add(text, words.Index % 2 == 0 ? colorA : colorB, 2.6f);
-            words.Tick(dt);
+            if (SungWords == null) return;
             var eye = view.transform.position;
-            foreach (var w in words.Words)
+            foreach (var w in SungWords.Words)
             {
                 if (!w.Active) continue;
                 float t = Mathf.Clamp01(w.Age / w.Life) * (path.Length - 1);
@@ -265,7 +282,6 @@ namespace MusicInYourHands
                 w.Rotation = WordLayer.Facing(w.Position, eye);
                 w.Halo = 0.2f + music.Kick * 0.3f;
             }
-            words.Draw(show ? hold : 0f);
         }
 
         void DrawRibbon(MusicFrame music, Camera view, float dt)

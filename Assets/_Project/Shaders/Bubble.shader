@@ -6,7 +6,7 @@ Shader "MusicInYourHands/Bubble"
     Properties
     {
         _Color ("Color", Color) = (1, 0.37, 0.68, 1)
-        _Icon ("Emblem (-1 none, 0-24)", Float) = 0
+        _Icon ("Emblem (-1 none, 0-28)", Float) = 0
         _Hover ("Hover 0-1", Float) = 0
         _Selected ("Current world 0-1", Float) = 0
         _Alpha ("Alpha", Float) = 1
@@ -336,11 +336,155 @@ Shader "MusicInYourHands/Bubble"
                         e += bar * (0.55 + 0.45 * step(frac(t * 0.4 - k * 0.33), 0.33));
                     }
                 }
-                else
+                else if (icon < 24.5)
                 {
                     // Add a song: a plus, gently breathing.
                     float size = 0.46 + 0.03 * sin(t * 2.5);
                     e = max(step(abs(p.x), 0.075) * step(abs(p.y), size), step(abs(p.y), 0.075) * step(abs(p.x), size));
+                }
+                else if (icon < 25.5)
+                {
+                    // BEGIN emblem 25 (Solar system)
+                    // Solar system: a glowing sun and three planets going round it on tipped orbits, the outer one ringed.
+                    float disc = smoothstep(0.2, 0.16, length(p));
+                    e = disc + exp(-dot(p, p) * 16.0) * (0.45 + 0.2 * sin(t * 3.0));
+                    [unroll] for (int k = 0; k < 3; k++)
+                    {
+                        float r = 0.34 + k * 0.19;
+                        float2 q = float2(p.x, p.y / 0.5);
+                        float stretch = length(float2(p.x, p.y / 0.25)) / max(length(q), 1e-3);
+                        e += Line(abs(length(q) - r) / max(stretch, 1e-3), 0.035) * 0.55;
+                        float a = t * (0.9 - k * 0.25) + k * 2.3;
+                        float2 c = float2(cos(a), sin(a) * 0.5) * r;
+                        float size = 0.07 + k * 0.016;
+                        // Planets on the far side pass behind the sun.
+                        float hidden = sin(a) > 0 ? 1 - disc : 1;
+                        e += smoothstep(size, size - 0.03, length(p - c)) * hidden;
+                        if (k == 2) e += Line(abs(length(float2(p.x - c.x, (p.y - c.y) / 0.35)) - size * 1.8), 0.03) * 0.85 * hidden;
+                    }
+                    // END emblem 25
+                }
+                else if (icon < 26.5)
+                {
+                    // BEGIN emblem 26 (Flower dance)
+                    // A flower bopping from side to side on the beat, its leaves lifting like arms; every fourth beat
+                    // its head pops open bigger.
+                    float2 g = (p - float2(0, 0.06)) / 1.2;
+                    float beat = t * 1.6;
+                    float hit = frac(beat);
+                    float lean = (fmod(floor(beat), 2) < 0.5 ? 1 : -1) * cos(3.1416 * smoothstep(0.1, 0.9, hit));
+                    float pop = 1 + 0.22 * exp(-frac(beat * 0.25) * 10);
+                    float2 head = float2(lean * 0.2, 0.17 - 0.05 * exp(-hit * 7));
+                    // The stem: a curve from the ground, upright at first, bending over to the head.
+                    float stem = 9;
+                    float2 s0 = float2(0, -0.72);
+                    [unroll] for (int k = 1; k <= 6; k++)
+                    {
+                        float u = k / 6.0;
+                        float2 s1 = float2(head.x * u * u, lerp(-0.72, head.y, u));
+                        stem = min(stem, Segment(g, s0, s1));
+                        s0 = s1;
+                    }
+                    e = Line(stem, 0.032);
+                    // Two leaves low on the stem, lifting on the beat.
+                    float lift = 0.35 + 0.45 * exp(-hit * 4);
+                    [unroll] for (int j = 0; j < 2; j++)
+                    {
+                        float side = j == 0 ? -1 : 1;
+                        float y = -0.56 + j * 0.1;
+                        float2 root = float2(head.x * pow((y + 0.72) / (head.y + 0.72), 2), y);
+                        float2 axis = float2(side * cos(lift), sin(lift));
+                        float2 q = g - root - axis * 0.13;
+                        float along = dot(q, axis), across = dot(q, float2(-axis.y, axis.x));
+                        e += smoothstep(1.0, 0.8, length(float2(along / 0.13, across / 0.06)));
+                    }
+                    // The head: five round petals, a ring of space, and the centre.
+                    float2 c = g - head;
+                    float petals = 0;
+                    [unroll] for (int m = 0; m < 5; m++)
+                    {
+                        float a = m * 1.2566 + 1.5708 + lean * 0.35;
+                        petals = max(petals, smoothstep(0.12, 0.095, length(c - float2(cos(a), sin(a)) * 0.15 * pop) / pop));
+                    }
+                    float r = length(c) / pop;
+                    e = max(saturate(e), max(petals * smoothstep(0.075, 0.1, r), smoothstep(0.07, 0.05, r)));
+                    // END emblem 26
+                }
+                else if (icon < 27.5)
+                {
+                    // BEGIN emblem 27 (Cube field)
+                    // A small field of blocks seen from above at an angle, the far ones taller, rising and falling as a
+                    // ripple runs out from the front corner. Drawn back to front, so the near blocks cover the far ones.
+                    [unroll] for (int k = 0; k < 9; k++)
+                    {
+                        float i = floor(k / 3.0), j = k - i * 3;
+                        float2 q = p - float2((i - j) * 0.27, -0.18 - (i + j - 2) * 0.155);
+                        float away = (4 - i - j) / 4;
+                        float h = 0.05 + away * 0.24 + (0.06 + away * 0.08) * (0.5 + 0.5 * sin(t * 2.4 + (i + j) * 1.3 + i * 0.5));
+                        float ax = abs(q.x);
+                        float rh = 0.11 - ax * 0.579;
+                        float inside = step(ax, 0.19) * step(-rh, q.y) * step(q.y, h + rh);
+                        float lid = step(abs(q.y - h), rh);
+                        float shade = lid > 0.5 ? 1 : (q.x < 0 ? 0.55 : 0.32);
+                        e = inside > 0.5 ? shade : e;
+                    }
+                    // END emblem 27
+                }
+                else
+                {
+                    // BEGIN emblem 28 (Four elements)
+                    // The four elements in turn, each fading into the next: a flickering flame, a drop of water, a rock
+                    // with two peaks, and lines of wind. Four dots round it, one per element, show which is up.
+                    float phase = t / 1.6;
+                    float lit = fmod(floor(phase), 4);
+                    float blend = smoothstep(0.8, 1.0, frac(phase));
+                    float4 show = (1 - step(0.5, abs(lit - float4(0, 1, 2, 3)))) * (1 - blend)
+                                + (1 - step(0.5, abs(fmod(lit + 1, 4) - float4(0, 1, 2, 3)))) * blend;
+                    // A flame: one tall tongue and two small ones leaning out beside it, flickering towards their tips.
+                    float flame = 0;
+                    [unroll] for (int f = 0; f < 3; f++)
+                    {
+                        float side = f == 0 ? 0 : (f == 1 ? -1 : 1);
+                        float2 g = p - float2(side * 0.16, f == 0 ? -0.36 : -0.33);
+                        float tall = f == 0 ? 0.78 : 0.36;
+                        float u = g.y / tall;
+                        g.x -= side * g.y * 0.45;
+                        g.x += 0.035 * sin(g.y * 14 - t * 9 + f * 2) * saturate(u);
+                        float cap = saturate(1 - u / 0.28);
+                        float width = (f == 0 ? 0.22 : 0.1) * (u < 0.28 ? sqrt(1 - cap * cap) : pow(saturate((1 - u) / 0.72), 1.15));
+                        flame = max(flame, smoothstep(0.015, -0.01, abs(g.x) - width) * step(0, u) * step(u, 1));
+                    }
+                    // A drop of water with a ripple spreading under it.
+                    float2 gd = p - float2(0, -0.16);
+                    float ud = gd.y / 0.62;
+                    float bottom = saturate(1 - ud / 0.42);
+                    float drop = smoothstep(0.015, -0.01, abs(gd.x) - 0.25 * (ud < 0.42 ? sqrt(1 - bottom * bottom) : pow(saturate((1 - ud) / 0.58), 0.85))) * step(0, ud) * step(ud, 1);
+                    float2 shine = (p - float2(-0.1, 0.13)) * float2(1.6, 1);
+                    drop *= 1 - 0.8 * smoothstep(0.015, 0, length(shine) - 0.05);
+                    float2 rr = (p - float2(0, -0.3)) * float2(1, 3.2);
+                    drop = max(drop, Line(abs(length(rr) - 0.32 - 0.04 * frac(t)), 0.06) * step(0.03, abs(rr.x)) * (1 - frac(t) * 0.5));
+                    // A rock with two peaks.
+                    float peaks = max(0.36 - abs(p.x + 0.08) * 1.15, 0.13 - abs(p.x - 0.25) * 1.15) - p.y;
+                    float rock = smoothstep(-0.01, 0.02, min(peaks, p.y + 0.3));
+                    // Lines of wind, rippling.
+                    float wind = 0;
+                    [unroll] for (int k = 0; k < 3; k++)
+                    {
+                        float yk = (1 - k) * 0.18 - 0.02;
+                        float reach = k == 1 ? 0.36 : (k == 0 ? 0.26 : 0.2);
+                        float x0 = k == 1 ? 0.0 : (k == 0 ? -0.08 : 0.1);
+                        float2 s = float2(p.x, p.y - 0.035 * sin(p.x * 11 - t * 5 + k * 2.1));
+                        wind += Line(Segment(s, float2(x0 - reach, yk), float2(x0 + reach, yk)), 0.045);
+                    }
+                    e = flame * show.x + drop * show.y + rock * show.z + saturate(wind) * show.w;
+                    // The four dots: fire at the top, then water, earth and air round to the left.
+                    [unroll] for (int j = 0; j < 4; j++)
+                    {
+                        float angle = 1.5708 - j * 1.5708;
+                        float2 d = p - float2(cos(angle), sin(angle)) * 0.68;
+                        e += smoothstep(0.05, 0.03, length(d)) * (0.35 + 0.65 * show[j]);
+                    }
+                    // END emblem 28
                 }
                 return saturate(e);
             }

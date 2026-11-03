@@ -11,6 +11,12 @@ namespace MusicInYourHands
     /// </summary>
     public class RisingFloor : World
     {
+        public override string DisplayName => "Rising floor";
+
+        public override Color Color => new Color(0.5f, 0.88f, 1f);
+
+        public override int MenuOrder => 160;
+
         public override int MenuIcon => 20;
 
         public override bool IsLyric => true;
@@ -27,9 +33,7 @@ namespace MusicInYourHands
         };
 
         [Header("Materials")]
-        [SerializeField] Material letteringMaterial;
         [SerializeField] Material ringMaterial;
-        [SerializeField] Material glowMaterial;
 
         [Header("Words")]
         [Tooltip("How far in front of you the arc of words stands (m).")]
@@ -70,19 +74,15 @@ namespace MusicInYourHands
 
         readonly List<Stalk> stalks = new List<Stalk>();
         readonly List<Stalk> sinking = new List<Stalk>();
-        readonly LyricCursor cursor = new LyricCursor();
         Material material;
         MaterialPropertyBlock block;
         ParticleSystem splashes;
         Vector3 head, forward, right;
-        float floorY, clock, fade;
+        float floorY;
         int lineNumber;
-        bool anchored, built;
 
-        public override void Build()
+        protected override void OnBuild()
         {
-            if (built) return;
-            built = true;
             block = new MaterialPropertyBlock();
             material = new Material(letteringMaterial) { name = "Rising Lettering", mainTexture = TypeFace.Bold.Atlas };
             // Two sets of words, so one line can sink while the next one rises.
@@ -100,19 +100,13 @@ namespace MusicInYourHands
             main.gravityModifier = 0.4f;
         }
 
-        protected override void OnEnable()
+        protected override void OnEnter()
         {
-            base.OnEnable();
-            anchored = false;
-            fade = 0f;
-            cursor.Reset();
-            if (built) foreach (var s in stalks) Retire(s);
+            foreach (var s in stalks) Retire(s);
         }
 
-        protected override void OnDisable()
+        protected override void OnExit()
         {
-            base.OnDisable();
-            if (!built) return;
             foreach (var s in stalks) Retire(s);
             splashes.Clear();
         }
@@ -125,29 +119,24 @@ namespace MusicInYourHands
             s.Ripple.gameObject.SetActive(false);
         }
 
-        public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
+        /// <summary>The words grow out of the floor in front of where you stand.</summary>
+        protected override void OnPlace(Camera view)
         {
-            Build();
-            if (view == null) return;
-            if (anchored && ShouldReanchor(view, dt)) anchored = false;
-            if (!anchored)
-            {
-                head = view.transform.position;
-                forward = Effects.FlatForward(view);
-                right = Vector3.Cross(Vector3.up, forward).normalized;
-                floorY = Effects.FloorY(view);
-                MarkAnchored(view);
-                anchored = true;
-            }
-            clock += dt;
-            fade = Mathf.MoveTowards(fade, 1f, dt * 1.5f);
+            head = view.transform.position;
+            forward = Effects.FlatForward(view);
+            right = Vector3.Cross(Vector3.up, forward).normalized;
+            floorY = Effects.FloorY(view);
+        }
 
-            if (cursor.Advance(music, out bool newLine))
-            {
-                if (newLine) Plant();
-                foreach (var s in stalks)
-                    if (s.Used && s.SinkAt < 0f && s.RiseAt < 0f && s.Line == lineNumber && s.Index == cursor.Index) Raise(s);
-            }
+        protected override void OnWord(string word, bool newLine)
+        {
+            if (newLine) Plant();
+            foreach (var s in stalks)
+                if (s.Used && s.SinkAt < 0f && s.RiseAt < 0f && s.Line == lineNumber && s.Index == Sung.Index) Raise(s);
+        }
+
+        protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
+        {
 
             // Anything below the floor is hidden, so words seem to come out of it.
             var toFloor = Matrix4x4.Translate(new Vector3(0f, -(floorY + 1.5f), 0f));
@@ -163,9 +152,9 @@ namespace MusicInYourHands
         /// </summary>
         void Plant()
         {
-            foreach (var s in stalks) if (s.Used && s.SinkAt < 0f) s.SinkAt = clock;
+            foreach (var s in stalks) if (s.Used && s.SinkAt < 0f) s.SinkAt = Clock;
             lineNumber++;
-            var texts = cursor.LineTexts.Length > 0 ? cursor.LineTexts : new[] { cursor.Word };
+            var texts = Sung.LineTexts.Length > 0 ? Sung.LineTexts : new[] { Sung.Word };
             int count = Mathf.Min(texts.Length, MaxWords);
             var color = LineColors[lineNumber % LineColors.Length];
             for (int i = 0; i < count; i++)
@@ -190,7 +179,7 @@ namespace MusicInYourHands
 
         void Raise(Stalk s)
         {
-            s.RiseAt = clock;
+            s.RiseAt = Clock;
             s.RippleAge = 0f;
             s.Ripple.gameObject.SetActive(true);
             for (int k = 0; k < 16; k++)
@@ -247,7 +236,7 @@ namespace MusicInYourHands
                 if (s.SinkAt >= 0f) target = 0f;
                 float speed = s.SinkAt >= 0f ? 1.6f : 5f;
                 s.Rise = Mathf.MoveTowards(s.Rise, target, dt * speed);
-                float age = s.RiseAt >= 0f ? clock - s.RiseAt : 0f;
+                float age = s.RiseAt >= 0f ? Clock - s.RiseAt : 0f;
                 float wobble = s.RiseAt >= 0f && s.SinkAt < 0f ? Mathf.Exp(-age * 4f) * Mathf.Sin(age * 18f) * 0.2f : 0f;
                 float stretchY = 1f + wobble, stretchX = 1f - wobble * 0.5f;
                 if (s.SinkAt >= 0f && s.Rise <= 0f) { Retire(s); continue; }
@@ -264,7 +253,7 @@ namespace MusicInYourHands
                 s.Renderer.transform.localScale = new Vector3(size * stretchX, size * stretchY, size);
                 block.Clear();
                 block.SetColor(ColorId, Color.Lerp(s.Color, Color.white, 0.35f));
-                block.SetFloat(AlphaId, fade);
+                block.SetFloat(AlphaId, FadeIn);
                 s.Renderer.SetPropertyBlock(block);
 
                 if (s.RippleAge >= 0f)
@@ -280,7 +269,7 @@ namespace MusicInYourHands
                         block.SetColor(ColorId, s.Color);
                         block.SetFloat(RadiusId, 0.8f);
                         block.SetFloat(ThicknessId, 0.03f);
-                        block.SetFloat(AlphaId, (1f - u) * (1f - u) * fade);
+                        block.SetFloat(AlphaId, (1f - u) * (1f - u) * FadeIn);
                         s.Ripple.SetPropertyBlock(block);
                     }
                 }

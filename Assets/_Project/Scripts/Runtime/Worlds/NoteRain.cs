@@ -14,6 +14,12 @@ namespace MusicInYourHands
     /// </summary>
     public class NoteRain : World
     {
+        public override string DisplayName => "Note rain";
+
+        public override Color Color => new Color(0.5f, 0.72f, 1f);
+
+        public override int MenuOrder => 40;
+
         public override int MenuIcon => 4;
 
         public override string Hint => "Hold out a palm and catch the falling notes";
@@ -28,10 +34,8 @@ namespace MusicInYourHands
         };
 
         [Header("Materials")]
-        [SerializeField] Material glowMaterial;
         [SerializeField] Material streakMaterial;
         [SerializeField] Material ringMaterial;
-        [SerializeField] Material letteringMaterial;
 
         [Header("Rain")]
         [SerializeField] float areaWidth = 0.9f;
@@ -94,19 +98,19 @@ namespace MusicInYourHands
         readonly Color[] expectColor = { Effects.Blue, Effects.Blue };
         readonly Color[] chargeColor = { Effects.Blue, Effects.Blue };
         Renderer[] palmGlows;
-        WordLayer words;
         AudioPool voices;
         ParticleSystem sparks;
         MaterialPropertyBlock block;
         Vector3 center, right, forward, head;
         float floorY, spawnY, songTime, beatGlow, drizzleDebt;
         MusicFrame frame;
-        bool anchored, built;
 
-        public override void Build()
+        protected override int SungWordCount => 6;
+
+        protected override float SungWordHeight => 0.04f;
+
+        protected override void OnBuild()
         {
-            if (built) return;
-            built = true;
             block = new MaterialPropertyBlock();
             for (int i = 0; i < maxDrops; i++)
             {
@@ -131,19 +135,15 @@ namespace MusicInYourHands
             palmGlows = new[] { Effects.MakeQuad("Palm Glow L", transform, glowMaterial), Effects.MakeQuad("Palm Glow R", transform, glowMaterial) };
             voices = new AudioPool(transform, 6);
             sparks = Effects.MakeSparkSystem("Sparks", transform, glowMaterial);
-            if (letteringMaterial != null) words = new WordLayer("Lyric", transform, letteringMaterial, 6, 0.04f);
         }
 
-        protected override void OnEnable()
+        protected override void OnEnter()
         {
-            base.OnEnable();
-            anchored = false;
             spawned.Clear();
         }
 
-        protected override void OnDisable()
+        protected override void OnExit()
         {
-            base.OnDisable();
             foreach (var d in drops) Release(d);
             foreach (var m in marks)
             {
@@ -152,25 +152,34 @@ namespace MusicInYourHands
                 m.Glow.gameObject.SetActive(false);
             }
             charge[0] = charge[1] = 0f;
-            words?.Clear();
         }
 
-        public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
+        /// <summary>The rain falls in front of you, from a little above your eyes down to the floor.</summary>
+        protected override void OnPlace(Camera view)
         {
-            Build();
-            if (view == null) return;
-            if (anchored && ShouldReanchor(view, dt)) anchored = false;
-            if (!anchored)
-            {
-                forward = Effects.FlatForward(view);
-                right = Vector3.Cross(Vector3.up, forward).normalized;
-                center = view.transform.position + forward * distance;
-                head = view.transform.position;
-                floorY = Effects.FloorY(view);
-                spawnY = view.transform.position.y + spawnHeight;
-                MarkAnchored(view);
-                anchored = true;
-            }
+            forward = Effects.FlatForward(view);
+            right = Vector3.Cross(Vector3.up, forward).normalized;
+            center = view.transform.position + forward * distance;
+            head = view.transform.position;
+            floorY = Effects.FloorY(view);
+            spawnY = view.transform.position.y + spawnHeight;
+        }
+
+        /// <summary>
+        /// Each sung word falls with the rain in front of you, a little left or right along the line, and lands with a
+        /// splash in a puddle of light, where it lies for a moment.
+        /// </summary>
+        protected override void OnWord(string word, bool newLine)
+        {
+            var w = SungWords.Add(word, Color.Lerp(Effects.Blue, Color.white, 0.45f), 7f);
+            float x = ((Sung.Index % 5) - 2) * 0.16f + (w.Seed - 0.5f) * 0.06f;
+            w.Position = center + right * x + forward * 0.1f + Vector3.up * (head.y + 0.12f - center.y);
+            w.Velocity = Vector3.down * 0.06f;
+            w.Slot = 0;
+        }
+
+        protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
+        {
             songTime = music.SongTime;
             frame = music;
             beatGlow = music.Beat ? 1f : Mathf.MoveTowards(beatGlow, 0f, dt * 2.5f);
@@ -182,27 +191,15 @@ namespace MusicInYourHands
             UpdateDrops(rig, view, dt);
             UpdateMarks(dt);
             UpdatePalms(rig, view, music, dt);
-            Sing(music, view, dt);
+            Sing(view, dt);
         }
 
-        /// <summary>
-        /// Each sung word falls with the rain in front of you, a little left or right along the line, and lands with a
-        /// splash in a puddle of light, where it lies for a moment.
-        /// </summary>
-        void Sing(MusicFrame music, Camera view, float dt)
+        /// <summary>The sung words fall, land with a splash and lie in their puddles for a moment.</summary>
+        void Sing(Camera view, float dt)
         {
-            if (words == null) return;
-            if (words.Next(music, out var text, out _))
-            {
-                var w = words.Add(text, Color.Lerp(Effects.Blue, Color.white, 0.45f), 7f);
-                float x = ((words.Index % 5) - 2) * 0.16f + (w.Seed - 0.5f) * 0.06f;
-                w.Position = center + right * x + forward * 0.1f + Vector3.up * (head.y + 0.12f - center.y);
-                w.Velocity = Vector3.down * 0.06f;
-                w.Slot = 0;
-            }
-            words.Tick(dt);
+            if (SungWords == null) return;
             var eye = view.transform.position;
-            foreach (var w in words.Words)
+            foreach (var w in SungWords.Words)
             {
                 if (!w.Active) continue;
                 float ground = Room.GroundBelow(w.Position, floorY);
@@ -226,7 +223,6 @@ namespace MusicInYourHands
                 else w.Rotation = WordLayer.Lying(w.Position, eye);
                 w.Halo = 0.15f + beatGlow * 0.3f;
             }
-            words.Draw(1f);
         }
 
         /// <summary>Each note appears <see cref="fallTime"/> before it is sung, so it lands on the floor on the note.</summary>

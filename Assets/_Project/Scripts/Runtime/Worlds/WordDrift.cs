@@ -12,6 +12,12 @@ namespace MusicInYourHands
     /// </summary>
     public class WordDrift : World
     {
+        public override string DisplayName => "Word drift";
+
+        public override Color Color => new Color(0.8f, 0.88f, 1f);
+
+        public override int MenuOrder => 150;
+
         public override int MenuIcon => 19;
 
         public override bool IsLyric => true;
@@ -26,10 +32,6 @@ namespace MusicInYourHands
             Pattern = HandTheme.Effect.Specks,
             PatternColor = new Color(0.8f, 0.9f, 1f)
         };
-
-        [Header("Materials")]
-        [SerializeField] Material letteringMaterial;
-        [SerializeField] Material glowMaterial;
 
         [Header("Drift")]
         [Tooltip("How far away words appear (m), and how long they take to reach you (s).")]
@@ -76,19 +78,15 @@ namespace MusicInYourHands
         }
 
         readonly List<Drifter> drifters = new List<Drifter>();
-        readonly LyricCursor cursor = new LyricCursor();
         Material material;
         MaterialPropertyBlock block;
         ParticleSystem dust;
         Vector3 head, forward, right;
         int lineNumber, lane;
-        float dustDebt, fade, touchPause;
-        bool anchored, built;
+        float dustDebt, touchPause;
 
-        public override void Build()
+        protected override void OnBuild()
         {
-            if (built) return;
-            built = true;
             block = new MaterialPropertyBlock();
             material = new Material(letteringMaterial) { name = "Drift Lettering", mainTexture = TypeFace.Bold.Atlas };
             for (int i = 0; i < Pool; i++)
@@ -103,19 +101,13 @@ namespace MusicInYourHands
             main.gravityModifier = 0f;
         }
 
-        protected override void OnEnable()
+        protected override void OnEnter()
         {
-            base.OnEnable();
-            anchored = false;
-            fade = 0f;
-            cursor.Reset();
-            if (built) foreach (var d in drifters) Retire(d);
+            foreach (var d in drifters) Retire(d);
         }
 
-        protected override void OnDisable()
+        protected override void OnExit()
         {
-            base.OnDisable();
-            if (!built) return;
             foreach (var d in drifters) Retire(d);
             dust.Clear();
         }
@@ -127,25 +119,22 @@ namespace MusicInYourHands
             d.Renderer.gameObject.SetActive(false);
         }
 
-        public override void Step(HandRig rig, MusicFrame music, Camera view, float dt)
+        /// <summary>Words come towards where you stand, from the way you face.</summary>
+        protected override void OnPlace(Camera view)
         {
-            Build();
-            if (view == null) return;
-            if (anchored && ShouldReanchor(view, dt)) anchored = false;
-            if (!anchored)
-            {
-                head = view.transform.position;
-                forward = Effects.FlatForward(view);
-                right = Vector3.Cross(Vector3.up, forward).normalized;
-                MarkAnchored(view);
-                anchored = true;
-            }
-            fade = Mathf.MoveTowards(fade, 1f, dt * 1.5f);
-            if (cursor.Advance(music, out bool newLine))
-            {
-                if (newLine) lineNumber++;
-                Launch(cursor.Word);
-            }
+            head = view.transform.position;
+            forward = Effects.FlatForward(view);
+            right = Vector3.Cross(Vector3.up, forward).normalized;
+        }
+
+        protected override void OnWord(string word, bool newLine)
+        {
+            if (newLine) lineNumber++;
+            Launch(word);
+        }
+
+        protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
+        {
             Drift(rig, music, view, dt);
             Dust(music, dt);
         }
@@ -221,7 +210,7 @@ namespace MusicInYourHands
                 d.Renderer.transform.localScale = Vector3.one * d.Size * (1f + music.Kick * 0.05f);
                 block.Clear();
                 block.SetColor(ColorId, Color.Lerp(d.Color, new Color(1f, 0.86f, 0.5f), d.Glow));
-                block.SetFloat(AlphaId, alpha * fade);
+                block.SetFloat(AlphaId, alpha * FadeIn);
                 d.Renderer.SetPropertyBlock(block);
             }
         }
