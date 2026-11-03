@@ -32,6 +32,7 @@ namespace MusicInYourHands.EditorTools
 #if META_XR_CORE
             Directory.CreateDirectory(ShotFolder);
             LoadSceneSettings();
+            ShotTypes.Clear();
 
             Shot<LivingSkin>("1-living-skin", HandPose.PalmsToFace, 8f);
             Shot<HeartbeatOrb>("2-heartbeat-orb", HandPose.PalmsFacing, 18f, closeUp: rig => HandSkin.FocusPosition);
@@ -76,6 +77,10 @@ namespace MusicInYourHands.EditorTools
             Shot<WordSnow>("19r-word-snow-room", HandPose.PalmsUp, 22f, lead: 14f, scanned: true);
             Shot<CeilingStars>("20r-ceiling-stars-room", HandPose.PalmsToFace, -40f, lead: 4f, scanned: true);
             Shot<NoteRain>("5r-note-rain-room", HandPose.PalmsUp, 30f, scanned: true);
+
+            // Every other world (a new one, say) gets a default shot, w-<class>.png: palms to the face, from head height.
+            foreach (var type in WorldCatalog.Types())
+                if (!ShotTypes.Contains(type)) Shot(type, $"w-{type.Name}", HandPose.PalmsToFace, 8f);
             Room.Clear();
             Debug.Log($"[Shots] Saved screenshots to {ShotFolder}.");
             return true;
@@ -273,16 +278,31 @@ namespace MusicInYourHands.EditorTools
         /// </summary>
         static void Shot<T>(string name, HandPose pose, float pitch, System.Action<HandRig> holdPose = null,
             System.Func<HandRig, Vector3> closeUp = null, System.Func<string, Vector3> handOffset = null, float lead = 3f,
-            System.Action<World> prepare = null, float extra = 0f, bool scanned = false) where T : World
+            System.Action<World> prepare = null, float extra = 0f, bool scanned = false) where T : World =>
+            Shot(typeof(T), name, pose, pitch, holdPose, closeUp, handOffset, lead, prepare, extra, scanned);
+
+        // The worlds shot so far, so every other world gets a default shot.
+        static readonly HashSet<System.Type> ShotTypes = new HashSet<System.Type>();
+
+        static void Shot(System.Type type, string name, HandPose pose, float pitch, System.Action<HandRig> holdPose = null,
+            System.Func<HandRig, Vector3> closeUp = null, System.Func<string, Vector3> handOffset = null, float lead = 3f,
+            System.Action<World> prepare = null, float extra = 0f, bool scanned = false)
         {
+            ShotTypes.Add(type);
             if (!Wanted(name)) return;
             var camera = StageRoom(pitch, scanned);
             var rig = new GameObject("HandRig").AddComponent<HandRig>();
             var hands = PlaceHands(camera, pose, rig, handOffset);
 
-            var world = new GameObject(typeof(T).Name).AddComponent<T>();
-            if (SceneSettings.TryGetValue(typeof(T), out var json)) EditorJsonUtility.FromJsonOverwrite(json, world);
-            else Debug.LogWarning($"[Shots] {typeof(T).Name} is not in the main scene; using its defaults.");
+            var world = (World)new GameObject(type.Name).AddComponent(type);
+            if (SceneSettings.TryGetValue(type, out var json)) EditorJsonUtility.FromJsonOverwrite(json, world);
+            else
+            {
+                // A world not in the main scene yet (a new one) gets its defaults and its materials by name, as Update
+                // Worlds in Main Scene would give it.
+                ProjectSetup.AssignMaterials(world);
+                Debug.Log($"[Shots] {type.Name} is not in the main scene yet; using its defaults and materials by name.");
+            }
             world.Build();
             prepare?.Invoke(world);
             HandSkin.Theme = world.Theme;

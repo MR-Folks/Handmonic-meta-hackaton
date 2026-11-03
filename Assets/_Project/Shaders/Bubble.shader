@@ -6,7 +6,7 @@ Shader "MusicInYourHands/Bubble"
     Properties
     {
         _Color ("Color", Color) = (1, 0.37, 0.68, 1)
-        _Icon ("Emblem (-1 none, 0-24)", Float) = 0
+        _Icon ("Emblem (-1 none, 0-28)", Float) = 0
         _Hover ("Hover 0-1", Float) = 0
         _Selected ("Current world 0-1", Float) = 0
         _Alpha ("Alpha", Float) = 1
@@ -336,11 +336,35 @@ Shader "MusicInYourHands/Bubble"
                         e += bar * (0.55 + 0.45 * step(frac(t * 0.4 - k * 0.33), 0.33));
                     }
                 }
-                else
+                else if (icon < 24.5)
                 {
                     // Add a song: a plus, gently breathing.
                     float size = 0.46 + 0.03 * sin(t * 2.5);
                     e = max(step(abs(p.x), 0.075) * step(abs(p.y), size), step(abs(p.y), 0.075) * step(abs(p.x), size));
+                }
+                else if (icon < 25.5)
+                {
+                    // BEGIN emblem 25 (Solar system)
+                    e = Line(abs(length(p) - 0.45), 0.04);
+                    // END emblem 25
+                }
+                else if (icon < 26.5)
+                {
+                    // BEGIN emblem 26 (Flower dance)
+                    e = Line(abs(length(p) - 0.45), 0.04);
+                    // END emblem 26
+                }
+                else if (icon < 27.5)
+                {
+                    // BEGIN emblem 27 (Cube field)
+                    e = Line(abs(length(p) - 0.45), 0.04);
+                    // END emblem 27
+                }
+                else
+                {
+                    // BEGIN emblem 28 (Four elements)
+                    e = Line(abs(length(p) - 0.45), 0.04);
+                    // END emblem 28
                 }
                 return saturate(e);
             }
