@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 
 namespace MusicInYourHands
@@ -14,9 +16,14 @@ namespace MusicInYourHands
     /// The menu opens within arm's reach, so you can touch a bubble or button with your index fingertip, or point at it
     /// from farther away and pinch. A pointing hand casts a soft ray onto the menu (from the shoulder through the
     /// pinch); once its fingertip comes within 15 cm of the menu, the ray gives way to a dot under the fingertip that
-    /// shrinks as the finger nears (Meta's touch specs). The bubble you point at or reach for swells and its name shows
-    /// large above the honeycomb. Under the menu a line says how to choose, or that a song is loading or couldn't play,
-    /// and while a song from Audius plays, a second line gives the credit its license asks for.
+    /// shrinks as the finger nears (Meta's touch specs). The bubble you point at or reach for swells and the caption
+    /// above the honeycomb says what choosing it will do. Under the menu a line says how to choose, or that a song is
+    /// loading or couldn't play, and while a song from Audius plays, a second line gives the credit its license asks for.
+    /// Several worlds can be on at once (see WorldManager): each one that is on wears a ring, choosing another adds it
+    /// ("Add Flower dance") or swaps it for the ones it clashes with ("Swap Cube field for Flower dance"), and choosing
+    /// one that is on turns it off ("Turn off Solar system"). The menu stays open after each choice, so you can put
+    /// several together; the menu gesture closes it. With no bubble under a finger, the caption names the worlds that
+    /// are on.
     /// </summary>
     [DefaultExecutionOrder(170)]
     public class WorldMenu : MonoBehaviour
@@ -49,6 +56,7 @@ namespace MusicInYourHands
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
         static readonly int EqId = Shader.PropertyToID("_Eq");
         static readonly int PausedId = Shader.PropertyToID("_Paused");
+        static readonly int OnId = Shader.PropertyToID("_On");
         static readonly int IntensityId = Shader.PropertyToID("_Intensity");
 
         // Bubble.World values for the bubbles that aren't worlds.
@@ -72,6 +80,8 @@ namespace MusicInYourHands
             public float Delay;
             public float Hover;
             public float Pop;
+            /// <summary>The ring of a world that is on, 0-1: it eases in and out as the world turns on and off.</summary>
+            public float On;
         }
 
         /// <summary>
@@ -128,8 +138,20 @@ namespace MusicInYourHands
         readonly Vector2?[] aims = new Vector2?[2];
         readonly Vector2?[] presses = new Vector2?[2];
         float honeycomb = 1f;
-        bool open, toggleRequested;
-        float openTime, closeAt = -1f, cooldown;
+        bool open, toggleRequested, snapRings;
+        float openTime, cooldown;
+        // The caption for a world bubble (or for none, -1), kept until the bubble or the worlds that are on change.
+        int captionWorld = int.MinValue, captionVersion = -1;
+        string captionText = "";
+        // What the last world bubble pressed did ("Added Flower dance"), said while it stays under the finger for a moment.
+        int doneWorld = -1;
+        float doneUntil;
+        string doneText = "";
+        // The worlds choosing the world bubble under a finger would swap out, kept until that or the worlds on change.
+        int goingFor = int.MinValue, goingVersion = -1;
+        readonly List<int> going = new List<int>();
+        readonly List<int> replaced = new List<int>();
+        readonly StringBuilder names = new StringBuilder();
         // Where a fingertip can touch the menu (in its space), and how far behind the bubbles the surface it touches is.
         Rect touchArea;
         float surface;
@@ -167,7 +189,8 @@ namespace MusicInYourHands
             MusicBus.Instance?.RefreshSongs();
             open = true;
             openTime = 0f;
-            closeAt = -1f;
+            snapRings = true;
+            doneWorld = -1;
             Place(view);
             foreach (var b in bubbles) b.Pop = 0f;
             // The pinch that opened the menu (Meta's menu gesture) must be let go before a pinch can select, and a
@@ -237,7 +260,6 @@ namespace MusicInYourHands
             else if (open) Follow(view, dt);
             openTime += dt;
             cooldown -= dt;
-            if (closeAt >= 0f && openTime >= closeAt) Close();
 
             bool anyVisible = false;
             var gaze = GazePoint(view);
@@ -245,11 +267,16 @@ namespace MusicInYourHands
 
             float t = Application.isPlaying ? Time.time : 0f;
             int hovered = -1;
+            FindGoing(manager);
             for (int i = 0; i < bubbles.Length; i++)
             {
                 var b = bubbles[i];
                 float appear = open ? Mathf.Clamp01((openTime - b.Delay) / 0.32f) : 0f;
                 b.Pop = Mathf.MoveTowards(b.Pop, 0f, dt * 2.2f);
+                // A world that is on wears a ring, already there as the menu opens and easing in and out after that. While
+                // a finger is on a world that would swap it out, its ring starts to unwind.
+                float ring = b.World >= 0 && manager.IsOn(b.World) ? going.Contains(b.World) ? 0.35f : 1f : 0f;
+                b.On = snapRings ? ring : Mathf.MoveTowards(b.On, ring, dt * 5f);
                 float show = open ? EaseOutBack(appear) * honeycomb : 0f;
                 bool visible = show > 0.001f || b.Pop > 0.001f;
                 if (b.Renderer.gameObject.activeSelf != visible) b.Renderer.gameObject.SetActive(visible);
@@ -271,18 +298,19 @@ namespace MusicInYourHands
                 b.Renderer.transform.localScale = Vector3.one * Mathf.Max(scale, 1e-4f);
                 Effects.Face(b.Renderer.transform, view);
 
-                bool selected = b.World == ListenToggle ? bus != null && bus.IsListening
-                    : b.World == LyricsToggle ? LyricsOption.On : b.World == manager.Current;
+                bool selected = b.World == ListenToggle ? bus != null && bus.IsListening : b.World == LyricsToggle && LyricsOption.On;
                 block.Clear();
                 block.SetColor(ColorId, BubbleColor(b, manager));
                 block.SetFloat(IconId, b.World >= 0 ? manager.Worlds[b.World].MenuIcon : Icon(b.World));
                 block.SetFloat(HoverId, b.Hover);
                 block.SetFloat(SelectedId, selected ? 1f : 0f);
+                block.SetFloat(OnId, b.On);
                 block.SetFloat(AlphaId, Mathf.Clamp01(show) * (1f - b.Pop * 0.85f) + b.Pop * 0.15f);
                 if (bus != null) block.SetVector(EqId, new Vector4(bus.Bands[1], bus.Bands[2], bus.Bands[3], bus.Bands[4]));
                 block.SetFloat(PausedId, bus != null && !bus.IsPlaying ? 1f : 0f);
                 b.Renderer.SetPropertyBlock(block);
             }
+            snapRings = false;
 
             // Touch or pinch to choose. A touch presses the bubble under the fingertip as it reaches the menu; a pinch,
             // the bubble the hand was aiming at just before the pinch closed, so the small jump of the hand while
@@ -528,8 +556,10 @@ namespace MusicInYourHands
             at.x > touchArea.xMin - margin && at.x < touchArea.xMax + margin && at.y > touchArea.yMin - margin && at.y < touchArea.yMax + margin;
 
         /// <summary>
-        /// The name of the bubble you point at, large above the honeycomb (or the current world's when you point at
-        /// none), with a soft shadow so it reads over any room. A small hint below says how to choose.
+        /// What choosing the bubble you point at or reach for will do, large above the honeycomb, with a soft shadow so
+        /// it reads over any room: for a world, adding it, swapping it in or turning it off (<see cref="WorldCaption"/>);
+        /// for the other bubbles, their name. With no bubble under a finger it names the worlds that are on, in the
+        /// colour of the one chosen last. A small hint below says how to choose.
         /// </summary>
         void DrawCaption(WorldManager manager, MusicBus bus, int hovered, Camera view, float dt)
         {
@@ -548,11 +578,13 @@ namespace MusicInYourHands
             if (!visible) return;
 
             Bubble subject = hovered >= 0 ? bubbles[hovered] : null;
-            if (subject == null)
-                foreach (var b in bubbles) if (b.World == manager.Current) subject = b;
-            string text = subject != null ? BubbleName(subject, manager, bus) : "";
-            caption.Text = text;
-            var color = subject != null ? Color.Lerp(Color.white, BubbleColor(subject, manager), hovered >= 0 ? 0.3f : 0.15f) : Color.white;
+            int lead = manager.Current;
+            // Right after a press the caption says what it did, rather than what pressing again would do.
+            if (subject != null && subject.World == doneWorld && openTime < doneUntil) caption.Text = doneText;
+            else if (subject == null || subject.World >= 0) caption.Text = WorldCaption(subject != null ? subject.World : -1, manager);
+            else caption.Text = BubbleName(subject, manager, bus);
+            var color = subject != null ? Color.Lerp(Color.white, BubbleColor(subject, manager), 0.3f)
+                : lead >= 0 ? Color.Lerp(Color.white, manager.Worlds[lead].Color, 0.15f) : Color.white;
             color.a = show * (hovered >= 0 ? 1f : 0.8f);
             caption.Color = color;
             hint.Color = new Color(1f, 1f, 1f, show * 0.8f);
@@ -583,19 +615,86 @@ namespace MusicInYourHands
             lyricLabel.Transform.SetPositionAndRotation(root.TransformPoint(new Vector3(LyricCenter.x, highest + bubbleSize * 0.62f, 0f)), rotation);
         }
 
+        /// <summary>
+        /// The words of the caption for world bubble <paramref name="world"/>: what choosing it will do, as in "Add
+        /// Flower dance", "Swap Cube field for Flower dance", "Turn off Solar system", or "Solar system is on" for the
+        /// only world on. For -1 (no bubble under a finger), the worlds that are on: "Flower dance + Solar system".
+        /// Made again only when the bubble or the worlds that are on change.
+        /// </summary>
+        string WorldCaption(int world, WorldManager manager)
+        {
+            if (world == captionWorld && manager.Version == captionVersion) return captionText;
+            captionWorld = world;
+            captionVersion = manager.Version;
+            if (world < 0)
+                return captionText = Names(manager, manager.Active, " + ", " + ");
+            string name = manager.Worlds[world].DisplayName;
+            captionText = manager.Plan(world, replaced) switch
+            {
+                WorldManager.Choice.Add => $"Add {name}",
+                WorldManager.Choice.Swap => $"Swap {Names(manager, replaced, ", ", " and ")} for {name}",
+                WorldManager.Choice.TurnOff => $"Turn off {name}",
+                WorldManager.Choice.StayOn => $"{name} is on",
+                _ => name
+            };
+            return captionText;
+        }
+
+        /// <summary>
+        /// The worlds that choosing the world bubble a finger is on would swap out (none for other bubbles, or for a
+        /// world that would only turn off), found again only when that bubble or the worlds that are on change.
+        /// </summary>
+        void FindGoing(WorldManager manager)
+        {
+            int target = -1;
+            if (open && !library.IsOpen)
+                foreach (var p in pointers)
+                    if (p.Target >= 0 && bubbles[p.Target].World >= 0) target = bubbles[p.Target].World;
+            if (target == goingFor && manager.Version == goingVersion) return;
+            goingFor = target;
+            goingVersion = manager.Version;
+            if (target < 0 || manager.Plan(target, going) != WorldManager.Choice.Swap) going.Clear();
+        }
+
+        /// <summary>World names in a row: "Cube field", "Cube field and Solar system", "A, B and C".</summary>
+        string Names(WorldManager manager, IReadOnlyList<int> indices, string between, string beforeLast)
+        {
+            names.Clear();
+            for (int i = 0; i < indices.Count; i++)
+            {
+                if (i > 0) names.Append(i == indices.Count - 1 ? beforeLast : between);
+                names.Append(manager.Worlds[indices[i]].DisplayName);
+            }
+            return names.ToString();
+        }
+
         void Press(Bubble b, WorldManager manager, MusicBus bus)
         {
             cooldown = 0.6f;
             b.Pop = 1f;
-            float note = b.World >= 0 ? Synth.Pentatonic[6 + b.World % 5]
-                : Synth.Pentatonic[b.World == ListenToggle ? 4 : IsSongStep(b) ? 3 : b.World == LyricsToggle || b.World == Library ? 2 : 5];
-            voices.Play(Synth.Chime(note), b.Renderer.transform.position, 0.6f);
             if (b.World >= 0)
             {
-                manager.Switch(b.World);
-                closeAt = openTime + 0.35f;
+                // The menu stays open, so more worlds can be put together; the menu gesture closes it. A world turning
+                // off answers an octave lower, and the one world that stays on only softly.
+                string name = manager.Worlds[b.World].DisplayName;
+                var choice = manager.Plan(b.World, replaced);
+                doneText = choice switch
+                {
+                    WorldManager.Choice.Add => $"Added {name}",
+                    WorldManager.Choice.Swap => $"Swapped {Names(manager, replaced, ", ", " and ")} for {name}",
+                    WorldManager.Choice.TurnOff => $"Turned off {name}",
+                    _ => $"{name} stays on"
+                };
+                doneWorld = b.World;
+                doneUntil = openTime + 1.5f;
+                manager.Choose(b.World);
+                float tone = Synth.Pentatonic[(choice == WorldManager.Choice.TurnOff ? 1 : 6) + b.World % 5];
+                voices.Play(Synth.Chime(tone), b.Renderer.transform.position, choice == WorldManager.Choice.StayOn ? 0.25f : 0.6f);
+                return;
             }
-            else if (b.World == LyricsToggle) LyricsOption.On = !LyricsOption.On;
+            float note = Synth.Pentatonic[b.World == ListenToggle ? 4 : IsSongStep(b) ? 3 : b.World == LyricsToggle || b.World == Library ? 2 : 5];
+            voices.Play(Synth.Chime(note), b.Renderer.transform.position, 0.6f);
+            if (b.World == LyricsToggle) LyricsOption.On = !LyricsOption.On;
             else if (b.World == Library) library.Show();
             else if (bus == null) return;
             else if (b.World == ListenToggle) bus.ToggleListen();
