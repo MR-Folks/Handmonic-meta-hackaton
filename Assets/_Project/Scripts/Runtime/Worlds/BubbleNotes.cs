@@ -21,6 +21,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Pop the bubbles with a fingertip";
 
+        /// <summary>The bubbles rise in front of you, within reach.</summary>
+        public override Space Spaces => Space.InFront;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.12f, 0.1f, 0.2f, 0.45f),

@@ -26,6 +26,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Point at a wall and pinch to spray";
 
+        /// <summary>The words are sprayed onto the walls, and a pinch sprays paint.</summary>
+        public override Space Spaces => Space.Walls | Space.Pinch;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.1f, 0.09f, 0.12f, 0.55f),

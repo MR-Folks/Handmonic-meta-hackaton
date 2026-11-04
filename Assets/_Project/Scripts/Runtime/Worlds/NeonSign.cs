@@ -24,6 +24,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Touch a word to make it buzz";
 
+        /// <summary>The sign hangs in front of you, on a wall within reach once the room is scanned.</summary>
+        public override Space Spaces => Space.InFront | Space.Walls;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.16f, 0.07f, 0.14f, 0.55f),

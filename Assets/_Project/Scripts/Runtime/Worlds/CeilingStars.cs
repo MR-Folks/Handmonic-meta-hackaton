@@ -25,6 +25,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Look up, then point at a star";
 
+        /// <summary>The night sky opens on the ceiling.</summary>
+        public override Space Spaces => Space.Ceiling;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.1f, 0.08f, 0.2f, 0.5f),

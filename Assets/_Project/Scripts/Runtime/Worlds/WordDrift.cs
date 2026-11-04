@@ -24,6 +24,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Touch a word to hold it";
 
+        /// <summary>The words drift through the room towards you, and wait in front of you when touched.</summary>
+        public override Space Spaces => Space.AroundYou | Space.InFront;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.1f, 0.12f, 0.2f, 0.5f),

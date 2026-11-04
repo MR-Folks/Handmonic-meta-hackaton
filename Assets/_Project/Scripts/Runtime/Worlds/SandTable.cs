@@ -22,6 +22,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Touch the sand, hover to change the pattern, pinch to pour";
 
+        /// <summary>The plate lies in front of you, and a pinch pours sand onto it.</summary>
+        public override Space Spaces => Space.InFront | Space.Pinch;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.12f, 0.09f, 0.07f, 0.55f),

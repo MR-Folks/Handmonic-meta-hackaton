@@ -21,6 +21,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Pinch and move to draw; two fists clear it";
 
+        /// <summary>You draw in the air in front of you with a pinch, and clear it with both fists.</summary>
+        public override Space Spaces => Space.InFront | Space.Pinch | Space.Fists;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.14f, 0.12f, 0.1f, 0.5f),

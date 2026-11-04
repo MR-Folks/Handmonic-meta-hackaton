@@ -24,6 +24,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Hold out a palm and catch the falling notes";
 
+        /// <summary>The notes fall in front of you onto the floor and furniture, and a drizzle falls all around you.</summary>
+        public override Space Spaces => Space.InFront | Space.Ground | Space.AroundYou;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.07f, 0.13f, 0.28f, 0.5f),

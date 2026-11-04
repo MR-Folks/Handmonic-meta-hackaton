@@ -23,6 +23,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Sweep your hand across the words";
 
+        /// <summary>The words rise out of the floor.</summary>
+        public override Space Spaces => Space.Ground;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.06f, 0.12f, 0.2f, 0.5f),

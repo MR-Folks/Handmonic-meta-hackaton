@@ -22,6 +22,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Push your palm towards a wall";
 
+        /// <summary>The grid traces the walls and the floor.</summary>
+        public override Space Spaces => Space.Walls | Space.Ground;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.14f, 0.1f, 0.26f, 0.5f),

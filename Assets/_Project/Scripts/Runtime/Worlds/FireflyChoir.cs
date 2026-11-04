@@ -23,6 +23,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Hold out a hand and the fireflies gather around it";
 
+        /// <summary>The swarm fills the air all around you.</summary>
+        public override Space Spaces => Space.AroundYou;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.3f, 0.24f, 0.17f, 0.42f),

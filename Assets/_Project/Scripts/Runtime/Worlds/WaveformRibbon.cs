@@ -22,6 +22,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Pinch with both hands and pull them apart";
 
+        /// <summary>The silk stretches between your hands while they pinch.</summary>
+        public override Space Spaces => Space.Hands | Space.Pinch;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.08f, 0.12f, 0.22f, 0.55f),

@@ -25,6 +25,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Push the letters, flick a ring, or make a fist";
 
+        /// <summary>The word arrives in front of you, the line circles you, and a fist pulls the word to your hand.</summary>
+        public override Space Spaces => Space.InFront | Space.AroundYou | Space.Fists;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.12f, 0.12f, 0.14f, 0.5f),

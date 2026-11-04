@@ -28,6 +28,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Dip your hand into the pool and listen";
 
+        /// <summary>The pool lies in front of you, and a pinch pours droplets into it.</summary>
+        public override Space Spaces => Space.InFront | Space.Pinch;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.05f, 0.14f, 0.2f, 0.5f),

@@ -23,6 +23,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Hold your palms facing each other, then turn them like a ball";
 
+        /// <summary>The orb is held between your hands.</summary>
+        public override Space Spaces => Space.Hands;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.22f, 0.1f, 0.2f, 0.55f),
