@@ -412,22 +412,8 @@ Shader "MusicInYourHands/Bubble"
                 }
                 else if (icon < 27.5)
                 {
-                    // BEGIN emblem 27 (Cube field)
-                    // A small field of blocks seen from above at an angle, the far ones taller, rising and falling as a
-                    // ripple runs out from the front corner. Drawn back to front, so the near blocks cover the far ones.
-                    [unroll] for (int k = 0; k < 9; k++)
-                    {
-                        float i = floor(k / 3.0), j = k - i * 3;
-                        float2 q = p - float2((i - j) * 0.27, -0.18 - (i + j - 2) * 0.155);
-                        float away = (4 - i - j) / 4;
-                        float h = 0.05 + away * 0.24 + (0.06 + away * 0.08) * (0.5 + 0.5 * sin(t * 2.4 + (i + j) * 1.3 + i * 0.5));
-                        float ax = abs(q.x);
-                        float rh = 0.11 - ax * 0.579;
-                        float inside = step(ax, 0.19) * step(-rh, q.y) * step(q.y, h + rh);
-                        float lid = step(abs(q.y - h), rh);
-                        float shade = lid > 0.5 ? 1 : (q.x < 0 ? 0.55 : 0.32);
-                        e = inside > 0.5 ? shade : e;
-                    }
+                    // BEGIN emblem 27 (free)
+                    e = Line(abs(length(p) - 0.45), 0.04);
                     // END emblem 27
                 }
                 else

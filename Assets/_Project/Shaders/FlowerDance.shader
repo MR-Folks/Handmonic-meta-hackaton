@@ -34,8 +34,8 @@ Shader "MusicInYourHands/FlowerDance"
             float4 _ShadowColor;
         CBUFFER_END
 
-        // Per flower, set by FlowerDance every frame through its property block. These live outside UnityPerMaterial,
-        // as CubeField's blocks do: declared inside it, the flowers drew in the editor but not on Quest.
+        // Per flower, set by FlowerDance every frame through its property block. These live outside UnityPerMaterial:
+        // declared inside it, the flowers drew in the editor but not on Quest.
         float4 _Root[FLOWERS];  // xyz: where it grows (room space); w: which way it faces (radians about up)
         float4 _Pose[FLOWERS];  // xy: where its tip leans (share of its height, own x and z); z: height scale; w: head scale
         float4 _Look[FLOWERS];  // x: petals open 0-1; y: bold 0-1; z: head squash (- squashed, + stretched); w: head nod (radians)
