@@ -1963,6 +1963,7 @@ MonoBehaviour:
   - {fileID: 377810160}
   - {fileID: 214973737}
   startWorld: 0
+  maxWorlds: 3
 --- !u!4 &1462377328
 Transform:
   m_ObjectHideFlags: 0
