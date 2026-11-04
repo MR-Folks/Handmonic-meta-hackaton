@@ -5,7 +5,8 @@ namespace MusicInYourHands
     /// <summary>
     /// Drives the MusicInYourHands/Hand shader on one hand mesh: the beat pulse, the music energy and where the
     /// wrist is, so the forearm fades out. Values go through a property block, so both hands share one material.
-    /// The active world sets the shared look (Theme) and its effect inputs (focus point, per-hand charge).
+    /// The world that dresses the hands sets the shared look (Theme) and its effect inputs (focus point, per-hand
+    /// charge); with several worlds on, that is only one of them (see World.OwnsHands).
     /// </summary>
     [DefaultExecutionOrder(200)]
     public class HandSkin : MonoBehaviour
@@ -26,6 +27,57 @@ namespace MusicInYourHands
         public static float FocusStrength;
         /// <summary>Per-hand fill, 0-1 (left, right), such as caught rain.</summary>
         public static readonly float[] Charge = new float[2];
+
+        /// <summary>Gives the hands a world's look, with no focus point or charge yet.</summary>
+        public static void Dress(HandTheme theme)
+        {
+            Theme = theme;
+            FocusStrength = 0f;
+            Charge[0] = Charge[1] = 0f;
+        }
+
+        /// <summary>
+        /// The hands' shared look (theme, focus point, charge) and how far each visible hand is nudged, saved so that
+        /// what a world does to them can be undone. With several worlds on, only one dresses the hands, and World
+        /// puts back what the others change.
+        /// </summary>
+        public struct Look
+        {
+            HandTheme theme;
+            Vector3 focusPosition, offsetLeft, offsetRight;
+            float focusStrength, chargeLeft, chargeRight;
+
+            public static Look Save(HandRig rig) => new Look
+            {
+                theme = Theme,
+                focusPosition = FocusPosition,
+                focusStrength = FocusStrength,
+                chargeLeft = Charge[0],
+                chargeRight = Charge[1],
+                offsetLeft = Offset(rig != null ? rig.Left : null),
+                offsetRight = Offset(rig != null ? rig.Right : null)
+            };
+
+            public void Restore(HandRig rig)
+            {
+                Theme = theme;
+                FocusPosition = focusPosition;
+                FocusStrength = focusStrength;
+                Charge[0] = chargeLeft;
+                Charge[1] = chargeRight;
+                if (rig == null) return;
+                Put(rig.Left, offsetLeft);
+                Put(rig.Right, offsetRight);
+            }
+
+            static Vector3 Offset(HandRig.Hand hand) => hand != null && hand.VisualRoot != null ? hand.VisualRoot.localPosition : Vector3.zero;
+
+            static void Put(HandRig.Hand hand, Vector3 local)
+            {
+                var root = hand.VisualRoot;
+                if (root != null && root.localPosition != local) root.localPosition = local;
+            }
+        }
 
         static readonly int WristPos = Shader.PropertyToID("_WristPos");
         static readonly int HandForward = Shader.PropertyToID("_HandForward");

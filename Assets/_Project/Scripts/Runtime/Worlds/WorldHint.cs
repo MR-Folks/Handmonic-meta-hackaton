@@ -4,7 +4,8 @@ namespace MusicInYourHands
 {
     /// <summary>
     /// When a world starts, its name and a short line saying what to do float in front of you for a few seconds,
-    /// following your view loosely, then fade. Hidden while the menu is open.
+    /// following your view loosely, then fade. Hidden while the menu is open: the worlds turned on there wait their
+    /// turn and show one after another once it closes (a world turned off again before then is skipped).
     /// </summary>
     [DefaultExecutionOrder(175)]
     public class WorldHint : MonoBehaviour
@@ -18,15 +19,18 @@ namespace MusicInYourHands
         Transform root;
         float age = 99f;
         bool placed;
+        // The worlds whose hints wait to be shown, oldest first.
+        readonly int[] waiting = new int[4];
+        int waitingCount;
 
         void OnEnable()
         {
-            if (WorldManager.Instance != null) WorldManager.Instance.WorldChanged += OnWorld;
+            if (WorldManager.Instance != null) WorldManager.Instance.WorldStarted += OnWorld;
         }
 
         void OnDisable()
         {
-            if (WorldManager.Instance != null) WorldManager.Instance.WorldChanged -= OnWorld;
+            if (WorldManager.Instance != null) WorldManager.Instance.WorldStarted -= OnWorld;
         }
 
         void Start()
@@ -34,8 +38,8 @@ namespace MusicInYourHands
             // The first world may have started before this subscribed.
             if (WorldManager.Instance != null)
             {
-                WorldManager.Instance.WorldChanged -= OnWorld;
-                WorldManager.Instance.WorldChanged += OnWorld;
+                WorldManager.Instance.WorldStarted -= OnWorld;
+                WorldManager.Instance.WorldStarted += OnWorld;
                 if (WorldManager.Instance.Current >= 0) OnWorld(WorldManager.Instance.Current);
             }
         }
@@ -50,27 +54,61 @@ namespace MusicInYourHands
             root.gameObject.SetActive(false);
         }
 
+        /// <summary>A world started: its hint waits its turn (a world started again moves to the back).</summary>
         void OnWorld(int index)
         {
             var manager = WorldManager.Instance;
             if (manager == null || index < 0 || index >= manager.Worlds.Count) return;
             var world = manager.Worlds[index];
             if (world == null || string.IsNullOrEmpty(world.Hint)) return;
-            Build();
-            title.Text = world.DisplayName;
-            line.Text = world.Hint;
-            titleColor = Color.Lerp(Color.white, world.Color, 0.35f);
-            age = 0f;
-            placed = false;
+            int kept = 0;
+            for (int i = 0; i < waitingCount; i++)
+                if (waiting[i] != index) waiting[kept++] = waiting[i];
+            waitingCount = kept;
+            if (waitingCount == waiting.Length)
+            {
+                for (int i = 1; i < waiting.Length; i++) waiting[i - 1] = waiting[i];
+                waitingCount--;
+            }
+            waiting[waitingCount++] = index;
+            // The hint showing gives way. Turned on with the menu closed (the start, the demo tour), it shows now;
+            // otherwise as soon as the menu closes.
+            age = showSeconds;
+            var menu = WorldMenu.Instance;
+            if (menu == null || !menu.IsOpen) ShowNext();
+        }
+
+        /// <summary>Shows the next waiting hint of a world that is still on, if there is one.</summary>
+        bool ShowNext()
+        {
+            var manager = WorldManager.Instance;
+            while (waitingCount > 0)
+            {
+                int index = waiting[0];
+                for (int i = 1; i < waitingCount; i++) waiting[i - 1] = waiting[i];
+                waitingCount--;
+                if (manager == null || !manager.IsOn(index)) continue;
+                var world = manager.Worlds[index];
+                Build();
+                title.Text = world.DisplayName;
+                line.Text = world.Hint;
+                titleColor = Color.Lerp(Color.white, world.Color, 0.35f);
+                age = 0f;
+                placed = false;
+                return true;
+            }
+            return false;
         }
 
         void LateUpdate()
         {
-            if (root == null) return;
-            age += Time.deltaTime;
-            var view = Camera.main;
             var menu = WorldMenu.Instance;
-            bool show = age < showSeconds && view != null && (menu == null || !menu.IsOpen);
+            bool menuOpen = menu != null && menu.IsOpen;
+            // The hint's time only runs while the menu is closed; when it runs out, the next one waiting shows.
+            if (!menuOpen && (age < showSeconds || !ShowNext())) age += Time.deltaTime;
+            if (root == null) return;
+            var view = Camera.main;
+            bool show = age < showSeconds && view != null && !menuOpen;
             if (root.gameObject.activeSelf != show) root.gameObject.SetActive(show);
             if (!show) return;
 
