@@ -345,23 +345,27 @@ Shader "MusicInYourHands/Bubble"
                 else if (icon < 25.5)
                 {
                     // BEGIN emblem 25 (Solar system)
-                    // Solar system: a glowing sun and three planets going round it on tipped orbits, the outer one ringed.
-                    float disc = smoothstep(0.2, 0.16, length(p));
-                    e = disc + exp(-dot(p, p) * 16.0) * (0.45 + 0.2 * sin(t * 3.0));
+                    // Solar system: you are the small dot in the middle, with planets going round you on tipped orbits,
+                    // and the sun, a bright disc in its glow, drifts slowly round the outer ring, floating a little above it.
+                    e = smoothstep(0.075, 0.045, length(p));
                     [unroll] for (int k = 0; k < 3; k++)
                     {
-                        float r = 0.34 + k * 0.19;
+                        float r = 0.3 + k * 0.21;
                         float2 q = float2(p.x, p.y / 0.5);
                         float stretch = length(float2(p.x, p.y / 0.25)) / max(length(q), 1e-3);
-                        e += Line(abs(length(q) - r) / max(stretch, 1e-3), 0.035) * 0.55;
-                        float a = t * (0.9 - k * 0.25) + k * 2.3;
-                        float2 c = float2(cos(a), sin(a) * 0.5) * r;
-                        float size = 0.07 + k * 0.016;
-                        // Planets on the far side pass behind the sun.
-                        float hidden = sin(a) > 0 ? 1 - disc : 1;
-                        e += smoothstep(size, size - 0.03, length(p - c)) * hidden;
-                        if (k == 2) e += Line(abs(length(float2(p.x - c.x, (p.y - c.y) / 0.35)) - size * 1.8), 0.03) * 0.85 * hidden;
+                        e += Line(abs(length(q) - r) / max(stretch, 1e-3), 0.03) * 0.5;
+                        if (k < 2)
+                        {
+                            float a = t * (1.1 - k * 0.45) + k * 2.6;
+                            float2 c = float2(cos(a), sin(a) * 0.5) * r;
+                            float size = 0.06 + k * 0.018;
+                            e += smoothstep(size, size - 0.03, length(p - c));
+                        }
                     }
+                    float sa = t * 0.35 + 0.8;
+                    float2 sc = float2(cos(sa), sin(sa) * 0.5) * 0.72 + float2(0, 0.1);
+                    float sd = length(p - sc);
+                    e += smoothstep(0.14, 0.1, sd) + exp(-sd * sd * 30) * (0.45 + 0.15 * sin(t * 3.0));
                     // END emblem 25
                 }
                 else if (icon < 26.5)

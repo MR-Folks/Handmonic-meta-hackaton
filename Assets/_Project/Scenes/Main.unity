@@ -631,20 +631,28 @@ MonoBehaviour:
   ringsMaterial: {fileID: 2100000, guid: 24dd6462e955ec54a8715367bdb02cd6, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
-  distance: 0.68
-  drop: 0.27
-  tilt: 24
-  scaleRange: {x: 0.5, y: 2}
-  earthYear: 16
+  orbitDrop: 0.32
+  headRoom: 0.22
+  headGap: 0.3
+  wallMargin: 0.3
+  glideSpeed: 0.5
+  sunRing: 1.12
+  sunRise: 0.2
+  sunStart: {x: 15, y: 40}
+  sunSway: 30
+  sunSwayTime: 100
+  sunGap: 0.85
+  yearSeconds: 28
   speedSwell: 0.8
-  orbitRange: {x: 0.075, y: 0.62}
-  asteroids: 520
-  reach: 0.035
-  warmReach: 0.17
+  newOrbits: {x: 0.36, y: 3}
+  asteroidCount: 900
+  grabReach: 0.05
+  warmAim: 28
   warmUp: 1.5
   cometLife: 3.6
-  cometReach: {x: 0.27, y: 0.42}
-  cometSwing: 60
+  wordRing: 1
+  wordDrop: 0.12
+  cometSweep: 12
 --- !u!4 &403129350
 Transform:
   m_ObjectHideFlags: 0
