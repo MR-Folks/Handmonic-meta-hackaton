@@ -211,7 +211,8 @@ namespace MusicInYourHands
                     for (int side = 0; side < 2; side++)
                     {
                         var hand = rig.Get(side == 0);
-                        if (!hand.IsTracked) continue;
+                        // A hand sweeping at the open menu isn't sweeping the words.
+                        if (!hand.IsTracked || MenuOpen) continue;
                         var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
                         var flatVelocity = Vector3.ProjectOnPlane(hand.Velocity, Vector3.up);
                         float speed = flatVelocity.magnitude;

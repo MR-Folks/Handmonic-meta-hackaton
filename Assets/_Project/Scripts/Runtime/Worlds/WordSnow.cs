@@ -222,7 +222,8 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                if (!hand.IsTracked || hand.Fist > 0.5f || hand.PalmNormal.y < 0.5f) continue;
+                // While the menu is open the words fall past the hands choosing there.
+                if (!hand.IsTracked || hand.Fist > 0.5f || hand.PalmNormal.y < 0.5f || MenuOpen) continue;
                 var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
                 var flat = Vector3.ProjectOnPlane(f.Position - palm, Vector3.up);
                 float above = f.Position.y - palm.y;

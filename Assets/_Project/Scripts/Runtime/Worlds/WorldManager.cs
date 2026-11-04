@@ -9,9 +9,8 @@ namespace MusicInYourHands
     /// (<see cref="World.Spaces"/>). Choosing a world in the menu (<see cref="Choose"/>) turns it on beside the worlds
     /// that are on, and turns off any it clashes with, or, past <see cref="MaxWorlds"/>, the one chosen longest ago.
     /// Choosing a world that is on turns it off, though one always stays on. Of the worlds that are on, one shows the
-    /// sung words (a lyric world, else the one chosen last that shows words) and one dresses the hands (the one that
-    /// uses the Hands space, else the one chosen last); every other hook reaches them all. The music keeps playing
-    /// across changes.
+    /// sung words and one dresses the hands (see <see cref="ChooseOwners"/>); every other hook reaches them all. The
+    /// music keeps playing across changes.
     /// </summary>
     [DefaultExecutionOrder(-40)]
     public class WorldManager : MonoBehaviour
@@ -142,15 +141,26 @@ namespace MusicInYourHands
 
         bool Valid(int index) => index >= 0 && index < worlds.Length && worlds[index] != null;
 
-        /// <summary>Turns the worlds in <paramref name="off"/> off and world <paramref name="on"/> (if any) on.</summary>
+        /// <summary>
+        /// Turns the worlds in <paramref name="off"/> off and world <paramref name="on"/> (if any) on. A world that throws
+        /// as it turns on or off is logged, and the change still goes through.
+        /// </summary>
         void Apply(List<int> off, int on)
         {
             foreach (int index in off)
             {
                 active.Remove(index);
                 var world = worlds[index];
-                world.Exit();
+                // Off first: while playing that runs its OnExit (OnDisable), and whatever happens there, it stops.
                 world.gameObject.SetActive(false);
+                try
+                {
+                    world.Exit();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e, world);
+                }
                 // A world that is off is on its own again (the editor previews step worlds one at a time).
                 world.SetOwners(true, true);
             }
@@ -160,30 +170,42 @@ namespace MusicInYourHands
             {
                 // Its owners are set first, so it starts dressing the hands, or not, from its first frame.
                 worlds[on].gameObject.SetActive(true);
-                worlds[on].Enter();
+                try
+                {
+                    worlds[on].Enter();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e, worlds[on]);
+                }
             }
             Version++;
             if (on >= 0) WorldStarted?.Invoke(on);
         }
 
         /// <summary>
-        /// Picks which of the worlds that are on shows the sung words (the lyric world, else the one chosen last that
-        /// shows words) and which dresses the hands (the one that uses the Hands space, else the one chosen last), and
-        /// tells each of them.
+        /// Picks which of the worlds that are on shows the sung words and which dresses the hands, and tells each of
+        /// them. The words go to the lyric world, else to the one chosen last that shows words, else to the one chosen
+        /// last. The hands go to the world you play with them most: the one that uses the Hands space; else one whose
+        /// pinches, fists or things within reach your hands work (its feedback on the hands, such as Note rain's
+        /// filling palm or Sand table's under-light, belongs to what they are doing); else the one chosen last.
         /// </summary>
         void ChooseOwners()
         {
-            int words = -1, hands = -1;
-            // The newest first, so the one chosen last wins unless an older one is a lyric world or uses the hands.
-            // (Two lyric worlds, or two that use the hands, are never on together.)
+            const World.Space Played = World.Space.Pinch | World.Space.Fists | World.Space.InFront;
+            int words = -1, hands = -1, played = -1;
+            // The newest first, so the one chosen last wins unless an older one is a lyric world or plays more with the
+            // hands. (Two lyric worlds, or two that use the hands, are never on together.)
             for (int i = active.Count - 1; i >= 0; i--)
             {
                 int index = active[i];
                 var world = worlds[index];
                 if (world.IsLyric || (words < 0 && world.ShowsWords)) words = index;
                 if (hands < 0 && (world.Spaces & World.Space.Hands) != 0) hands = index;
+                if (played < 0 && (world.Spaces & Played) != 0) played = index;
             }
-            if (hands < 0) hands = Current;
+            if (words < 0) words = Current;
+            if (hands < 0) hands = played >= 0 ? played : Current;
             WordsWorld = words;
             HandsWorld = hands;
             foreach (int index in active) worlds[index].SetOwners(index == words, index == hands);

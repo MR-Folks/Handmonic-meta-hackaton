@@ -5,7 +5,8 @@ namespace MusicInYourHands
     /// <summary>
     /// When a world starts, its name and a short line saying what to do float in front of you for a few seconds,
     /// following your view loosely, then fade. Hidden while the menu is open: the worlds turned on there wait their
-    /// turn and show one after another once it closes (a world turned off again before then is skipped).
+    /// turn and show one after another once it closes. A world's hint goes as soon as the world is turned off, and one
+    /// turned off before its turn is skipped.
     /// </summary>
     [DefaultExecutionOrder(175)]
     public class WorldHint : MonoBehaviour
@@ -19,6 +20,8 @@ namespace MusicInYourHands
         Transform root;
         float age = 99f;
         bool placed;
+        // The world whose hint is showing (or waiting for the menu to close), or -1.
+        int shown = -1;
         // The worlds whose hints wait to be shown, oldest first.
         readonly int[] waiting = new int[4];
         int waitingCount;
@@ -89,6 +92,7 @@ namespace MusicInYourHands
                 waitingCount--;
                 if (manager == null || !manager.IsOn(index)) continue;
                 var world = manager.Worlds[index];
+                shown = index;
                 Build();
                 title.Text = world.DisplayName;
                 line.Text = world.Hint;
@@ -104,6 +108,9 @@ namespace MusicInYourHands
         {
             var menu = WorldMenu.Instance;
             bool menuOpen = menu != null && menu.IsOpen;
+            // A world turned off takes its hint with it.
+            var manager = WorldManager.Instance;
+            if (age < showSeconds && shown >= 0 && manager != null && !manager.IsOn(shown)) age = showSeconds;
             // The hint's time only runs while the menu is closed; when it runs out, the next one waiting shows.
             if (!menuOpen && (age < showSeconds || !ShowNext())) age += Time.deltaTime;
             if (root == null) return;

@@ -374,7 +374,7 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                if (!hand.IsTracked) continue;
+                if (!hand.IsTracked || MenuOpen) continue;
                 var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
                 var flat = Vector3.ProjectOnPlane(drop.Position - palm, Vector3.up);
                 float height = drop.Position.y - palm.y;
@@ -393,7 +393,8 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                if (!hand.IsTracked) continue;
+                // While the menu is open the drops fall past the hands choosing there.
+                if (!hand.IsTracked || MenuOpen) continue;
                 var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
                 var cup = palm + hand.PalmNormal * 0.02f;
                 var flat = Vector3.ProjectOnPlane(drop.Position - cup, Vector3.up);

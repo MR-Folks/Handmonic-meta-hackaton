@@ -474,7 +474,8 @@ namespace MusicInYourHands
                 var hand = rig.Get(side == 0);
                 for (int k = 0; k < 6; k++)
                 {
-                    if (!hand.IsTracked)
+                    // While the menu is open the hands are choosing there.
+                    if (!hand.IsTracked || MenuOpen)
                     {
                         wasUnder[side, k] = false;
                         continue;
@@ -525,7 +526,8 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig?.Get(side == 0);
-                bool now = hand != null && hand.IsTracked && hand.Pinch > 0.8f && !hand.InSystemGesture;
+                // While the menu is open the hands are choosing there.
+                bool now = hand != null && hand.IsTracked && hand.Pinch > 0.8f && !hand.InSystemGesture && !MenuOpen;
                 if (!now)
                 {
                     if (pouring[side])

@@ -905,7 +905,8 @@ namespace MusicInYourHands
             {
                 var hand = rig.Get(s == 0);
                 var grip = grips[s];
-                grip.Tracked = hand.IsTracked && !hand.InSystemGesture;
+                // While the menu is open the hands are choosing there: no planet lights up for them, and no palm warms the sun.
+                grip.Tracked = hand.IsTracked && !hand.InSystemGesture && !MenuOpen;
                 if (hand.IsTracked) grip.Point = PinchPoint(hand);
                 grip.Pinch = grip.Tracked ? hand.Pinch : 0f;
                 grip.Near = grip.Tracked && grip.Held < 0 && !IsPinching(s == 0) ? Nearest(grip.Point) : -1;

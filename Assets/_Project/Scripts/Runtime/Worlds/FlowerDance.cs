@@ -477,7 +477,8 @@ namespace MusicInYourHands
                 for (int s = 0; s < 2; s++)
                 {
                     var hand = rig.Get(s == 0);
-                    if (!hand.IsTracked || hand.InSystemGesture) continue;
+                    // While the menu is open the hands are choosing there.
+                    if (!hand.IsTracked || hand.InSystemGesture || MenuOpen) continue;
                     var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
                     var local = ToLocal(palm - f.Root, f.Yaw);
                     // The lean that would bring its tip under the palm.

@@ -14,7 +14,7 @@ namespace MusicInYourHands
     /// away, recenter) or the room scan changes, so the world can set itself up around you.</item>
     /// <item>The frame's events: <b>OnBeat</b> on each beat, <b>OnNote</b> when a melody note starts, <b>OnWord</b>
     /// when a sung word starts (lyric worlds also get the song title's words when a song has no lyrics), and
-    /// <b>OnPinch</b> / <b>OnRelease</b> for each hand.</item>
+    /// <b>OnPinch</b> / <b>OnRelease</b> for each hand (none while the menu is open: see <see cref="MenuOpen"/>).</item>
     /// <item><b>OnStep</b>, the world's own update for the frame. The sung words are drawn after it.</item>
     /// </list>
     /// <b>OnEnter</b> runs each time the world is turned on and <b>OnExit</b> when it is turned off: undo there
@@ -31,7 +31,8 @@ namespace MusicInYourHands
     {
         /// <summary>
         /// The parts of the room and of your body a world uses. Worlds that share none of them can be on together;
-        /// choosing a world that shares one with a world that is on turns that one off.
+        /// choosing a world that shares one with a world that is on turns that one off. Inside a world, Space means this
+        /// one: write UnityEngine.Space for Unity's own (as in transform.Rotate(axis, angle, UnityEngine.Space.World)).
         /// </summary>
         [System.Flags]
         public enum Space
@@ -129,10 +130,10 @@ namespace MusicInYourHands
         /// </summary>
         protected virtual void OnWord(string word, bool newLine) { }
 
-        /// <summary>A hand closed a pinch (index and thumb together).</summary>
+        /// <summary>A hand closed a pinch (index and thumb together). Not while the menu is open.</summary>
         protected virtual void OnPinch(HandRig.Hand hand, bool left) { }
 
-        /// <summary>A hand let a pinch go, or was lost while pinching.</summary>
+        /// <summary>A hand let a pinch go, was lost while pinching, or the menu opened while it pinched.</summary>
         protected virtual void OnRelease(HandRig.Hand hand, bool left) { }
 
         /// <summary>The world's own update for this frame, after placing and the events.</summary>
@@ -174,7 +175,8 @@ namespace MusicInYourHands
         /// <summary>
         /// Whether the world dresses the hands: its Theme, HandSkin's focus point and charge, and nudging the visible
         /// hands. A world on its own always does; with several on, WorldManager picks one (the one that uses the Hands
-        /// space, else the one chosen last), and World undoes what the others' hooks do to the hands.
+        /// space, else one that uses the pinch, the fists or what is in front of you, else the one chosen last), and
+        /// World undoes what the others' hooks do to the hands.
         /// </summary>
         public bool OwnsHands { get; private set; } = true;
 
@@ -204,6 +206,20 @@ namespace MusicInYourHands
         /// <summary>Whether a hand is pinching, by the same rule as OnPinch and OnRelease.</summary>
         protected bool IsPinching(bool left) => pinching[left ? 0 : 1];
 
+        /// <summary>
+        /// True while the world menu is open: the hands are choosing there, so a world leaves their pinches, touches and
+        /// fists alone. OnPinch and OnRelease already do (a pinch held as the menu opens is let go), but a world that
+        /// reads the hands itself (hand.Pinch, a fingertip on something, a fist) should check this too.
+        /// </summary>
+        protected bool MenuOpen
+        {
+            get
+            {
+                var menu = WorldMenu.Instance;
+                return menu != null && menu.IsOpen;
+            }
+        }
+
         /// <summary>Whether the world is on: between Enter (OnEnter) and Exit (OnExit).</summary>
         public bool IsOn => entered;
 
@@ -229,6 +245,8 @@ namespace MusicInYourHands
         int nextNote;
         float noteTime;
         readonly bool[] pinching = new bool[2];
+        // A hand that pinched while the menu was open must open its pinch before its next pinch counts here.
+        readonly bool[] waitOpen = new bool[2];
 
         // Re-anchoring: worlds placed in the room move to you when you sit down, stand up, walk elsewhere or
         // recenter, instead of staying where you were when the world started.
@@ -333,6 +351,7 @@ namespace MusicInYourHands
                 Sung.Reset();
                 noteTrack = null;
                 pinching[0] = pinching[1] = false;
+                waitOpen[0] = waitOpen[1] = false;
                 beatPending = false;
                 if (MusicBus.Instance != null) MusicBus.Instance.Beat += OnBusBeat;
                 OnEnter();
@@ -465,15 +484,22 @@ namespace MusicInYourHands
             OnWord(Sung.Word, newLine);
         }
 
-        /// <summary>OnPinch and OnRelease, with hysteresis so a pinch held near the threshold doesn't flicker.</summary>
+        /// <summary>
+        /// OnPinch and OnRelease, with hysteresis so a pinch held near the threshold doesn't flicker. While the menu is
+        /// open the pinches are the menu's: a pinch held as it opens is let go (OnRelease), and one still held as it
+        /// closes only counts once it has opened and closed again.
+        /// </summary>
         void DispatchPinches(HandRig rig)
         {
+            bool menu = MenuOpen;
             for (int s = 0; s < 2; s++)
             {
                 var hand = rig != null ? rig.Get(s == 0) : null;
                 bool was = pinching[s];
-                bool now = hand != null && hand.IsTracked && !hand.InSystemGesture
-                    && hand.Pinch >= (was ? PinchThresholds.y : PinchThresholds.x);
+                bool usable = hand != null && hand.IsTracked && !hand.InSystemGesture;
+                if (menu) waitOpen[s] = true;
+                else if (!usable || hand.Pinch < PinchThresholds.y) waitOpen[s] = false;
+                bool now = usable && !menu && !waitOpen[s] && hand.Pinch >= (was ? PinchThresholds.y : PinchThresholds.x);
                 pinching[s] = now;
                 if (now && !was) OnPinch(hand, s == 0);
                 else if (!now && was) OnRelease(hand, s == 0);

@@ -17,13 +17,14 @@ namespace MusicInYourHands
     /// from farther away and pinch. A pointing hand casts a soft ray onto the menu (from the shoulder through the
     /// pinch); once its fingertip comes within 15 cm of the menu, the ray gives way to a dot under the fingertip that
     /// shrinks as the finger nears (Meta's touch specs). The bubble you point at or reach for swells and the caption
-    /// above the honeycomb says what choosing it will do. Under the menu a line says how to choose, or that a song is
-    /// loading or couldn't play, and while a song from Audius plays, a second line gives the credit its license asks for.
+    /// above the honeycomb says what choosing it will do. Under the menu a line says how to choose and how to close the
+    /// menu, or that a song is loading or couldn't play, and while a song from Audius plays, a second line gives the
+    /// credit its license asks for.
     /// Several worlds can be on at once (see WorldManager): each one that is on wears a ring, choosing another adds it
     /// ("Add Flower dance") or swaps it for the ones it clashes with ("Swap Cube field for Flower dance"), and choosing
-    /// one that is on turns it off ("Turn off Solar system"). The menu stays open after each choice, so you can put
-    /// several together; the menu gesture closes it. With no bubble under a finger, the caption names the worlds that
-    /// are on.
+    /// one that is on turns it off ("Turn off Solar system"). The menu stays open while you put worlds together; the
+    /// menu gesture closes it, and so does a choice that leaves a single world on, a moment later. With no bubble under
+    /// a finger, the caption names the worlds that are on. While the menu is open the worlds leave your hands alone.
     /// </summary>
     [DefaultExecutionOrder(170)]
     public class WorldMenu : MonoBehaviour
@@ -120,7 +121,8 @@ namespace MusicInYourHands
         const float TouchContact = 0.005f, TouchRearm = 0.02f;
         // The song page sits this far behind the bubbles.
         const float PageDepth = 0.003f;
-        const string ChooseHint = "Touch or pinch to choose";
+        // How to choose, and, since the menu stays open while worlds are put together, how to close it (Meta's menu gesture).
+        const string ChooseHint = "Touch or pinch to choose. Turn your left palm to you and pinch to close.";
 
         Bubble[] bubbles = Array.Empty<Bubble>();
         readonly Pointer[] pointers = { new Pointer(), new Pointer() };
@@ -139,12 +141,13 @@ namespace MusicInYourHands
         readonly Vector2?[] presses = new Vector2?[2];
         float honeycomb = 1f;
         bool open, toggleRequested, snapRings;
-        float openTime, cooldown;
+        float openTime, closeAt = -1f, cooldown;
         // The caption for a world bubble (or for none, -1), kept until the bubble or the worlds that are on change.
         int captionWorld = int.MinValue, captionVersion = -1;
         string captionText = "";
         // What the last world bubble pressed did ("Added Flower dance"), said while it stays under the finger for a moment.
-        int doneWorld = -1;
+        // int.MinValue is no bubble: -1 and below are the song row's.
+        int doneWorld = int.MinValue;
         float doneUntil;
         string doneText = "";
         // The worlds choosing the world bubble under a finger would swap out, kept until that or the worlds on change.
@@ -157,6 +160,9 @@ namespace MusicInYourHands
         float surface;
 
         public bool IsOpen => open;
+
+        /// <summary>The caption's words right now (for the editor checks).</summary>
+        public string CaptionText => caption != null ? caption.Text : "";
 
         void OnEnable()
         {
@@ -181,16 +187,20 @@ namespace MusicInYourHands
             Step(HandRig.Instance, WorldManager.Instance, MusicBus.Instance, Camera.main, Time.deltaTime);
         }
 
-        /// <summary>Opens the menu in front of the viewer.</summary>
+        /// <summary>Opens the menu in front of the viewer. While it is open the worlds leave the hands alone (World.MenuOpen).</summary>
         public void Open(Camera view)
         {
             if (view == null) return;
+            // The menu that is open is the one the worlds ask about (the editor checks have no OnEnable to set it).
+            Instance = this;
             // Songs copied onto the headset while the app runs show up the next time the menu opens.
             MusicBus.Instance?.RefreshSongs();
             open = true;
             openTime = 0f;
+            closeAt = -1f;
             snapRings = true;
-            doneWorld = -1;
+            doneWorld = int.MinValue;
+            doneUntil = 0f;
             Place(view);
             foreach (var b in bubbles) b.Pop = 0f;
             // The pinch that opened the menu (Meta's menu gesture) must be let go before a pinch can select, and a
@@ -260,14 +270,16 @@ namespace MusicInYourHands
             else if (open) Follow(view, dt);
             openTime += dt;
             cooldown -= dt;
+            if (closeAt >= 0f && openTime >= closeAt) Close();
 
             bool anyVisible = false;
             var gaze = GazePoint(view);
             UpdatePointers(rig, view, dt);
 
             float t = Application.isPlaying ? Time.time : 0f;
-            int hovered = -1;
-            FindGoing(manager);
+            // The one bubble the caption speaks of, and whose choice the rings preview.
+            int hovered = FocusBubble();
+            FindGoing(manager, hovered);
             for (int i = 0; i < bubbles.Length; i++)
             {
                 var b = bubbles[i];
@@ -291,7 +303,6 @@ namespace MusicInYourHands
 
                 bool aimed = open && !library.IsOpen && (pointers[0].Target == i || pointers[1].Target == i);
                 b.Hover = Mathf.MoveTowards(b.Hover, aimed ? 1f : 0f, dt * 7f);
-                if (aimed) hovered = i;
 
                 float scale = size * (1f + b.Hover * 0.2f + b.Pop * 0.45f);
                 b.Renderer.transform.position = world;
@@ -641,15 +652,29 @@ namespace MusicInYourHands
         }
 
         /// <summary>
-        /// The worlds that choosing the world bubble a finger is on would swap out (none for other bubbles, or for a
-        /// world that would only turn off), found again only when that bubble or the worlds that are on change.
+        /// The one bubble the caption speaks of, and whose choice the rings preview: the one a fingertip touching the
+        /// menu is on, else one a hand points at, or -1.
         /// </summary>
-        void FindGoing(WorldManager manager)
+        int FocusBubble()
         {
-            int target = -1;
-            if (open && !library.IsOpen)
-                foreach (var p in pointers)
-                    if (p.Target >= 0 && bubbles[p.Target].World >= 0) target = bubbles[p.Target].World;
+            if (!open || library.IsOpen) return -1;
+            int pointed = -1;
+            foreach (var p in pointers)
+            {
+                if (p.Target < 0) continue;
+                if (p.Touching) return p.Target;
+                if (pointed < 0) pointed = p.Target;
+            }
+            return pointed;
+        }
+
+        /// <summary>
+        /// The worlds that choosing the world bubble in focus would swap out (none for other bubbles, or for a world
+        /// that would only turn off), found again only when that bubble or the worlds that are on change.
+        /// </summary>
+        void FindGoing(WorldManager manager, int focus)
+        {
+            int target = focus >= 0 ? bubbles[focus].World : -1;
             if (target == goingFor && manager.Version == goingVersion) return;
             goingFor = target;
             goingVersion = manager.Version;
@@ -674,8 +699,10 @@ namespace MusicInYourHands
             b.Pop = 1f;
             if (b.World >= 0)
             {
-                // The menu stays open, so more worlds can be put together; the menu gesture closes it. A world turning
-                // off answers an octave lower, and the one world that stays on only softly.
+                // The menu stays open while worlds are being put together, so more can join; the menu gesture closes
+                // it. A choice that leaves a single world on (a swap for all that were on) closes it a moment later, as
+                // choosing a world always used to. A world turning off answers an octave lower, and the one world
+                // that stays on only softly.
                 string name = manager.Worlds[b.World].DisplayName;
                 var choice = manager.Plan(b.World, replaced);
                 doneText = choice switch
@@ -688,6 +715,7 @@ namespace MusicInYourHands
                 doneWorld = b.World;
                 doneUntil = openTime + 1.5f;
                 manager.Choose(b.World);
+                if (choice == WorldManager.Choice.Swap && manager.Active.Count == 1) closeAt = openTime + 0.35f;
                 float tone = Synth.Pentatonic[(choice == WorldManager.Choice.TurnOff ? 1 : 6) + b.World % 5];
                 voices.Play(Synth.Chime(tone), b.Renderer.transform.position, choice == WorldManager.Choice.StayOn ? 0.25f : 0.6f);
                 return;

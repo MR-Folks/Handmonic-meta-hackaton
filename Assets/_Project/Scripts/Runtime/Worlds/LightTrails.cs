@@ -170,7 +170,8 @@ namespace MusicInYourHands
         /// <summary>While a hand pinches, its stroke grows from the pinch point; a small light marks the nib.</summary>
         void Draw(HandRig.Hand hand, int side, Color color, MusicFrame music, Camera view, float dt)
         {
-            bool pinching = hand.IsTracked && hand.Pinch > 0.8f && !hand.InSystemGesture;
+            // A pinch at the open menu chooses there; it doesn't draw.
+            bool pinching = hand.IsTracked && hand.Pinch > 0.8f && !hand.InSystemGesture && !MenuOpen;
             var nib = nibs[side];
             if (nib.gameObject.activeSelf != hand.IsTracked) nib.gameObject.SetActive(hand.IsTracked);
             if (!hand.IsTracked) { drawing[side] = null; return; }
@@ -282,7 +283,7 @@ namespace MusicInYourHands
         /// <summary>Both hands held as fists for a moment clears the sculpture, with a quick fade.</summary>
         void ClearWithFists(HandRig rig, float dt)
         {
-            bool fists = rig.Left.IsTracked && rig.Right.IsTracked && rig.Left.Fist > 0.7f && rig.Right.Fist > 0.7f;
+            bool fists = !MenuOpen && rig.Left.IsTracked && rig.Right.IsTracked && rig.Left.Fist > 0.7f && rig.Right.Fist > 0.7f;
             clearHold = fists ? clearHold + dt : 0f;
             if (clearHold > 0.8f && clearFade >= 1f)
             {

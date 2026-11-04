@@ -159,7 +159,8 @@ namespace MusicInYourHands
             float kick = music.Kick;
             var left = rig.Left;
             var right = rig.Right;
-            bool holding = left.IsTracked && right.IsTracked;
+            // While the menu is open the hands are choosing there: the orb lets go (and the volume stays put) until it closes.
+            bool holding = left.IsTracked && right.IsTracked && !MenuOpen;
             float spread = 0f;
             if (holding)
             {

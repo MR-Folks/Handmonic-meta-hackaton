@@ -262,7 +262,8 @@ namespace MusicInYourHands
                 for (int side = 0; side < 2; side++)
                 {
                     var hand = rig.Get(side == 0);
-                    if (!hand.IsTracked || hand.Fist < 0.6f) continue;
+                    // While the menu is open the hands are choosing there.
+                    if (!hand.IsTracked || hand.Fist < 0.6f || MenuOpen) continue;
                     var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
                     if (Vector3.Distance(palm, front) < pullRadius) { fistPull = true; pullTo = palm; }
                 }
@@ -327,7 +328,7 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                if (!hand.IsTracked || hand.Fist > 0.6f) continue;
+                if (!hand.IsTracked || hand.Fist > 0.6f || MenuOpen) continue;
                 for (int k = 0; k < 6; k++)
                 {
                     var point = k < 5 ? (hand.TipJoints[k] != null ? hand.TipJoints[k].position : hand.Tips[k])
@@ -368,7 +369,7 @@ namespace MusicInYourHands
                         var tip = hand.TipJoints[k] != null ? hand.TipJoints[k].position : hand.Tips[k];
                         var move = (tip - lastTips[side, k]) / dt;
                         lastTips[side, k] = tip;
-                        if (!hand.IsTracked || move.magnitude > 6f) continue;
+                        if (!hand.IsTracked || move.magnitude > 6f || MenuOpen) continue;
                         for (int r = 0; r < rings.Length; r++)
                         {
                             // The ring's nearest point to the fingertip, and the ring's direction there.

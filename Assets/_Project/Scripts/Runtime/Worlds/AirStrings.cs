@@ -234,7 +234,8 @@ namespace MusicInYourHands
                 for (int f = 0; f < 5; f++)
                 {
                     int finger = side * 5 + f;
-                    if (!hand.IsTracked)
+                    // While the menu is open the fingers are choosing there, not playing.
+                    if (!hand.IsTracked || MenuOpen)
                     {
                         for (int i = 0; i < stringCount; i++) hadSide[finger, i] = false;
                         continue;

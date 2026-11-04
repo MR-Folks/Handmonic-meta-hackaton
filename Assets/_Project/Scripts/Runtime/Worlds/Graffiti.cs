@@ -215,7 +215,8 @@ namespace MusicInYourHands
                 if (!string.IsNullOrEmpty(word)) SprayTag(word, line, hit, normal, onWall, view);
             }
 
-            bool pinching = aimHand != null && aimHand.Pinch > 0.8f;
+            // A pinch at the open menu chooses there; it doesn't spray.
+            bool pinching = aimHand != null && aimHand.Pinch > 0.8f && !MenuOpen;
             HandSkin.FocusStrength = pinching ? 1f : 0.35f;
             Spray(pinching, nozzle, hit, normal, dt);
             DrawReticle(aimHand != null, hit, normal, pinching, music);
