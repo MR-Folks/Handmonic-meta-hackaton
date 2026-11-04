@@ -283,8 +283,10 @@ namespace MusicInYourHands
             int used = Room.Scanned ? PlantOnFurniture(head, forward, floorY) : 0;
             PlantRows(head, forward, floorY, used);
             garden.gameObject.SetActive(true);
-            // The shader moves every flower into place, so the mesh's own bounds mean nothing: cover the garden.
-            garden.bounds = new Bounds(new Vector3(head.x, floorY + 1.3f, head.z), new Vector3(7f, 3.2f, 7f));
+            // The shader moves every flower into place, so the bounds the mesh was built with mean nothing: make them
+            // cover the garden round you, in the garden's own space, the way the other worlds set their bounds.
+            var centre = garden.transform.InverseTransformPoint(new Vector3(head.x, floorY + 1.3f, head.z));
+            mesh.bounds = new Bounds(centre, new Vector3(9f, 4f, 9f));
         }
 
         /// <summary>On each beat a few flowers get bold, mostly ones you can see.</summary>
