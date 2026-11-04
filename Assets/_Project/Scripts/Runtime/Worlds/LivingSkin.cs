@@ -7,7 +7,7 @@ namespace MusicInYourHands
     /// The Living skin world: your hands are made of the music. Each fingertip carries a soft light tuned to one
     /// frequency band, every beat sends a round wave out of each palm in the colour of one of the fingers, sparks drift
     /// off the fingertips as they move, and quick finger movements leave short trails of light in the air. Each wave
-    /// carries on across the room and lands on it, lighting veins in the walls (LivingWalls), and each sung word flies
+    /// carries on across the room and lands on it, lighting veins in the walls (RoomWaves), and each sung word flies
     /// from your palm to the wall ahead. The pulse that runs through the hand itself lives in the hand shader (see HandSkin).
     /// </summary>
     [DefaultExecutionOrder(150)]
@@ -108,7 +108,7 @@ namespace MusicInYourHands
         Quaternion lineRotation = Quaternion.identity;
         float lineSize = 1f;
         bool lineShowing;
-        LivingWalls walls;
+        RoomWaves walls;
         int beats;
 
         protected override int SungWordCount => 24;
@@ -172,7 +172,7 @@ namespace MusicInYourHands
 
             sparks = Effects.MakeSparkSystem("Sparks", transform, glowMaterial);
             if (SungWords != null) SungWords.Rim = 0.9f;
-            if (wallMaterial != null) walls = new LivingWalls(transform, wallMaterial, halfSize, roomHeight);
+            if (wallMaterial != null) walls = new RoomWaves(transform, wallMaterial, halfSize, roomHeight);
         }
 
         /// <summary>Lays the room's walls around where you stand, for the waves and the sung words to land on.</summary>

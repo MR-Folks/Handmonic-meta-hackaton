@@ -6,11 +6,15 @@ namespace MusicInYourHands
     /// <summary>
     /// The Sound pool world: a liquid surface at table height in front of you. The bass rolls slow swells across it,
     /// each kick drops a ring in the middle, and every melody note falls in as a glowing droplet exactly when it is
-    /// sung, placed by pitch from left (low) to right (high). Specks of light float in the water and ride its waves,
-    /// and the stirred water throws shifting light on the floor below. Dip your hand in and the liquid parts around
-    /// your fingers and ripples out as you move, and the music bends around it: the deeper your hand, the more muffled
-    /// the song sounds, as if you were hearing it under water. Your hand glistens below the waterline. Pinch above the
-    /// pool and a stream of droplets pours from your fingers, rippling the water where it lands.
+    /// sung, placed by pitch from left (low) to right (high). The surface is dotted with an even grid of low-poly beads
+    /// that ride its waves, swelling and glowing on the crests. The stirred water throws shifting light on the floor
+    /// below, and the same light carries on across the whole room, dimming with distance (RoomWaves): each kick, and
+    /// each hand that breaks the surface, sends a brighter swell of it out over the walls, floor and ceiling.
+    /// Dip your hand in and the liquid parts around your fingers and ripples out as you move, and the music bends
+    /// around it: the deeper your hand, the more muffled the song sounds, as if you were hearing it under water. Your
+    /// hand glistens below the waterline. Pinch above the pool and a clear stream pours from your fingers, curving as
+    /// your hand moves, thinning as it falls and breaking into beads where it meets the water; let go and its tail
+    /// falls as drops.
     /// </summary>
     public class SoundPool : World
     {
@@ -36,6 +40,17 @@ namespace MusicInYourHands
         [Header("Materials")]
         [SerializeField] Material waterMaterial;
         [SerializeField] Material causticsMaterial;
+        [Tooltip("The low-poly beads dotting the surface (Materials/Facet). Needs GPU instancing.")]
+        [SerializeField] Material facetMaterial;
+        [Tooltip("The stream poured from a pinch (Materials/Stream).")]
+        [SerializeField] Material streamMaterial;
+        [Tooltip("The water light spreading over the room (Materials/RoomRipples).")]
+        [SerializeField] Material roomRipplesMaterial;
+
+        [Header("Room")]
+        [Tooltip("Half the width and depth of the stand-in room (m), and its height.")]
+        [SerializeField] Vector2 roomHalfSize = new Vector2(1.8f, 1.8f);
+        [SerializeField] float roomHeight = 2.6f;
 
         [Header("Pool")]
         [SerializeField] Vector2 size = new Vector2(0.7f, 0.48f);
@@ -58,22 +73,57 @@ namespace MusicInYourHands
 
         static readonly int KickId = Shader.PropertyToID("_Kick");
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
+        static readonly int TintId = Shader.PropertyToID("_Tint");
+        static readonly int LengthId = Shader.PropertyToID("_Length");
+        static readonly int ClockId = Shader.PropertyToID("_Clock");
         static readonly Color[] DropColors = { Effects.Blue, Effects.Mint, new Color(0.6f, 0.92f, 1f), Effects.Violet };
+        static readonly Color BeadDeep = new Color(0.25f, 0.6f, 1f);
+        static readonly Color BeadCrest = new Color(0.72f, 0.96f, 1f);
+        static readonly Color RippleColor = new Color(0.45f, 0.85f, 1f);
+
+        /// <summary>A drop of poured water. Attached drops are still part of the stream; let go, they fall as drops.</summary>
+        struct Drip
+        {
+            public Vector3 Position, Velocity;
+            public Color Color;
+            public int Side;
+            public bool Attached;
+        }
 
         Transform surface;
         Mesh mesh;
         MeshRenderer surfaceRenderer;
         Vector3[] vertices, normals;
         float[] height, previous, next, sponge;
-        ParticleSystem splashes, specks, stream;
+        ParticleSystem splashes, loose;
         Renderer caustics;
-        ParticleSystem.Particle[] speckOut, streamOut;
-        Vector3[] speckSeed;
-        readonly List<(Vector3 position, Vector3 velocity, Color color)> drips = new List<(Vector3, Vector3, Color)>();
+        ParticleSystem.Particle[] looseOut;
+        Quaternion[] beadTurn;
+        Mesh beadMesh;
+        // How tall the ocean swell is this frame (m), from the bass and the kick.
+        float swellHeight;
+        Matrix4x4[] beadMatrices;
+        Vector4[] beadTints;
+        MaterialPropertyBlock beadBlock;
+        LineStrip[] streams;
+        Vector3[] streamPath;
+        float[] streamWidths;
+        RoomWaves room;
+        readonly List<Drip> drips = new List<Drip>();
         readonly float[] streamDebt = new float[2];
+        readonly bool[] pouring = new bool[2];
+        readonly Vector3[] pourFrom = new Vector3[2];
+        readonly Vector3[] lastPourFrom = new Vector3[2];
+        // The hand's speed with tracking jitter smoothed out, so neighbouring drops leave it alike.
+        readonly Vector3[] pourVelocity = new Vector3[2];
+        Vector3[] streamSmooth;
+        Vector3 litPoint;
         float stir;
-        const int SpeckCount = 420;
+        // The beads over the surface, about two centimetres apart, in lines across the pool.
+        const int BeadColumns = 35, BeadRows = 24, BeadCount = BeadColumns * BeadRows;
+        const float BeadSize = 0.0045f;
         const int MaxDrips = 260;
+        const int StreamPoints = 48;
         MaterialPropertyBlock block;
         AudioLowPassFilter lowPass;
         readonly HashSet<float> spawned = new HashSet<float>();
@@ -151,16 +201,74 @@ namespace MusicInYourHands
             caustics = Effects.MakeQuad("Water Light", transform, causticsMaterial);
             caustics.gameObject.SetActive(false);
 
-            // Specks floating at different depths in the water, each at a fixed spot across the pool.
+            // Each bead is turned its own way, so neighbours show different facets.
             var random = new System.Random(4);
-            speckSeed = new Vector3[SpeckCount];
-            for (int i = 0; i < SpeckCount; i++)
-                speckSeed[i] = new Vector3((float)random.NextDouble() * 0.9f + 0.05f, -(float)System.Math.Pow(random.NextDouble(), 1.6) * 0.06f + 0.003f,
-                    (float)random.NextDouble() * 0.9f + 0.05f);
-            speckOut = new ParticleSystem.Particle[SpeckCount];
-            specks = MakeManualSystem("Specks", SpeckCount, false);
-            streamOut = new ParticleSystem.Particle[MaxDrips];
-            stream = MakeManualSystem("Stream", MaxDrips, true);
+            float Next() => (float)random.NextDouble();
+            beadTurn = new Quaternion[BeadCount];
+            for (int i = 0; i < BeadCount; i++)
+                beadTurn[i] = Quaternion.Euler(Next() * 360f, Next() * 360f, Next() * 360f);
+            beadMesh = LowPolySphere();
+            beadMatrices = new Matrix4x4[BeadCount];
+            beadTints = new Vector4[BeadCount];
+            beadBlock = new MaterialPropertyBlock();
+            // All the beads are one instanced draw, which the material must allow.
+            if (facetMaterial != null && !facetMaterial.enableInstancing) facetMaterial.enableInstancing = true;
+
+            looseOut = new ParticleSystem.Particle[MaxDrips];
+            loose = MakeManualSystem("Drops", MaxDrips, true);
+            if (streamMaterial != null)
+            {
+                streams = new LineStrip[2];
+                for (int s = 0; s < 2; s++)
+                {
+                    streams[s] = new LineStrip(s == 0 ? "Pour L" : "Pour R", transform, streamMaterial, StreamPoints);
+                    streams[s].SetVisible(false);
+                }
+            }
+            streamPath = new Vector3[StreamPoints];
+            streamWidths = new float[StreamPoints];
+            streamSmooth = new Vector3[StreamPoints];
+            if (roomRipplesMaterial != null) room = new RoomWaves(transform, roomRipplesMaterial, roomHalfSize, roomHeight);
+        }
+
+        /// <summary>
+        /// A low-poly ball: an icosahedron (twenty faces) of diameter 1, each face with its own three vertices and normal
+        /// so it shades flat, like a cut bead.
+        /// </summary>
+        static Mesh LowPolySphere()
+        {
+            float g = (1f + Mathf.Sqrt(5f)) * 0.5f;
+            Vector3[] corners =
+            {
+                new Vector3(-1, g, 0), new Vector3(1, g, 0), new Vector3(-1, -g, 0), new Vector3(1, -g, 0),
+                new Vector3(0, -1, g), new Vector3(0, 1, g), new Vector3(0, -1, -g), new Vector3(0, 1, -g),
+                new Vector3(g, 0, -1), new Vector3(g, 0, 1), new Vector3(-g, 0, -1), new Vector3(-g, 0, 1)
+            };
+            int[] faces =
+            {
+                0, 11, 5, 0, 5, 1, 0, 1, 7, 0, 7, 10, 0, 10, 11, 1, 5, 9, 5, 11, 4, 11, 10, 2, 10, 7, 6, 7, 1, 8,
+                3, 9, 4, 3, 4, 2, 3, 2, 6, 3, 6, 8, 3, 8, 9, 4, 9, 5, 2, 4, 11, 6, 2, 10, 8, 6, 7, 9, 8, 1
+            };
+            var vertices = new Vector3[faces.Length];
+            var normals = new Vector3[faces.Length];
+            var triangles = new int[faces.Length];
+            for (int f = 0; f < faces.Length; f += 3)
+            {
+                var a = corners[faces[f]].normalized * 0.5f;
+                var b = corners[faces[f + 1]].normalized * 0.5f;
+                var c = corners[faces[f + 2]].normalized * 0.5f;
+                var n = Vector3.Cross(b - a, c - a).normalized;
+                if (Vector3.Dot(n, a) < 0f) n = -n;
+                vertices[f] = a; vertices[f + 1] = b; vertices[f + 2] = c;
+                normals[f] = normals[f + 1] = normals[f + 2] = n;
+                triangles[f] = f; triangles[f + 1] = f + 1; triangles[f + 2] = f + 2;
+            }
+            var mesh = new Mesh { name = "Low-poly bead" };
+            mesh.vertices = vertices;
+            mesh.normals = normals;
+            mesh.triangles = triangles;
+            mesh.RecalculateBounds();
+            return mesh;
         }
 
         /// <summary>A particle system whose particles this world places itself every frame.</summary>
@@ -202,8 +310,10 @@ namespace MusicInYourHands
             if (surface != null) surface.gameObject.SetActive(false);
             if (caustics != null) caustics.gameObject.SetActive(false);
             drips.Clear();
-            if (specks != null) specks.Clear();
-            if (stream != null) stream.Clear();
+            pouring[0] = pouring[1] = false;
+            if (loose != null) loose.Clear();
+            if (streams != null) foreach (var s in streams) s.SetVisible(false);
+            room?.Hide();
             cutoff = 22000f;
             if (lowPass != null) lowPass.enabled = false;
             if (splashes != null) splashes.Clear();
@@ -222,14 +332,21 @@ namespace MusicInYourHands
             surface.gameObject.SetActive(true);
             // The water's light falls on the table under it, or on the floor right below it.
             float lit = onTable ? spot.y + 0.003f : Effects.FloorY(view) + 0.004f;
-            caustics.transform.SetPositionAndRotation(new Vector3(center.x, lit, center.z), Quaternion.LookRotation(Vector3.down, forward));
+            litPoint = new Vector3(center.x, lit, center.z);
+            caustics.transform.SetPositionAndRotation(litPoint, Quaternion.LookRotation(Vector3.down, forward));
             float spread = onTable ? 1.1f : 1.4f;
             caustics.transform.localScale = new Vector3(size.x * spread, size.y * spread, 1f);
-            caustics.gameObject.SetActive(true);
+            // On the floor, the room's own floor carries this light on outwards, so the patch would only double it.
+            caustics.gameObject.SetActive(onTable || room == null);
+            room?.Place(view.transform.position, forward, Effects.FloorY(view));
         }
 
-        /// <summary>Each kick drops a ring in the middle of the pool.</summary>
-        protected override void OnBeat(MusicFrame music) => Disturb(new Vector2(0.5f, 0.5f), 0.05f, -0.006f - music.Kick * 0.004f);
+        /// <summary>Each kick drops a ring in the middle of the pool, and sends its light out across the room.</summary>
+        protected override void OnBeat(MusicFrame music)
+        {
+            Disturb(new Vector2(0.5f, 0.5f), 0.05f, -0.006f - music.Kick * 0.004f);
+            room?.Ripple(surface.position, RippleColor, 0.45f + music.Kick * 0.55f);
+        }
 
         /// <summary>
         /// Each sung word lands on the water with a ripple and floats there, written on the surface: rising and
@@ -258,14 +375,20 @@ namespace MusicInYourHands
             Simulate(dt);
             UpdateMesh(music);
             Muffle(music.Bus, dip, dt);
-            DrawSpecks(music);
+            DrawBeads(music);
             Sing(music, view, dt);
 
             stir *= Mathf.Exp(-dt * 1.5f);
+            float light = (0.25f + music.Band(1) * 0.35f + Mathf.Min(stir, 1f) * 0.6f) * FadeIn;
             block.Clear();
-            block.SetFloat("_Strength", (0.25f + music.Band(1) * 0.35f + Mathf.Min(stir, 1f) * 0.6f) * FadeIn);
+            block.SetFloat("_Strength", light);
             block.SetFloat("_Clock", Now);
             caustics.SetPropertyBlock(block);
+            if (room != null)
+            {
+                room.SetLight(litPoint, light);
+                room.Step(music, dt);
+            }
 
             block.Clear();
             block.SetFloat(KickId, music.Kick);
@@ -372,6 +495,8 @@ namespace MusicInYourHands
                         {
                             Disturb(spot, radius * 1.5f, -0.006f);
                             Splash(SurfacePoint(spot), Effects.Blue, k < 5 ? 4 : 10, 0.25f);
+                            // A palm breaking the surface sends its own ring of light out over the room.
+                            if (k == 5) room?.Ripple(SurfacePoint(spot), Effects.Blue, 0.6f);
                         }
                     }
                     else if (wasUnder[side, k] && inside)
@@ -387,58 +512,127 @@ namespace MusicInYourHands
         }
 
         /// <summary>
-        /// Pinching pours a stream of droplets from between thumb and index; they fall under gravity and ripple the
-        /// water where they land (or vanish on the floor beside it).
+        /// Pinching pours water from between thumb and index. Each frame it lets go of a few drops that fall under
+        /// gravity; while you keep pinching they stay joined as one stream, drawn as a smooth curve through them from
+        /// your fingers down, so it bends as your hand moves. It ripples the water where it lands (or vanishes on the
+        /// floor beside it). Let go and the stream's tail falls on as separate drops.
         /// </summary>
         void Pour(HandRig rig, float dt)
         {
-            if (rig != null)
+            for (int side = 0; side < 2; side++)
             {
-                for (int side = 0; side < 2; side++)
+                var hand = rig?.Get(side == 0);
+                bool now = hand != null && hand.IsTracked && hand.Pinch > 0.8f && !hand.InSystemGesture;
+                if (!now)
                 {
-                    var hand = rig.Get(side == 0);
-                    bool pouring = hand.IsTracked && hand.Pinch > 0.8f && !hand.InSystemGesture;
-                    if (!pouring) { streamDebt[side] = 0f; continue; }
-                    var thumb = hand.TipJoints[0] != null ? hand.TipJoints[0].position : hand.Tips[0];
-                    var index = hand.TipJoints[1] != null ? hand.TipJoints[1].position : hand.Tips[1];
-                    var from = (thumb + index) * 0.5f;
-                    streamDebt[side] += 55f * dt;
-                    while (streamDebt[side] >= 1f && drips.Count < MaxDrips)
-                    {
-                        streamDebt[side] -= 1f;
-                        var v = hand.Velocity * 0.4f + Random.insideUnitSphere * 0.03f + Vector3.down * 0.15f;
-                        drips.Add((from + Random.insideUnitSphere * 0.004f, v, Color.Lerp(Effects.Blue, Color.white, Random.Range(0.2f, 0.6f))));
-                    }
+                    if (pouring[side])
+                        for (int i = 0; i < drips.Count; i++)
+                            if (drips[i].Side == side && drips[i].Attached) { var d = drips[i]; d.Attached = false; drips[i] = d; }
+                    pouring[side] = false;
+                    streamDebt[side] = 0f;
+                    continue;
                 }
+                var thumb = hand.TipJoints[0] != null ? hand.TipJoints[0].position : hand.Tips[0];
+                var index = hand.TipJoints[1] != null ? hand.TipJoints[1].position : hand.Tips[1];
+                pourFrom[side] = (thumb + index) * 0.5f;
+                if (!pouring[side])
+                {
+                    lastPourFrom[side] = pourFrom[side];
+                    pourVelocity[side] = hand.Velocity;
+                }
+                pouring[side] = true;
+                pourVelocity[side] = Vector3.Lerp(pourVelocity[side], hand.Velocity, 1f - Mathf.Exp(-6f * dt));
+                streamDebt[side] += 80f * dt;
+                int count = (int)streamDebt[side];
+                // Spread this frame's drops along the way the fingers moved since the last one, and start each a
+                // little further on in its fall, so they leave one after another instead of in a clump.
+                for (int k = 0; k < count && drips.Count < MaxDrips; k++)
+                {
+                    float back = (count - k) / (float)count;
+                    var velocity = pourVelocity[side] * 0.3f + Vector3.down * 0.15f;
+                    float early = back * dt;
+                    drips.Add(new Drip
+                    {
+                        Position = Vector3.Lerp(pourFrom[side], lastPourFrom[side], back) + velocity * early + Physics.gravity * (0.5f * early * early),
+                        Velocity = velocity + Physics.gravity * early,
+                        Color = Color.Lerp(Effects.Blue, Color.white, Random.Range(0.3f, 0.6f)),
+                        Side = side,
+                        Attached = true
+                    });
+                }
+                streamDebt[side] -= count;
+                lastPourFrom[side] = pourFrom[side];
             }
 
             float floor = surface.position.y - 2f;
             int n = 0;
             for (int i = drips.Count - 1; i >= 0; i--)
             {
-                var (p, v, c) = drips[i];
-                v += Physics.gravity * dt;
-                p += v * dt;
-                var local = surface.InverseTransformPoint(p);
+                var d = drips[i];
+                d.Velocity += Physics.gravity * dt;
+                d.Position += d.Velocity * dt;
+                var local = surface.InverseTransformPoint(d.Position);
                 var spot = new Vector2(local.x / size.x + 0.5f, local.z / size.y + 0.5f);
                 bool over = spot.x > 0f && spot.x < 1f && spot.y > 0f && spot.y < 1f;
                 if (over && local.y <= HeightAt(spot))
                 {
-                    Disturb(spot, 0.01f, -0.0022f);
-                    if (Random.value < 0.25f) Splash(p, c, 2, 0.12f);
+                    // The stream digs a dent where it lands and keeps throwing water up out of it; a loose drop splashes less.
+                    Disturb(spot, d.Attached ? 0.014f : 0.01f, d.Attached ? -0.003f : -0.0025f);
+                    if (Random.value < (d.Attached ? 0.4f : 0.35f)) Splash(d.Position, d.Color, d.Attached ? 5 : 3, d.Attached ? 0.75f : 0.4f);
                     drips.RemoveAt(i);
                     continue;
                 }
-                if (p.y < floor || local.y < -0.6f) { drips.RemoveAt(i); continue; }
-                drips[i] = (p, v, c);
-                if (n < MaxDrips)
-                    streamOut[n++] = new ParticleSystem.Particle
+                if (d.Position.y < floor || local.y < -0.6f) { drips.RemoveAt(i); continue; }
+                drips[i] = d;
+                // Drops still in the stream are drawn as part of it; loose ones as drops of their own.
+                if (!d.Attached && n < MaxDrips)
+                    looseOut[n++] = new ParticleSystem.Particle
                     {
-                        position = p, velocity = v, startColor = c, startSize = 0.0045f,
+                        position = d.Position, velocity = d.Velocity, startColor = d.Color, startSize = 0.006f,
                         startLifetime = 5f, remainingLifetime = 5f
                     };
             }
-            stream.SetParticles(streamOut, n);
+            loose.SetParticles(looseOut, n);
+            for (int side = 0; side < 2; side++) DrawStream(side);
+        }
+
+        /// <summary>
+        /// The stream from one hand: a curve from the fingers down through its drops, newest first. It narrows as the
+        /// water speeds up, as a real stream does.
+        /// </summary>
+        void DrawStream(int side)
+        {
+            if (streams == null) return;
+            var line = streams[side];
+            int count = 0;
+            if (pouring[side]) streamPath[count++] = pourFrom[side];
+            for (int i = drips.Count - 1; i >= 0 && count < StreamPoints; i--)
+            {
+                var d = drips[i];
+                if (d.Side != side || !d.Attached) continue;
+                streamPath[count] = d.Position;
+                streamWidths[count] = Mathf.Clamp(Mathf.Sqrt(0.6f / Mathf.Max(d.Velocity.magnitude, 0.6f)), 0.35f, 1f);
+                count++;
+            }
+            bool show = count >= 3 && View != null;
+            line.SetVisible(show);
+            if (!show) return;
+            streamWidths[0] = 1f;
+            // Round off any small kinks left between drops: each point moves a little towards its neighbours' middle,
+            // twice; the ends stay where they are.
+            for (int pass = 0; pass < 2; pass++)
+            {
+                for (int k = 1; k < count - 1; k++)
+                    streamSmooth[k] = streamPath[k] * 0.5f + (streamPath[k - 1] + streamPath[k + 1]) * 0.25f;
+                for (int k = 1; k < count - 1; k++) streamPath[k] = streamSmooth[k];
+            }
+            float length = 0f;
+            for (int k = 1; k < count; k++) length += Vector3.Distance(streamPath[k], streamPath[k - 1]);
+            block.Clear();
+            block.SetFloat(LengthId, length);
+            block.SetFloat(ClockId, Now);
+            line.Renderer.SetPropertyBlock(block);
+            line.Set(streamPath, null, streamWidths, count, 0.011f, new Color(1f, 1f, 1f, FadeIn), View.transform.position);
         }
 
         /// <summary>The sung words drift slowly across the water, rising and falling with its waves.</summary>
@@ -456,39 +650,88 @@ namespace MusicInYourHands
             }
         }
 
-        float HeightAt(Vector2 spot)
+        float HeightAt(Vector2 spot) => vertices[Nearest(spot)].y;
+
+        /// <summary>The grid vertex nearest a spot (0-1 across the pool).</summary>
+        int Nearest(Vector2 spot)
         {
             int x = Mathf.Clamp(Mathf.RoundToInt(spot.x * (columns - 1)), 0, columns - 1);
             int z = Mathf.Clamp(Mathf.RoundToInt(spot.y * (rows - 1)), 0, rows - 1);
-            return vertices[z * columns + x].y;
+            return z * columns + x;
         }
 
-        /// <summary>Specks of light suspended in the water, bobbing with the surface; brighter near it and in waves.</summary>
-        void DrawSpecks(MusicFrame music)
+        // Two ocean waves crossing the pool: their direction in the pool's plane, wavelength (m) and share of the height.
+        static readonly (Vector2 direction, float length, float share)[] Swells =
         {
-            float t = Now;
-            for (int i = 0; i < SpeckCount; i++)
+            (new Vector2(0.8f, 0.6f), 0.26f, 1f),
+            (new Vector2(-0.4f, 0.92f), 0.17f, 0.6f)
+        };
+
+        /// <summary>
+        /// The ocean swell at a point on the pool (metres across it), <paramref name="amplitude"/> tall: its height, and in
+        /// <paramref name="shift"/> how far the water there is carried sideways. These are Gerstner waves: the water moves
+        /// in circles as a wave passes, gathering under the crests, so crests come up sharp and troughs stay wide.
+        /// </summary>
+        static float Swell(Vector2 p, float t, float amplitude, out Vector2 shift)
+        {
+            shift = Vector2.zero;
+            float h = 0f;
+            foreach (var (direction, length, share) in Swells)
             {
-                var seed = speckSeed[i];
-                var spot = new Vector2(seed.x, seed.z);
-                float h = HeightAt(spot);
-                float wave = Mathf.Abs(h) * 120f;
-                float bob = Mathf.Sin(t * 1.3f + i * 0.37f) * 0.003f;
-                float depth = Mathf.Clamp01(-seed.y / 0.06f);
-                // Specks near the top ride the waves fully; deeper ones move less.
-                var local = new Vector3((seed.x - 0.5f) * size.x, h * (1f - depth * 0.6f) + seed.y + bob, (seed.z - 0.5f) * size.y);
-                var c = Color.Lerp(new Color(0.75f, 0.95f, 1f), new Color(0.3f, 0.6f, 1f), depth);
-                c.a = Mathf.Clamp01((0.55f - depth * 0.35f + wave * 0.6f + music.Kick * 0.15f) * FadeIn);
-                speckOut[i] = new ParticleSystem.Particle
-                {
-                    position = surface.TransformPoint(local),
-                    startColor = c,
-                    startSize = Mathf.Lerp(0.006f, 0.0035f, depth) * (1f + wave * 0.5f),
-                    startLifetime = 5f,
-                    remainingLifetime = 5f
-                };
+                float k = Mathf.PI * 2f / length;
+                // Deep-water speed, slowed down to suit a pool this size.
+                float omega = Mathf.Sqrt(9.81f * k) * 0.45f;
+                float phase = k * Vector2.Dot(direction, p) - omega * t;
+                float a = amplitude * share / 1.6f;
+                shift += direction * (a * 0.9f * Mathf.Cos(phase));
+                h += a * Mathf.Sin(phase);
             }
-            specks.SetParticles(speckOut, SpeckCount);
+            return h;
+        }
+
+        /// <summary>
+        /// The beads dotting the surface: low-poly balls in lines across the water, about two centimetres apart, riding
+        /// the ocean swell (see Swell): each rises and falls with it and is carried a little back and forth as the crests
+        /// pass, so the lines bunch on the crests and spread in the troughs. They bob on the ripples from hands and drops
+        /// too. On a crest a bead swells and glows; towards the edges they shrink away, so the pool has no hard border.
+        /// They turn slowly so their facets catch the light. All of them are one instanced draw.
+        /// </summary>
+        void DrawBeads(MusicFrame music)
+        {
+            if (facetMaterial == null) return;
+            float t = Now;
+            var spin = Quaternion.Euler(t * 14f, t * 9f, 0f);
+            for (int z = 0; z < BeadRows; z++)
+            {
+                for (int x = 0; x < BeadColumns; x++)
+                {
+                    int i = z * BeadColumns + x;
+                    var spot = new Vector2((x + 0.5f) / BeadColumns, (z + 0.5f) / BeadRows);
+                    var rest = new Vector2((spot.x - 0.5f) * size.x, (spot.y - 0.5f) * size.y);
+                    float edge = Mathf.SmoothStep(0f, 1f, Mathf.Min(Mathf.Min(spot.x, 1f - spot.x), Mathf.Min(spot.y, 1f - spot.y)) * 9f);
+                    float swell = Swell(rest, t, swellHeight, out var shift) * edge;
+                    shift *= edge;
+                    // The water's own ripples, from hands and drops.
+                    float ripple = height[Nearest(spot)];
+                    // Up on a crest is bright, down in a trough is deep.
+                    float crest = Mathf.Clamp01(0.5f + swell / Mathf.Max(swellHeight, 1e-4f) * 0.6f + ripple * 25f);
+                    var local = new Vector3(rest.x + shift.x, swell + ripple + 0.002f, rest.y + shift.y);
+                    float diameter = BeadSize * (0.8f + crest * 0.5f) * edge * FadeIn;
+                    beadMatrices[i] = Matrix4x4.TRS(surface.TransformPoint(local), spin * beadTurn[i], Vector3.one * diameter);
+                    var c = Color.Lerp(BeadDeep, BeadCrest, crest);
+                    beadTints[i] = new Vector4(c.r, c.g, c.b, crest * crest * 0.9f + music.Kick * 0.25f);
+                }
+            }
+            beadBlock.SetVectorArray(TintId, beadTints);
+            var draw = new RenderParams(facetMaterial)
+            {
+                matProps = beadBlock,
+                layer = gameObject.layer,
+                shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off,
+                receiveShadows = false,
+                worldBounds = new Bounds(surface.position, new Vector3(size.x + 0.1f, 0.2f, size.x + 0.1f))
+            };
+            Graphics.RenderMeshInstanced(draw, beadMesh, 0, beadMatrices, BeadCount);
         }
 
         /// <summary>Pushes the surface down (negative) or up around a spot (0-1 across the pool).</summary>
@@ -533,11 +776,14 @@ namespace MusicInYourHands
             }
         }
 
-        /// <summary>Copies the heights into the mesh, plus slow swells with the bass, and rebuilds the normals.</summary>
+        /// <summary>
+        /// Copies the heights into the mesh, plus the ocean swell rolling across it all the time (see Swell), taller
+        /// with the bass and the kick, and rebuilds the normals.
+        /// </summary>
         void UpdateMesh(MusicFrame music)
         {
             float t = Now;
-            float swell = music.Band(1) * 0.004f + music.Kick * 0.0015f;
+            swellHeight = 0.007f + music.Band(1) * 0.009f + music.Kick * 0.004f;
             for (int z = 0; z < rows; z++)
             {
                 for (int x = 0; x < columns; x++)
@@ -545,8 +791,9 @@ namespace MusicInYourHands
                     int i = z * columns + x;
                     float u = x / (float)(columns - 1), v = z / (float)(rows - 1);
                     float edge = Mathf.Clamp01(Mathf.Min(Mathf.Min(u, 1f - u), Mathf.Min(v, 1f - v)) * 8f);
-                    float roll = Mathf.Sin(u * 9f - t * 2.2f + v * 2f) * Mathf.Sin(v * 6f + t * 1.3f) * swell * edge;
-                    vertices[i].y = height[i] + roll;
+                    // The sheet takes the swell's height; only the beads on it are carried sideways.
+                    float swell = Swell(new Vector2(vertices[i].x, vertices[i].z), t, swellHeight, out _);
+                    vertices[i].y = height[i] + swell * edge;
                 }
             }
             float sx = size.x / (columns - 1), sz = size.y / (rows - 1);

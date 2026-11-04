@@ -4,12 +4,13 @@ using UnityEngine;
 namespace MusicInYourHands
 {
     /// <summary>
-    /// Living skin's room: the waves that leave your palms travel across the room and land on whatever is in their way,
-    /// wall, floor or ceiling, spreading there as a ring of their colour with veins lit behind it (LivingWalls shader).
-    /// The veins also wake a little on the bass. With a room scan the waves land on your real walls; until then the
-    /// walls stand a couple of metres around where you started.
+    /// Waves across the room: a quad on each wall, the floor and the ceiling, on which waves spread as rings of their
+    /// colour, with a look set by the material: Living skin's palm waves land and light veins (LivingWalls shader), and
+    /// Sound pool's ripples spread out from the pool as water light (RoomRipples shader). The surfaces also wake a little
+    /// on the bass. With a room scan they are your real walls; until then the walls stand a couple of metres around
+    /// where you started.
     /// </summary>
-    public sealed class LivingWalls
+    public sealed class RoomWaves
     {
         const int MaxWaves = 8;
         // How fast a wave crosses the room before it lands (m/s).
@@ -20,6 +21,7 @@ namespace MusicInYourHands
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
         static readonly int WavesId = Shader.PropertyToID("_Waves");
         static readonly int WaveColorsId = Shader.PropertyToID("_WaveColors");
+        static readonly int OriginId = Shader.PropertyToID("_Origin");
 
         readonly Transform parent;
         readonly Material material;
@@ -32,8 +34,9 @@ namespace MusicInYourHands
         readonly MaterialPropertyBlock block = new MaterialPropertyBlock();
         int nextWave;
         float pulse, fade;
+        Vector4 light;
 
-        public LivingWalls(Transform parent, Material material, Vector2 halfSize, float height)
+        public RoomWaves(Transform parent, Material material, Vector2 halfSize, float height)
         {
             this.parent = parent;
             this.material = material;
@@ -72,6 +75,20 @@ namespace MusicInYourHands
             nextWave = (nextWave + 1) % MaxWaves;
         }
 
+        /// <summary>Starts a wave spreading out from <paramref name="at"/> at once, across every surface it reaches.</summary>
+        public void Ripple(Vector3 at, Color color, float strength)
+        {
+            waves[nextWave] = new Vector4(at.x, at.y, at.z, 0f);
+            colors[nextWave] = new Vector4(color.r, color.g, color.b, strength);
+            nextWave = (nextWave + 1) % MaxWaves;
+        }
+
+        /// <summary>
+        /// Where the room's light comes from and how strong it is there, for materials that spread a light out from one
+        /// place (Sound pool's water light, from the spot under the pool).
+        /// </summary>
+        public void SetLight(Vector3 origin, float strength) => light = new Vector4(origin.x, origin.y, origin.z, strength);
+
         /// <summary>The first wall a ray from <paramref name="from"/> meets, and where.</summary>
         public bool Aim(Vector3 from, Vector3 direction, out Room.Surface wall, out Vector3 hit, out float distance)
         {
@@ -95,6 +112,7 @@ namespace MusicInYourHands
             block.Clear();
             block.SetFloat(PulseId, pulse);
             block.SetFloat(AlphaId, fade);
+            block.SetVector(OriginId, light);
             block.SetVectorArray(WavesId, waves);
             block.SetVectorArray(WaveColorsId, colors);
             for (int i = 0; i < faces.Count; i++)

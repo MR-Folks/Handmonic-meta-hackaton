@@ -7,7 +7,7 @@ Shader "MusicInYourHands/Caustics"
         _Color ("Colour", Color) = (0.45, 0.85, 1, 1)
         _Strength ("Strength (set by SoundPool)", Float) = 0.5
         _Clock ("Time (set by SoundPool)", Float) = 0
-        _Scale ("Pattern scale", Float) = 7
+        _Scale ("Pattern scale (per metre)", Float) = 7
     }
 
     SubShader
@@ -46,6 +46,7 @@ Shader "MusicInYourHands/Caustics"
             {
                 float4 positionCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
+                float3 positionWS : TEXCOORD1;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -54,7 +55,8 @@ Shader "MusicInYourHands/Caustics"
                 Varyings output = (Varyings)0;
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
-                output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
+                output.positionWS = TransformObjectToWorld(input.positionOS.xyz);
+                output.positionCS = TransformWorldToHClip(output.positionWS);
                 output.uv = input.uv;
                 return output;
             }
@@ -74,7 +76,9 @@ Shader "MusicInYourHands/Caustics"
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
                 float2 uv = input.uv;
-                float light = saturate(Caustic(uv * _Scale, _Clock * 0.8));
+                // Laid out in world space (_Scale per metre), so the room's water light (RoomRipples) carries the same
+                // web on past this patch without a seam.
+                float light = saturate(Caustic(input.positionWS.xz * _Scale, _Clock * 0.8));
                 // Fade out softly towards the edges of the patch of light.
                 float2 e = min(uv, 1 - uv);
                 float edge = smoothstep(0.0, 0.22, min(e.x, e.y));

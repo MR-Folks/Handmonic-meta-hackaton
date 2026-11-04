@@ -2722,6 +2722,9 @@ MonoBehaviour:
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   waterMaterial: {fileID: 2100000, guid: 5a8cb478aa2674256bde3519ded63635, type: 2}
   causticsMaterial: {fileID: 2100000, guid: 630e4af74708d49b4b4e1a22e4c476d3, type: 2}
+  facetMaterial: {fileID: 2100000, guid: 3707b89de3074f6ea9e58679b75a74f0, type: 2}
+  streamMaterial: {fileID: 2100000, guid: 94ead8ba2bba4e55b8b519a4243f9992, type: 2}
+  roomRipplesMaterial: {fileID: 2100000, guid: 0d2a8fd62a644a8981cd417fedc6f9f0, type: 2}
   size: {x: 0.7, y: 0.48}
   distance: 0.5
   belowEyes: 0.52
