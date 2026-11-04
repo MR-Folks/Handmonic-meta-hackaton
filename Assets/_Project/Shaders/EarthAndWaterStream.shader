@@ -1,16 +1,16 @@
-// Four elements: a stream of water flowing through the air, drawn on a camera-facing strip built by LineStrip (uv.x
+// Earth and water: a stream of water flowing through the air, drawn on a camera-facing strip built by LineStrip (uv.x
 // from the hand to the tail, uv.y across). It is shaded as a round, see-through tube: deep blue in its body, lighter at
 // its edges, a bright highlight running along one side, and glints that flow down its length (_Length is the stream's
 // length in metres, so they keep their spacing). Vertex colour tints it and fades its ends.
-Shader "MusicInYourHands/FourElementsStream"
+Shader "MusicInYourHands/EarthAndWaterStream"
 {
     Properties
     {
         _Deep ("Body colour", Color) = (0.1, 0.42, 0.85, 0.45)
         _Light ("Edge and glint colour", Color) = (0.55, 0.93, 1, 1)
-        _Length ("Stream length in metres (set by FourElements)", Float) = 0.5
-        _Clock ("Time (set by FourElements)", Float) = 0
-        _Alpha ("Fade (set by FourElements)", Float) = 1
+        _Length ("Stream length in metres (set by EarthAndWater)", Float) = 0.5
+        _Clock ("Time (set by EarthAndWater)", Float) = 0
+        _Alpha ("Fade (set by EarthAndWater)", Float) = 1
     }
 
     SubShader

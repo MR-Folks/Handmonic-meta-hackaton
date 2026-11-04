@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: FourElementsFlame
-  m_Shader: {fileID: 4800000, guid: 2d686e75e7f34cb49bbb47e9872b2786, type: 3}
+  m_Name: EarthAndWaterCrack
+  m_Shader: {fileID: 4800000, guid: 9f55401a8b0b30d40812499779f45c18, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -25,14 +25,10 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _Alpha: 1
-    - _Clock: 0
-    - _DepthPull: 0.04
-    - _Flare: 0
-    - _Intensity: 1
+    - _Glow: 0.3
+    - _Inner: 0.35
     - _Seed: 0
-    - _Shape: 0
     m_Colors:
-    - _Bend: {r: 0, g: 0, b: 0, a: 0}
+    - _Color: {r: 1, g: 0.58, b: 0.21999997, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

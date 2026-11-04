@@ -1,18 +1,18 @@
-// Four elements: the wobbling ball of water held between the palms. The vertex stage bends a sphere with three slow
+// Earth and water: the wobbling ball of water held between the palms. The vertex stage bends a sphere with three slow
 // waves that grow with the bass (_Bass) and a ripple that runs from top to bottom after each kick (_Wave: seconds since
 // it); the fragment stage shades it as clear water: a deep blue body, a bright rim, glints of light from above and a
 // web of caustics drifting inside it. Drawn see-through, after the hands' fill, without writing depth.
-Shader "MusicInYourHands/FourElementsOrb"
+Shader "MusicInYourHands/EarthAndWaterOrb"
 {
     Properties
     {
         _Deep ("Body colour", Color) = (0.12, 0.42, 0.78, 0.2)
         _Light ("Rim and caustics", Color) = (0.55, 0.92, 1, 1)
-        _Bass ("Bass 0-1 (set by FourElements)", Float) = 0.3
-        _Wave ("Seconds since the kick (set by FourElements)", Float) = 9
-        _Kick ("Beat 0-1 (set by FourElements)", Float) = 0
-        _Clock ("Time (set by FourElements)", Float) = 0
-        _Alpha ("Fade (set by FourElements)", Float) = 1
+        _Bass ("Bass 0-1 (set by EarthAndWater)", Float) = 0.3
+        _Wave ("Seconds since the kick (set by EarthAndWater)", Float) = 9
+        _Kick ("Beat 0-1 (set by EarthAndWater)", Float) = 0
+        _Clock ("Time (set by EarthAndWater)", Float) = 0
+        _Alpha ("Fade (set by EarthAndWater)", Float) = 1
     }
 
     SubShader

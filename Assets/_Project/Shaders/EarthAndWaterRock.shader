@@ -1,19 +1,19 @@
-// Four elements: a rock risen out of the floor. Solid, faceted stone in warm greys with grain and faint strata, lit
+// Earth and water: a rock risen out of the floor. Solid, faceted stone in warm greys with grain and faint strata, lit
 // from above and from the viewer's side so its faces always read; glowing cracks run through it (_Glow, brighter on
 // the beat and while it moves) and a glowing seam marks where it comes out of the ground. Everything below _Ground
 // (world height: the floor, or the furniture it rises from) is cut away, so the rock seems to push up through it.
-Shader "MusicInYourHands/FourElementsRock"
+Shader "MusicInYourHands/EarthAndWaterRock"
 {
     Properties
     {
         _Stone ("Stone", Color) = (0.6, 0.53, 0.45, 1)
         _Dark ("Crevices", Color) = (0.25, 0.21, 0.18, 1)
         _Crack ("Glow in the cracks", Color) = (1, 0.55, 0.2, 1)
-        _Tint ("Tint (set by FourElements)", Color) = (1, 1, 1, 1)
-        _Glow ("Crack glow 0-1 (set by FourElements)", Float) = 0.2
-        _Ground ("Ground height, world y (set by FourElements)", Float) = 0
-        _Seed ("Seed (set by FourElements)", Float) = 0
-        _Clock ("Time (set by FourElements)", Float) = 0
+        _Tint ("Tint (set by EarthAndWater)", Color) = (1, 1, 1, 1)
+        _Glow ("Crack glow 0-1 (set by EarthAndWater)", Float) = 0.2
+        _Ground ("Ground height, world y (set by EarthAndWater)", Float) = 0
+        _Seed ("Seed (set by EarthAndWater)", Float) = 0
+        _Clock ("Time (set by EarthAndWater)", Float) = 0
     }
 
     SubShader

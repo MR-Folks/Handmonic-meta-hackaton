@@ -1,14 +1,14 @@
-// Four elements: the cracked floor around a rising rock, on a quad lying flat on the ground. Wandering cracks run out
+// Earth and water: the cracked floor around a rising rock, on a quad lying flat on the ground. Wandering cracks run out
 // from the rock's footprint (_Inner, a share of the quad's half width), with finer branches between them, and glow from
 // below with _Glow: brightly while the rock moves or on the beat, faintly while it stands. Additive.
-Shader "MusicInYourHands/FourElementsCrack"
+Shader "MusicInYourHands/EarthAndWaterCrack"
 {
     Properties
     {
         _Color ("Glow", Color) = (1, 0.58, 0.22, 1)
-        _Glow ("Glow 0-1 (set by FourElements)", Float) = 0.3
-        _Inner ("Footprint radius 0-1 (set by FourElements)", Float) = 0.35
-        _Seed ("Seed (set by FourElements)", Float) = 0
+        _Glow ("Glow 0-1 (set by EarthAndWater)", Float) = 0.3
+        _Inner ("Footprint radius 0-1 (set by EarthAndWater)", Float) = 0.35
+        _Seed ("Seed (set by EarthAndWater)", Float) = 0
     }
 
     SubShader

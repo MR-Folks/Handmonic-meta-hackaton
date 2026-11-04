@@ -4,42 +4,29 @@ using UnityEngine;
 namespace MusicInYourHands
 {
     /// <summary>
-    /// The Four elements world: your bare hands command fire, water, earth and air, one element at a time. Now and then
-    /// the element changes by itself with the music, at the start of a sung line and never to the same one twice; clench
-    /// both fists for a moment to call up the next one yourself. Each change bursts out in the new element's colours,
-    /// dresses your hands for it, and a short caption names it and says what to do.
+    /// The Earth and water world: your bare hands command earth and water, one at a time. Now and then the music hands
+    /// over from one to the other by itself, at the start of a sung line; clench both fists for a moment to switch over
+    /// yourself. Each change bursts out in the new element's colours, dresses your hands for it, and a short caption
+    /// names it and says what to do.
     /// <list type="bullet">
-    /// <item><b>Fire</b>: flames rise from your open palms and flare on every beat. Push a hand forward quickly to throw
-    /// a fireball that flies across the room and bursts into sparks where it lands.</item>
-    /// <item><b>Water</b>: a stream of water circles each hand and follows it through the air like a ribbon of liquid,
-    /// shedding drops as it whips round. Hold your palms facing each other and a wobbling ball of water forms between
-    /// them, rippling with the bass; pull your hands apart and it splashes.</item>
     /// <item><b>Earth</b>: rocks push up out of the floor around you (or out of your table). Lift your palms, palms up, to
     /// raise the rocks in front of that hand; push down, palms down, to sink them. They rumble and shake on the beat, the
     /// floor glows through its cracks around them, and pebbles hover over your palms.</item>
-    /// <item><b>Air</b>: currents of wind swirl around your hands. Move a hand round in circles to spin up a whirlwind
-    /// on the floor in front of you that keeps turning for a while after you stop. Every beat sends a gust through.</item>
+    /// <item><b>Water</b>: a stream of water circles each hand and follows it through the air like a ribbon of liquid,
+    /// shedding drops as it whips round. Hold your palms facing each other and a wobbling ball of water forms between
+    /// them, rippling with the bass; pull your hands apart and it splashes.</item>
     /// </list>
-    /// The sung words are carried by the element: glowing embers rising from the flames, floating in bubbles of water,
-    /// carved into the rocks, or blown along on the wind.
+    /// The sung words are carried by the element: carved into the rocks, or floating in bubbles of water.
     /// </summary>
-    public class FourElements : World
+    public class EarthAndWater : World
     {
-        const int Fire = 0, Water = 1, Earth = 2, Air = 3;
+        const int Water = 0, Earth = 1;
         const int StreamPoints = 40;
-        const int CurrentPoints = 18;
-        const int CurrentsPerHand = 2;
-        const int StrandPoints = 34;
-        const int TrailPoints = 14;
-        const int Strands = 7;
-        const int WhirlMotes = 140;
-        const int GustMotes = 24;
-        const int RoomMotes = 40;
         const int PebblesPerHand = 4;
         // Where a rock's flat front face is cut, in its mesh (radius 0.5): the words are carved there.
         const float FrontFace = 0.22f;
 
-        public override string DisplayName => "Four elements";
+        public override string DisplayName => "Earth and water";
 
         public override Color Color => new Color(1f, 0.56f, 0.36f);
 
@@ -47,47 +34,30 @@ namespace MusicInYourHands
 
         public override int MenuIcon => 28;
 
-        public override string Hint => "Play the element with your hands; clench both fists to switch";
+        public override string Hint => "Move earth and water with your hands; clench both fists to switch";
 
         public override HandTheme Theme => Themes[current];
 
-        static readonly string[] Names = { "Fire", "Water", "Earth", "Air" };
+        static readonly string[] Names = { "Water", "Earth" };
 
         static readonly string[] HowTo =
         {
-            "Push a palm forward to throw a fireball",
             "Sweep your hands; palms facing make an orb",
-            "Lift palms up to raise rocks, push down to sink",
-            "Circle a hand to spin up a whirlwind"
+            "Lift palms up to raise rocks, push down to sink"
         };
 
         // Each element's colours: its main colour, a second one and a bright one, for bursts, words and lights.
-        static readonly Color[] MainColors =
-        {
-            new Color(1f, 0.45f, 0.12f), new Color(0.25f, 0.66f, 1f), new Color(0.78f, 0.56f, 0.3f), new Color(0.75f, 0.92f, 1f)
-        };
-        static readonly Color[] SecondColors =
-        {
-            new Color(1f, 0.76f, 0.28f), new Color(0.45f, 0.95f, 1f), new Color(0.6f, 0.74f, 0.4f), new Color(0.58f, 0.84f, 0.98f)
-        };
-        static readonly Color[] BrightColors =
-        {
-            new Color(1f, 0.93f, 0.7f), new Color(0.86f, 0.98f, 1f), new Color(1f, 0.82f, 0.5f), new Color(1f, 1f, 1f)
-        };
+        static readonly Color[] MainColors = { new Color(0.25f, 0.66f, 1f), new Color(0.78f, 0.56f, 0.3f) };
+        static readonly Color[] SecondColors = { new Color(0.45f, 0.95f, 1f), new Color(0.6f, 0.74f, 0.4f) };
+        static readonly Color[] BrightColors = { new Color(0.86f, 0.98f, 1f), new Color(1f, 0.82f, 0.5f) };
         static readonly Color DustColor = new Color(0.78f, 0.64f, 0.46f, 0.55f);
 
         // The note each element plays as it arrives (MIDI), fitted to the song by Musical, with a fifth above it.
-        static readonly int[] Chords = { 69, 64, 57, 72 };
+        static readonly int[] Chords = { 64, 57 };
 
-        // How the hands look with each element: embers crackling over the skin, ripples, grains of glowing mineral in
-        // stone-brown skin, and wind streaming over them.
+        // How the hands look with each element: ripples, and grains of glowing mineral in stone-brown skin.
         static readonly HandTheme[] Themes =
         {
-            new HandTheme
-            {
-                Fill = new Color(0.25f, 0.08f, 0.04f, 0.5f), Edge = new Color(1f, 0.55f, 0.22f), Glow = new Color(1f, 0.85f, 0.4f),
-                Pattern = HandTheme.Effect.Electric, PatternColor = new Color(1f, 0.62f, 0.25f)
-            },
             new HandTheme
             {
                 Fill = new Color(0.04f, 0.14f, 0.3f, 0.5f), Edge = new Color(0.45f, 0.8f, 1f), Glow = new Color(0.7f, 0.95f, 1f),
@@ -97,26 +67,18 @@ namespace MusicInYourHands
             {
                 Fill = new Color(0.16f, 0.11f, 0.07f, 0.58f), Edge = new Color(0.86f, 0.64f, 0.36f), Glow = new Color(1f, 0.76f, 0.38f),
                 Pattern = HandTheme.Effect.Specks, PatternColor = new Color(1f, 0.68f, 0.32f)
-            },
-            new HandTheme
-            {
-                Fill = new Color(0.12f, 0.16f, 0.2f, 0.4f), Edge = new Color(0.8f, 0.95f, 1f), Glow = new Color(0.85f, 1f, 1f),
-                Pattern = HandTheme.Effect.Flow, PatternColor = new Color(0.85f, 0.97f, 1f)
             }
         };
 
         [Header("Materials")]
-        [WorldMaterial("FourElementsFlame")]
-        [SerializeField] Material flameMaterial;
-        [WorldMaterial("FourElementsStream")]
+        [WorldMaterial("EarthAndWaterStream")]
         [SerializeField] Material streamMaterial;
-        [WorldMaterial("FourElementsOrb")]
+        [WorldMaterial("EarthAndWaterOrb")]
         [SerializeField] Material orbMaterial;
-        [WorldMaterial("FourElementsRock")]
+        [WorldMaterial("EarthAndWaterRock")]
         [SerializeField] Material rockMaterial;
-        [WorldMaterial("FourElementsCrack")]
+        [WorldMaterial("EarthAndWaterCrack")]
         [SerializeField] Material crackMaterial;
-        [SerializeField] Material lineMaterial;
         [SerializeField] Material ringMaterial;
         [SerializeField] Material bubbleMaterial;
 
@@ -127,13 +89,6 @@ namespace MusicInYourHands
         [SerializeField] int beatsAfterPick = 64;
         [Tooltip("Seconds both fists stay clenched to change the element.")]
         [SerializeField] float fistSeconds = 0.35f;
-
-        [Header("Fire")]
-        [Tooltip("Height of the flame on an open palm (m).")]
-        [SerializeField] float flameHeight = 0.16f;
-        [Tooltip("Speed (m/s) a hand must reach, moving away from you, to throw a fireball.")]
-        [SerializeField] float throwSpeed = 1.3f;
-        [SerializeField] float fireballSpeed = 3.2f;
 
         [Header("Water")]
         [Tooltip("Width of the stream where it leaves the hand (m).")]
@@ -148,20 +103,11 @@ namespace MusicInYourHands
         [Tooltip("How far the rocks stand from you (m), nearest and furthest.")]
         [SerializeField] Vector2 rockDistance = new Vector2(1f, 1.35f);
 
-        [Header("Air")]
-        [Tooltip("Turns of a hand in a circle that spin a whirlwind up to full strength.")]
-        [SerializeField] float turnsToSpin = 1.25f;
-        [Tooltip("Specks of air swirling round each hand.")]
-        [SerializeField] int windPerHand = 36;
-
         static readonly int ColorId = Shader.PropertyToID("_Color");
         static readonly int IntensityId = Shader.PropertyToID("_Intensity");
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
         static readonly int ClockId = Shader.PropertyToID("_Clock");
         static readonly int SeedId = Shader.PropertyToID("_Seed");
-        static readonly int BendId = Shader.PropertyToID("_Bend");
-        static readonly int FlareId = Shader.PropertyToID("_Flare");
-        static readonly int ShapeId = Shader.PropertyToID("_Shape");
         static readonly int LengthId = Shader.PropertyToID("_Length");
         static readonly int BassId = Shader.PropertyToID("_Bass");
         static readonly int WaveId = Shader.PropertyToID("_Wave");
@@ -173,17 +119,6 @@ namespace MusicInYourHands
         static readonly int RadiusId = Shader.PropertyToID("_Radius");
         static readonly int ThicknessId = Shader.PropertyToID("_Thickness");
         static readonly int IconId = Shader.PropertyToID("_Icon");
-        static readonly int CoreId = Shader.PropertyToID("_Core");
-
-        sealed class Fireball
-        {
-            public Renderer Ball, Core;
-            public Vector3 Position, Velocity;
-            public float Age, Seed;
-            public bool Flying;
-            /// <summary>Seconds since it burst, for the flash it leaves.</summary>
-            public float Burst = 9f;
-        }
 
         sealed class Rock
         {
@@ -203,32 +138,18 @@ namespace MusicInYourHands
             public Color Tint;
         }
 
-        sealed class Whirl
-        {
-            public LineStrip[] Strands;
-            public Vector3 Base, Top, Drift;
-            /// <summary>0-1: how strongly it spins; it dies away at 0.</summary>
-            public float Energy;
-            /// <summary>1 while a circling hand drives it, falling to 0 once the hand lets it go.</summary>
-            public float Driven;
-            public float Spin;
-            public bool Active;
-        }
-
         // Which element is in charge, and how present each one is (0-1) while one fades over to the next.
-        int current = Fire;
-        readonly float[] presence = new float[4];
+        int current = Water;
+        readonly float[] presence = new float[2];
         int beatsSince, waitBeats = 32;
         float switchTime = -10f, lastAction = -10f;
-        HandTheme themeFrom = Themes[Fire];
+        HandTheme themeFrom = Themes[Water];
         float fistTime;
         bool fistArmed = true;
 
         MaterialPropertyBlock block;
         AudioPool voices;
-        ParticleSystem motes, falling, wind;
-        ParticleSystem.Particle[] windOut;
-        int windCount;
+        ParticleSystem motes, falling;
         Vector3 head, forward = Vector3.forward, right = Vector3.right;
         float floorY, ambientDebt;
         bool menuOpen;
@@ -253,19 +174,10 @@ namespace MusicInYourHands
         bool captionDue = true, captionPlaced;
         Color captionColor;
 
-        // Fire.
-        Renderer[] flames, palmLights;
-        readonly float[] flameLevel = new float[2];
-        readonly float[] emberDebt = new float[2];
-        readonly float[] throwWait = new float[2];
-        Fireball[] fireballs;
-        bool previewThrow;
-
         // Water.
         LineStrip[] streams;
         Vector3[][] chains, before;
         Vector3[] path;
-        Color[] pathColors;
         float[] pathWidths;
         readonly float[] streamLevel = new float[2];
         readonly float[] streamPhase = new float[2];
@@ -285,30 +197,12 @@ namespace MusicInYourHands
         float rumbleWait, previewLift = -1f;
         bool raiseRocks = true;
 
-        // Air.
-        LineStrip[] currents, trails;
-        Whirl[] whirls;
-        readonly float[] airLevel = new float[2];
-        readonly float[] airPhase = new float[2];
-        readonly Vector3[] circleCentre = new Vector3[2];
-        readonly Vector3[] spinAxis = new Vector3[2];
-        readonly float[] turned = new float[2];
-        readonly bool[] wasTracked = new bool[2];
-        float[] windRadius, windHeight, windAngle, windSpeed;
-        float[] whirlU, whirlAngle, whirlReach;
-        Vector3[] gustFrom, gustVelocity;
-        float[] gustAge;
-        int nextGust;
-        float gust, windSign = 1f, roomPhase;
-        bool previewWhirl;
-
         // Per sung word (by its place in SungWords): where it came from and where it goes, by element.
         Vector3[] wordAnchor, wordAim;
-        float[] wordStart, wordEnd, wordLift;
         int[] wordRock;
         bool[] popped;
 
-        static AudioClip whoosh, crackle, splash, rumble;
+        static AudioClip splash, rumble;
 
         protected override int SungWordCount => 6;
 
@@ -323,7 +217,7 @@ namespace MusicInYourHands
             block = new MaterialPropertyBlock();
             voices = new AudioPool(transform, 6);
             MakeSounds();
-            // Over the bubbles, flames and water, with a firm dark edge, so the words stay readable.
+            // Over the bubbles and water, with a firm dark edge, so the words stay readable.
             if (SungWords != null)
             {
                 SungWords.RenderQueue = 3200;
@@ -344,9 +238,6 @@ namespace MusicInYourHands
             streaks.renderMode = ParticleSystemRenderMode.Stretch;
             streaks.velocityScale = 0.035f;
             streaks.lengthScale = 1.4f;
-            int windMax = 2 * windPerHand + 2 * WhirlMotes + GustMotes + RoomMotes;
-            wind = MakeManualSystem("Wind", windMax);
-            windOut = new ParticleSystem.Particle[windMax];
 
             flash = Effects.MakeQuad("Change Flash", transform, glowMaterial);
             ring = Effects.MakeQuad("Change Ring", transform, ringMaterial);
@@ -360,58 +251,17 @@ namespace MusicInYourHands
             captionLine = new TypeLabel("Caption Line", captionRoot, 0.017f);
             captionRoot.gameObject.SetActive(false);
 
-            path = new Vector3[Mathf.Max(StreamPoints, StrandPoints)];
-            pathColors = new Color[path.Length];
+            path = new Vector3[StreamPoints];
             pathWidths = new float[path.Length];
             int words = SungWordCount;
             wordAnchor = new Vector3[words];
             wordAim = new Vector3[words];
-            wordStart = new float[words];
-            wordEnd = new float[words];
-            wordLift = new float[words];
             wordRock = new int[words];
             popped = new bool[words];
 
-            BuildFire();
             BuildWater();
             BuildEarth();
-            BuildAir();
             waitBeats = beatsPerElement;
-        }
-
-        void BuildFire()
-        {
-            flames = new Renderer[2];
-            palmLights = new Renderer[2];
-            // The fire's light on the palm: a soft glow without a white core that shows over the hand, so the curve of
-            // the palm and fingers never cuts it off.
-            var warmth = glowMaterial;
-            if (glowMaterial != null)
-            {
-                warmth = new Material(glowMaterial) { name = "Palm Light" };
-                warmth.SetFloat("_ZTest", (float)UnityEngine.Rendering.CompareFunction.Always);
-                warmth.SetFloat(CoreId, 0f);
-            }
-            for (int s = 0; s < 2; s++)
-            {
-                palmLights[s] = Effects.MakeQuad(s == 0 ? "Palm Light L" : "Palm Light R", transform, warmth);
-                flames[s] = Effects.MakeQuad(s == 0 ? "Flame L" : "Flame R", transform, flameMaterial);
-                Show(palmLights[s], false);
-                Show(flames[s], false);
-            }
-            fireballs = new Fireball[4];
-            for (int i = 0; i < fireballs.Length; i++)
-            {
-                var f = new Fireball
-                {
-                    Core = Effects.MakeQuad($"Fireball Core {i}", transform, glowMaterial),
-                    Ball = Effects.MakeQuad($"Fireball {i}", transform, flameMaterial),
-                    Seed = i * 7.31f
-                };
-                Show(f.Core, false);
-                Show(f.Ball, false);
-                fireballs[i] = f;
-            }
         }
 
         void BuildWater()
@@ -494,90 +344,6 @@ namespace MusicInYourHands
             }
         }
 
-        void BuildAir()
-        {
-            // Soft lines of wind, without the usual white-hot core.
-            var soft = new MaterialPropertyBlock();
-            soft.SetFloat(CoreId, 0.12f);
-            currents = new LineStrip[2 * CurrentsPerHand];
-            for (int i = 0; i < currents.Length; i++)
-            {
-                currents[i] = new LineStrip($"Wind Current {i}", transform, lineMaterial, CurrentPoints);
-                currents[i].Renderer.SetPropertyBlock(soft);
-                currents[i].SetVisible(false);
-            }
-            trails = new LineStrip[SungWordCount];
-            for (int i = 0; i < trails.Length; i++)
-            {
-                trails[i] = new LineStrip($"Word Wind {i}", transform, lineMaterial, TrailPoints);
-                trails[i].Renderer.SetPropertyBlock(soft);
-                trails[i].SetVisible(false);
-            }
-            whirls = new Whirl[2];
-            for (int i = 0; i < whirls.Length; i++)
-            {
-                var w = new Whirl { Strands = new LineStrip[Strands] };
-                for (int k = 0; k < Strands; k++)
-                {
-                    w.Strands[k] = new LineStrip($"Whirlwind {i} Strand {k}", transform, lineMaterial, StrandPoints);
-                    w.Strands[k].Renderer.SetPropertyBlock(soft);
-                    w.Strands[k].SetVisible(false);
-                }
-                whirls[i] = w;
-            }
-            var random = new System.Random(41);
-            int n = 2 * windPerHand;
-            windRadius = new float[n];
-            windHeight = new float[n];
-            windAngle = new float[n];
-            windSpeed = new float[n];
-            for (int i = 0; i < n; i++)
-            {
-                windRadius[i] = Mathf.Lerp(0.055f, 0.1f, (float)random.NextDouble());
-                windHeight[i] = Mathf.Lerp(-0.03f, 0.1f, (float)random.NextDouble());
-                windAngle[i] = (float)random.NextDouble() * Mathf.PI * 2f;
-                windSpeed[i] = Mathf.Lerp(0.75f, 1.3f, (float)random.NextDouble());
-            }
-            whirlU = new float[WhirlMotes];
-            whirlAngle = new float[WhirlMotes];
-            whirlReach = new float[WhirlMotes];
-            for (int i = 0; i < WhirlMotes; i++)
-            {
-                whirlU[i] = Mathf.Pow((float)random.NextDouble(), 0.8f);
-                whirlAngle[i] = (float)random.NextDouble() * Mathf.PI * 2f;
-                whirlReach[i] = Mathf.Lerp(0.8f, 1.2f, (float)random.NextDouble());
-            }
-            gustFrom = new Vector3[GustMotes];
-            gustVelocity = new Vector3[GustMotes];
-            gustAge = new float[GustMotes];
-            for (int i = 0; i < GustMotes; i++) gustAge[i] = 9f;
-        }
-
-        /// <summary>A particle system whose particles this world places itself every frame, stretched along their way.</summary>
-        ParticleSystem MakeManualSystem(string name, int max)
-        {
-            var go = new GameObject(name);
-            go.transform.SetParent(transform, false);
-            var ps = go.AddComponent<ParticleSystem>();
-            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-            var main = ps.main;
-            main.playOnAwake = false;
-            main.simulationSpace = ParticleSystemSimulationSpace.World;
-            main.maxParticles = max;
-            var emission = ps.emission;
-            emission.enabled = false;
-            var shape = ps.shape;
-            shape.enabled = false;
-            var r = go.GetComponent<ParticleSystemRenderer>();
-            r.sharedMaterial = glowMaterial;
-            r.renderMode = ParticleSystemRenderMode.Stretch;
-            r.velocityScale = 0.06f;
-            r.lengthScale = 1.2f;
-            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            r.receiveShadows = false;
-            return ps;
-        }
-
         /// <summary>Air resistance, so bursts fly out and then slow down and float.</summary>
         static void Drag(ParticleSystem ps, float drag)
         {
@@ -595,8 +361,8 @@ namespace MusicInYourHands
         /// <summary>A fresh start, with an element picked at random.</summary>
         protected override void OnEnter()
         {
-            current = Random.Range(0, 4);
-            for (int e = 0; e < 4; e++) presence[e] = 0f;
+            current = Random.Range(0, 2);
+            for (int e = 0; e < 2; e++) presence[e] = 0f;
             beatsSince = 0;
             waitBeats = beatsPerElement;
             switchTime = lastAction = -10f;
@@ -608,41 +374,18 @@ namespace MusicInYourHands
             flashAge = 9f;
             orbLevel = 0f;
             orbHeld = orbSounded = false;
-            gust = 0f;
             raiseRocks = true;
             for (int s = 0; s < 2; s++)
             {
-                flameLevel[s] = streamLevel[s] = airLevel[s] = pebbleLevel[s] = turned[s] = throwWait[s] = 0f;
+                streamLevel[s] = pebbleLevel[s] = 0f;
                 streamFresh[s] = true;
-                wasTracked[s] = false;
-            }
-            foreach (var f in fireballs)
-            {
-                f.Flying = false;
-                f.Burst = 9f;
-            }
-            foreach (var w in whirls)
-            {
-                w.Active = false;
-                w.Energy = 0f;
             }
             foreach (var r in rocks) r.Rise = r.Target = r.Speed = 0f;
         }
 
         protected override void OnExit()
         {
-            for (int s = 0; s < 2; s++)
-            {
-                Show(flames[s], false);
-                Show(palmLights[s], false);
-                streams[s].SetVisible(false);
-            }
-            foreach (var f in fireballs)
-            {
-                f.Flying = false;
-                Show(f.Ball, false);
-                Show(f.Core, false);
-            }
+            foreach (var line in streams) line.SetVisible(false);
             orb.gameObject.SetActive(false);
             foreach (var b in bubbles) Show(b, false);
             foreach (var r in rocks)
@@ -651,21 +394,12 @@ namespace MusicInYourHands
                 Show(r.Crack, false);
             }
             foreach (var p in pebbles) p.gameObject.SetActive(false);
-            foreach (var c in currents) c.SetVisible(false);
-            foreach (var t in trails) t.SetVisible(false);
-            foreach (var w in whirls)
-            {
-                w.Active = false;
-                foreach (var strand in w.Strands) strand.SetVisible(false);
-            }
             Show(flash, false);
             Show(ring, false);
             Show(charge, false);
             captionRoot.gameObject.SetActive(false);
             motes.Clear();
             falling.Clear();
-            wind.Clear();
-            HandSkin.FocusStrength = 0f;
             HandSkin.Charge[0] = HandSkin.Charge[1] = 0f;
         }
 
@@ -685,10 +419,8 @@ namespace MusicInYourHands
         protected override void OnBeat(MusicFrame music)
         {
             beatsSince++;
-            BeatFire(music);
             BeatWater();
             BeatEarth(music);
-            BeatAir(music);
             // In songs without lyrics, or a long gap between lines, the element changes on the beat instead.
             if (beatsSince >= waitBeats + 8 && beatsSince % 4 == 0 && !Busy) ChangeByItself();
         }
@@ -705,16 +437,14 @@ namespace MusicInYourHands
             var menu = WorldMenu.Instance;
             menuOpen = menu != null && menu.IsOpen;
             ReadHands(rig, dt);
-            for (int e = 0; e < 4; e++)
+            for (int e = 0; e < 2; e++)
                 presence[e] = Mathf.MoveTowards(presence[e], e == current ? 1f : 0f, dt * (e == current ? 1.6f : 1.2f));
             Fists(dt);
-            StepFire(music, view, dt);
             StepWater(music, view, dt);
             StepEarth(music, dt);
-            StepAir(music, view, dt);
             Ambient(music, view, dt);
             ChangeEffects(view, dt);
-            StepWords(music, view, dt);
+            StepWords(music, view);
             DressHands();
             StepCaption(view, dt);
         }
@@ -740,7 +470,7 @@ namespace MusicInYourHands
                 if (toTip.sqrMagnitude > 0.0025f) pointing[s] = toTip.normalized;
                 fist[s] = hand.Fist;
                 gesture[s] = hand.InSystemGesture;
-                // Smoothed a little: one frame's tracking jitter is not a throw.
+                // Smoothed a little: one frame's tracking jitter should not lift a rock or whip the water round.
                 velocity[s] = was ? Vector3.Lerp(velocity[s], hand.Velocity, 1f - Mathf.Exp(-22f * dt)) : Vector3.zero;
             }
         }
@@ -750,7 +480,10 @@ namespace MusicInYourHands
         /// <summary>True while you are in the middle of something with the element; it waits for you, up to a point.</summary>
         bool Busy => (Clock - lastAction < 2.5f || fistTime > 0f) && beatsSince < waitBeats * 2;
 
-        /// <summary>Both fists clenched for a moment call up the next element; open a hand before the next change.</summary>
+        /// <summary>The element that isn't in charge: the one every change brings, by itself or by your fists.</summary>
+        int Other => 1 - current;
+
+        /// <summary>Both fists clenched for a moment call up the other element; open a hand before the next change.</summary>
         void Fists(float dt)
         {
             bool both = tracked[0] && tracked[1] && !gesture[0] && !gesture[1] && !menuOpen;
@@ -760,15 +493,10 @@ namespace MusicInYourHands
             if (fistTime < fistSeconds) return;
             fistTime = 0f;
             fistArmed = false;
-            Change((current + 1) % 4, true, (palm[0] + palm[1]) * 0.5f);
+            Change(Other, true, (palm[0] + palm[1]) * 0.5f);
         }
 
-        void ChangeByItself()
-        {
-            int next = Random.Range(0, 3);
-            if (next >= current) next++;
-            Change(next, false, BurstPoint());
-        }
+        void ChangeByItself() => Change(Other, false, BurstPoint());
 
         /// <summary>Where a change bursts out when no fists called it: between your hands, or in front of you.</summary>
         Vector3 BurstPoint()
@@ -804,7 +532,7 @@ namespace MusicInYourHands
             Musical.Play(voices, Music, Chords[next] + 7, at, 0.2f);
         }
 
-        /// <summary>A short burst in the new element's colours: sparks, a splash of drops, dust and chips, or a swirl.</summary>
+        /// <summary>A short burst in the new element's colours: a splash of drops, or dust and chips.</summary>
         void Burst(int e, Vector3 at)
         {
             flashAge = 0f;
@@ -812,16 +540,6 @@ namespace MusicInYourHands
             flashColor = MainColors[e];
             switch (e)
             {
-                case Fire:
-                    for (int i = 0; i < 60; i++)
-                    {
-                        var d = AwayFromEyes(Random.onUnitSphere, at);
-                        Emit(motes, at + d * 0.03f, d * Random.Range(0.6f, 1.4f) + Vector3.up * 0.2f, Pick(Fire), Random.Range(0.008f, 0.016f), Random.Range(0.6f, 1.1f));
-                    }
-                    for (int i = 0; i < 24; i++)
-                        Emit(falling, at, AwayFromEyes(Random.onUnitSphere, at) * Random.Range(1f, 2f) + Vector3.up * 0.5f, BrightColors[Fire],
-                            Random.Range(0.004f, 0.008f), Random.Range(0.5f, 0.9f));
-                    break;
                 case Water:
                     for (int i = 0; i < 70; i++)
                     {
@@ -841,21 +559,10 @@ namespace MusicInYourHands
                         Emit(motes, at + Random.insideUnitSphere * 0.04f, AwayFromEyes(Random.onUnitSphere, at) * Random.Range(0.3f, 0.7f), DustColor, Random.Range(0.012f, 0.024f),
                             Random.Range(0.8f, 1.5f));
                     break;
-                default:
-                    for (int i = 0; i < 72; i++)
-                    {
-                        float a = i / 72f * Mathf.PI * 2f;
-                        var outward = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
-                        var swirl = Vector3.Cross(Vector3.up, outward);
-                        var spin = AwayFromEyes(outward * Random.Range(0.5f, 1.1f) + swirl * 0.8f, at);
-                        Emit(motes, at + outward * 0.04f, spin + Vector3.up * Random.Range(-0.2f, 0.3f), Pick(Air), Random.Range(0.006f, 0.012f), Random.Range(0.6f, 1f));
-                    }
-                    gust = 1f;
-                    break;
             }
         }
 
-        /// <summary>The flash and ring of a change, and the next element gathering between clenched fists.</summary>
+        /// <summary>The flash and ring of a change, and the other element gathering between clenched fists.</summary>
         void ChangeEffects(Camera view, float dt)
         {
             flashAge += dt;
@@ -887,7 +594,7 @@ namespace MusicInYourHands
             bool gathering = gathered > 0.01f && tracked[0] && tracked[1];
             Show(charge, gathering);
             if (!gathering) return;
-            int next = (current + 1) % 4;
+            int next = Other;
             var middle = (palm[0] + palm[1]) * 0.5f;
             charge.transform.position = middle;
             charge.transform.localScale = Vector3.one * (0.05f + 0.13f * gathered);
@@ -948,269 +655,10 @@ namespace MusicInYourHands
                 PatternColor = Color.Lerp(themeFrom.PatternColor, to.PatternColor, k),
                 Pattern = k < 0.5f ? themeFrom.Pattern : to.Pattern
             };
-            HandSkin.FocusStrength = 0f;
             HandSkin.Charge[0] = HandSkin.Charge[1] = 0f;
-            bool any = tracked[0] || tracked[1];
-            var middle = tracked[0] && tracked[1] ? (palm[0] + palm[1]) * 0.5f : palm[tracked[0] ? 0 : 1];
-            switch (current)
-            {
-                case Water:
-                    // The palms light up with ripples as the ball of water forms between them.
-                    for (int s = 0; s < 2; s++) HandSkin.Charge[s] = Mathf.Clamp01(orbLevel * 0.9f + streamLevel[s] * 0.15f) * presence[Water];
-                    break;
-                case Air:
-                    if (!any) break;
-                    // The wind streams over the skin from upwind.
-                    HandSkin.FocusPosition = middle - right * (windSign * 0.5f) + Vector3.up * 0.05f;
-                    HandSkin.FocusStrength = presence[Air] * (0.7f + gust * 0.3f);
-                    break;
-            }
-        }
-
-        // ---- Fire ----
-
-        /// <summary>
-        /// Flames on the open palms (taller with the palm up, leaning as the hand moves, flaring on the beat), embers
-        /// rising from them, and a quick push away from you throws a fireball.
-        /// </summary>
-        void StepFire(MusicFrame music, Camera view, float dt)
-        {
-            float p = presence[Fire];
-            var eye = view.transform.position;
-            for (int s = 0; s < 2; s++)
-            {
-                throwWait[s] -= dt;
-                bool lit = p > 0f && tracked[s] && fist[s] < 0.55f;
-                flameLevel[s] = Mathf.MoveTowards(flameLevel[s], lit ? 1f : 0f, dt * (lit ? 2.2f : 4f));
-                float level = flameLevel[s] * p;
-                bool show = level > 0.01f && tracked[s];
-                Show(flames[s], show);
-                Show(palmLights[s], show);
-                if (!show) continue;
-
-                float up = Mathf.Clamp01(normal[s].y * 0.5f + 0.5f);
-                float flare = music.Kick;
-                float height = flameHeight * (0.8f + 0.35f * up) * Mathf.SmoothStep(0f, 1f, level) * (1f + flare * 0.4f + music.Band(1) * 0.12f);
-                var root = palm[s] + normal[s] * 0.03f;
-                // Upright like a real flame, turned only about the vertical to face you.
-                var away = root - eye;
-                away.y = 0f;
-                var rotation = Quaternion.LookRotation(away.sqrMagnitude > 1e-6f ? away : forward, Vector3.up);
-                var upright = Vector3.up;
-                float lean = Mathf.Clamp(-Vector3.Dot(velocity[s], rotation * Vector3.right) * 0.45f, -0.7f, 0.7f);
-                var flame = flames[s];
-                flame.transform.SetPositionAndRotation(root + upright * (height * 0.45f), rotation);
-                flame.transform.localScale = new Vector3(height * 0.72f, height, 1f);
-                block.Clear();
-                block.SetFloat(ClockId, ShaderClock);
-                block.SetFloat(SeedId, s * 13.7f);
-                block.SetVector(BendId, new Vector4(lean, 0f, 0f, 0f));
-                block.SetFloat(FlareId, flare);
-                block.SetFloat(ShapeId, 0f);
-                block.SetFloat(AlphaId, Mathf.Clamp01(level * 1.5f));
-                flame.SetPropertyBlock(block);
-
-                // A warm light on the palm under the flame.
-                var light = palmLights[s];
-                light.transform.position = root + upright * (height * 0.2f);
-                light.transform.localScale = Vector3.one * (0.1f + height * 0.55f);
-                Effects.Face(light.transform, view);
-                block.Clear();
-                block.SetColor(ColorId, MainColors[Fire]);
-                block.SetFloat(IntensityId, (0.2f + flare * 0.22f) * level);
-                light.SetPropertyBlock(block);
-
-                // Embers rise from the flame, more of them with the treble, drifting a little away from your face.
-                emberDebt[s] += dt * level * (8f + music.Band(5) * 16f);
-                var drift = away.normalized * 0.06f;
-                while (emberDebt[s] >= 1f)
-                {
-                    emberDebt[s] -= 1f;
-                    var at = root + upright * (height * Random.Range(0.25f, 0.8f)) + Random.insideUnitSphere * (height * 0.12f);
-                    Emit(motes, at, Vector3.up * Random.Range(0.18f, 0.4f) + drift + velocity[s] * 0.2f + Random.insideUnitSphere * 0.05f, Pick(Fire),
-                        Random.Range(0.003f, 0.007f), Random.Range(0.7f, 1.4f));
-                }
-
-                if (p > 0.6f && !menuOpen && !gesture[s] && throwWait[s] <= 0f) TryThrow(s, eye);
-            }
-            if (previewThrow && tracked[1])
-            {
-                previewThrow = false;
-                Throw(1, (forward + Vector3.up * 0.1f).normalized);
-            }
-            StepFireballs(music, view, dt);
-        }
-
-        /// <summary>A hand pushed quickly away from you, mostly forwards, throws a fireball the way it moves.</summary>
-        void TryThrow(int s, Vector3 eye)
-        {
-            var v = velocity[s];
-            var away = palm[s] - eye;
-            away.y = 0f;
-            if (away.sqrMagnitude < 1e-4f) return;
-            away.Normalize();
-            float outward = Vector3.Dot(v, away);
-            if (outward < throwSpeed || outward < v.magnitude * 0.6f) return;
-            Throw(s, (v.normalized + away * 0.6f).normalized);
-        }
-
-        void Throw(int s, Vector3 direction)
-        {
-            Fireball ball = null;
-            foreach (var f in fireballs)
-                if (!f.Flying && (ball == null || f.Burst > ball.Burst)) ball = f;
-            if (ball == null)
-                foreach (var f in fireballs)
-                    if (ball == null || f.Age > ball.Age) ball = f;
-            // Not too steeply into the floor or up at the ceiling.
-            direction.y = Mathf.Clamp(direction.y, -0.35f, 0.45f);
-            direction.Normalize();
-            ball.Flying = true;
-            ball.Age = 0f;
-            ball.Position = palm[s] + direction * 0.06f;
-            ball.Velocity = direction * fireballSpeed;
-            throwWait[s] = 0.4f;
-            // The flame leaves the hand with the throw and grows back.
-            flameLevel[s] = Mathf.Min(flameLevel[s], 0.25f);
-            lastAction = Clock;
-            for (int i = 0; i < 14; i++)
-                Emit(motes, palm[s] + normal[s] * 0.04f, direction * Random.Range(0.3f, 0.9f) + Random.insideUnitSphere * 0.3f, Pick(Fire), Random.Range(0.005f, 0.01f), Random.Range(0.3f, 0.6f));
-            voices.Play(whoosh, palm[s], 0.3f, Random.Range(0.9f, 1.1f));
-        }
-
-        void StepFireballs(MusicFrame music, Camera view, float dt)
-        {
-            var eye = view.transform.position;
-            foreach (var f in fireballs)
-            {
-                if (f.Flying)
-                {
-                    f.Age += dt;
-                    var from = f.Position;
-                    f.Velocity += Vector3.down * (0.5f * dt);
-                    f.Position += f.Velocity * dt;
-                    for (int k = 0; k < 3; k++)
-                    {
-                        var at = Vector3.Lerp(from, f.Position, Random.value) + Random.insideUnitSphere * 0.02f;
-                        Emit(motes, at, -f.Velocity * 0.08f + Random.insideUnitSphere * 0.12f + Vector3.up * 0.1f, Pick(Fire),
-                            Random.Range(0.006f, 0.013f), Random.Range(0.3f, 0.6f));
-                    }
-                    if (Lands(from, f.Position, out var hit, out var surface)) Explode(f, hit, surface);
-                    else if (f.Age > 1.8f) Explode(f, f.Position, -f.Velocity.normalized);
-                }
-                else f.Burst += dt;
-
-                bool flying = f.Flying;
-                bool flashing = !flying && f.Burst < 0.35f;
-                Show(f.Ball, flying);
-                Show(f.Core, flying || flashing);
-                if (flying)
-                {
-                    var rotation = Quaternion.LookRotation(f.Position - eye, Vector3.up);
-                    var back = -f.Velocity.normalized;
-                    var trail = new Vector4(Vector3.Dot(back, rotation * Vector3.right), Vector3.Dot(back, rotation * Vector3.up), 0f, 0f);
-                    float grow = Mathf.Clamp01(f.Age / 0.12f);
-                    f.Ball.transform.SetPositionAndRotation(f.Position, rotation);
-                    f.Ball.transform.localScale = Vector3.one * (0.27f * grow * (1f + music.Kick * 0.2f));
-                    block.Clear();
-                    block.SetFloat(ClockId, ShaderClock);
-                    block.SetFloat(SeedId, f.Seed);
-                    block.SetVector(BendId, trail);
-                    block.SetFloat(FlareId, music.Kick);
-                    block.SetFloat(ShapeId, 1f);
-                    block.SetFloat(AlphaId, 1f);
-                    f.Ball.SetPropertyBlock(block);
-                    f.Core.transform.position = f.Position;
-                    f.Core.transform.localScale = Vector3.one * (0.11f * grow);
-                    Effects.Face(f.Core.transform, view);
-                    block.Clear();
-                    block.SetColor(ColorId, BrightColors[Fire]);
-                    block.SetFloat(IntensityId, 0.9f);
-                    f.Core.SetPropertyBlock(block);
-                }
-                else if (flashing)
-                {
-                    // The flash where it burst.
-                    float u = f.Burst / 0.35f;
-                    f.Core.transform.position = f.Position;
-                    f.Core.transform.localScale = Vector3.one * (0.12f + u * 0.5f);
-                    Effects.Face(f.Core.transform, view);
-                    block.Clear();
-                    block.SetColor(ColorId, MainColors[Fire]);
-                    block.SetFloat(IntensityId, (1f - u) * (1f - u) * 0.8f);
-                    f.Core.SetPropertyBlock(block);
-                }
-            }
-        }
-
-        /// <summary>Where a fireball moving from one point to the next meets the floor, a furniture top or a scanned wall.</summary>
-        bool Lands(Vector3 from, Vector3 to, out Vector3 hit, out Vector3 surface)
-        {
-            float ground = Room.GroundBelow(to, floorY);
-            if (to.y <= ground + 0.02f)
-            {
-                hit = new Vector3(to.x, ground + 0.02f, to.z);
-                surface = Vector3.up;
-                return true;
-            }
-            var walls = Room.Walls;
-            for (int i = 0; i < walls.Count; i++)
-            {
-                var w = walls[i];
-                float a = Vector3.Dot(from - w.Center, w.Normal), b = Vector3.Dot(to - w.Center, w.Normal);
-                if (a < 0f || b > 0f) continue;
-                var p = Vector3.Lerp(from, to, a / Mathf.Max(a - b, 1e-5f));
-                if (!w.Contains(p, -0.1f)) continue;
-                hit = p + w.Normal * 0.02f;
-                surface = w.Normal;
-                return true;
-            }
-            // Without a room scan, it bursts about where a wall would be.
-            var flat = new Vector3(to.x - head.x, 0f, to.z - head.z);
-            if (!Room.Scanned && flat.magnitude > 3.2f)
-            {
-                hit = to;
-                surface = -flat.normalized;
-                return true;
-            }
-            hit = to;
-            surface = Vector3.up;
-            return false;
-        }
-
-        /// <summary>A fireball bursts into sparks that bounce off the surface it hit, with a crackle.</summary>
-        void Explode(Fireball f, Vector3 at, Vector3 surface)
-        {
-            f.Flying = false;
-            f.Burst = 0f;
-            f.Position = at;
-            for (int i = 0; i < 64; i++)
-            {
-                var d = Random.onUnitSphere;
-                if (Vector3.Dot(d, surface) < 0f) d = Vector3.Reflect(d, surface);
-                Emit(falling, at, d * Random.Range(0.7f, 2.3f) + surface * 0.3f, Pick(Fire), Random.Range(0.004f, 0.009f), Random.Range(0.45f, 1f));
-            }
-            for (int i = 0; i < 26; i++)
-                Emit(motes, at + Random.insideUnitSphere * 0.05f, Random.insideUnitSphere * 0.35f + surface * 0.15f, Pick(Fire), Random.Range(0.008f, 0.016f), Random.Range(0.5f, 1.2f));
-            voices.Play(crackle, at, 0.3f, Random.Range(0.9f, 1.15f));
-        }
-
-        /// <summary>Each beat throws a spurt of sparks up from every flame.</summary>
-        void BeatFire(MusicFrame music)
-        {
-            if (presence[Fire] <= 0.2f) return;
-            for (int s = 0; s < 2; s++)
-            {
-                float level = flameLevel[s] * presence[Fire];
-                if (level < 0.3f || !tracked[s]) continue;
-                var root = palm[s] + normal[s] * 0.03f;
-                int n = 5 + (int)(music.Kick * 5f);
-                for (int i = 0; i < n; i++)
-                {
-                    var spurt = Vector3.up * Random.Range(0.4f, 0.8f) + AwayFromEyes(Random.insideUnitSphere, root) * 0.3f;
-                    Emit(motes, root + Random.insideUnitSphere * 0.02f, spurt * (0.8f + level * 0.4f), Pick(Fire), Random.Range(0.004f, 0.008f), Random.Range(0.5f, 0.9f));
-                }
-            }
+            // The palms light up with ripples as the ball of water forms between them.
+            if (current == Water)
+                for (int s = 0; s < 2; s++) HandSkin.Charge[s] = Mathf.Clamp01(orbLevel * 0.9f + streamLevel[s] * 0.15f) * presence[Water];
         }
 
         // ---- Water ----
@@ -1615,323 +1063,9 @@ namespace MusicInYourHands
             }
         }
 
-        // ---- Air ----
-
-        /// <summary>The wind around the hands, the whirlwinds, the beat's gusts and a slow wind circling the room.</summary>
-        void StepAir(MusicFrame music, Camera view, float dt)
-        {
-            float p = presence[Air];
-            var eye = view.transform.position;
-            gust = Mathf.Max(0f, gust - dt * 2.2f);
-            roomPhase += dt * windSign;
-            windCount = 0;
-            for (int s = 0; s < 2; s++)
-            {
-                Circling(s, p, eye, dt);
-                Currents(s, p, music, eye, dt);
-            }
-            if (previewWhirl)
-            {
-                previewWhirl = false;
-                var w = whirls[0];
-                w.Active = true;
-                w.Energy = 0.9f;
-                w.Driven = 0f;
-                w.Base = new Vector3(eye.x, floorY, eye.z) + forward * 0.85f + right * 0.1f;
-                w.Top = w.Base + Vector3.up;
-            }
-            StepWhirls(music, p, eye, dt);
-            Gusts(p, dt);
-            RoomWind(p);
-            wind.SetParticles(windOut, windCount);
-        }
-
-        /// <summary>
-        /// Tracks how fast a hand turns round the middle of its own recent movement. A hand going round in circles
-        /// keeps turning one way and drives a whirlwind; a sweep or a wave does not, as it never turns far.
-        /// </summary>
-        void Circling(int s, float p, Vector3 eye, float dt)
-        {
-            if (!tracked[s])
-            {
-                turned[s] = 0f;
-                spinAxis[s] = Vector3.zero;
-                wasTracked[s] = false;
-                return;
-            }
-            if (!wasTracked[s])
-            {
-                circleCentre[s] = palm[s];
-                wasTracked[s] = true;
-            }
-            circleCentre[s] = Vector3.Lerp(circleCentre[s], palm[s], 1f - Mathf.Exp(-2.5f * dt));
-            var r = palm[s] - circleCentre[s];
-            float r2 = r.sqrMagnitude;
-            var omega = r2 > 0.0006f ? Vector3.Cross(r, velocity[s]) / r2 : Vector3.zero;
-            spinAxis[s] = Vector3.Lerp(spinAxis[s], omega, 1f - Mathf.Exp(-6f * dt));
-            float rate = spinAxis[s].magnitude;
-            bool circling = p > 0.5f && current == Air && !menuOpen && rate > 2.6f && velocity[s].magnitude > 0.22f && fist[s] < 0.7f;
-            turned[s] = circling ? turned[s] + rate * dt : Mathf.MoveTowards(turned[s], 0f, dt * 6f);
-            if (!circling) return;
-            lastAction = Clock;
-            // Half a turn starts a whirlwind; it grows to full strength over the next turns.
-            if (turned[s] > Mathf.PI) Drive(s, rate, eye, dt);
-        }
-
-        /// <summary>A circling hand spins up its whirlwind on the floor a little beyond it, its top flaring round the hand.</summary>
-        void Drive(int s, float rate, Vector3 eye, float dt)
-        {
-            var w = whirls[s];
-            var flat = palm[s] - eye;
-            flat.y = 0f;
-            float reach = flat.magnitude;
-            var direction = reach > 0.05f ? flat / reach : forward;
-            var spot = new Vector3(eye.x, 0f, eye.z) + direction * Mathf.Clamp(reach + 0.3f, 0.6f, 1.2f);
-            spot.y = Room.GroundBelow(new Vector3(spot.x, palm[s].y - 0.05f, spot.z), floorY);
-            if (!w.Active)
-            {
-                w.Active = true;
-                w.Energy = 0f;
-                w.Base = spot;
-                w.Drift = Vector3.zero;
-                w.Spin = Random.value * 6f;
-                voices.Play(whoosh, spot + Vector3.up * 0.5f, 0.25f, 0.8f);
-            }
-            w.Base = Vector3.Lerp(w.Base, spot, 1f - Mathf.Exp(-2f * dt));
-            w.Top = palm[s] + direction * 0.06f;
-            w.Driven = 1f;
-            w.Energy = Mathf.Min(1f, w.Energy + dt * rate / (Mathf.PI * 2f * Mathf.Max(0.2f, turnsToSpin)));
-        }
-
-        void StepWhirls(MusicFrame music, float p, Vector3 eye, float dt)
-        {
-            for (int i = 0; i < whirls.Length; i++)
-            {
-                var w = whirls[i];
-                if (w.Active)
-                {
-                    // Let go, it keeps turning for several seconds; once the element has gone, it dies down quickly.
-                    w.Driven = Mathf.MoveTowards(w.Driven, 0f, dt * 2f);
-                    if (current != Air) w.Energy -= dt * 0.6f;
-                    else if (w.Driven <= 0f) w.Energy -= dt * 0.16f;
-                    if (w.Energy <= 0f) w.Active = false;
-                }
-                if (!w.Active)
-                {
-                    foreach (var strand in w.Strands) strand.SetVisible(false);
-                    continue;
-                }
-                if (w.Driven < 0.5f)
-                {
-                    // Free, it wanders slowly about the floor in front of you.
-                    var wander = new Vector3(Mathf.Sin(Clock * 0.37f + i * 3f), 0f, Mathf.Cos(Clock * 0.29f + i * 5f)) * 0.12f;
-                    w.Drift = Vector3.Lerp(w.Drift, wander, dt);
-                    w.Base += w.Drift * dt;
-                    var flat = new Vector3(w.Base.x - eye.x, 0f, w.Base.z - eye.z);
-                    float d = flat.magnitude;
-                    if (d > 1e-3f && d < 0.6f) w.Base += flat / d * (0.6f - d);
-                    if (d > 1.6f) w.Base -= flat / d * (d - 1.6f);
-                }
-                float size = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(w.Energy * 1.4f));
-                var free = new Vector3(w.Base.x, w.Base.y + Mathf.Lerp(0.45f, 0.95f, size), w.Base.z);
-                var top = Vector3.Lerp(free, w.Top, w.Driven);
-                w.Spin += dt * (5f + 9f * w.Energy) * (1f + gust * 0.6f + music.Band(1) * 0.3f);
-                DrawWhirl(w, top, size, p, music, eye);
-                if (Random.value < dt * 30f * size)
-                {
-                    float a = Random.value * Mathf.PI * 2f;
-                    var outward = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
-                    Emit(motes, w.Base + outward * 0.04f + Vector3.up * 0.02f, outward * 0.25f + Vector3.Cross(Vector3.up, outward) * 0.35f + Vector3.up * 0.15f, DustColor,
-                        Random.Range(0.008f, 0.016f), Random.Range(0.6f, 1.1f));
-                }
-            }
-        }
-
-        /// <summary>
-        /// A funnel of wind, narrow at its foot and flaring at the top: swirls of air circle it, climbing as they turn,
-        /// dusty near the ground, and specks ride round it, fastest at the bottom.
-        /// </summary>
-        void DrawWhirl(Whirl w, Vector3 top, float size, float p, MusicFrame music, Vector3 eye)
-        {
-            float fade = Mathf.Clamp01(w.Energy * 4f) * Mathf.Max(p, 0.3f);
-            float swell = 1f + music.Kick * 0.15f;
-            for (int k = 0; k < Strands; k++)
-            {
-                var strand = w.Strands[k];
-                strand.SetVisible(true);
-                // Each swirl circles the funnel at its own height, climbing slowly and fading out at the top as another
-                // forms at the foot; the lower ones turn faster.
-                float height = Mathf.Repeat(k / (float)Strands + w.Spin * 0.015f, 1f);
-                float heightFade = Mathf.Sin(height * Mathf.PI);
-                float start = w.Spin * (1.7f - height * 0.8f) + k * 2.4f;
-                for (int i = 0; i < StrandPoints; i++)
-                {
-                    float t = i / (float)(StrandPoints - 1);
-                    float u = Mathf.Clamp01(height + t * 0.08f);
-                    path[i] = Funnel(w, top, u, start - t * Mathf.PI * 1.3f, size, swell, 1f);
-                    var col = Color.Lerp(DustColor, MainColors[Air], Mathf.Clamp01(u * 2.5f));
-                    col.a = Mathf.Pow(Mathf.Sin(t * Mathf.PI), 0.8f) * Mathf.Sqrt(1f - t * 0.6f) * heightFade * (0.4f + 0.4f * size);
-                    pathColors[i] = col;
-                }
-                strand.Set(path, pathColors, StrandPoints, 0.005f * (0.7f + 0.6f * size), new Color(1f, 1f, 1f, fade), eye, false);
-            }
-            float spinRate = 5f + 9f * w.Energy;
-            for (int j = 0; j < WhirlMotes && windCount < windOut.Length; j++)
-            {
-                float u = whirlU[j];
-                float a = w.Spin * (1.25f - u * 0.45f) + whirlAngle[j] + u * 7f;
-                var at = Funnel(w, top, u, a, size, swell, whirlReach[j]);
-                var outward = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
-                var col = Color.Lerp(DustColor, BrightColors[Air], Mathf.Clamp01(u * 2f));
-                col.a = fade * (0.3f + 0.45f * Mathf.Sin(u * Mathf.PI));
-                float radius = Vector3.Distance(at, Vector3.Lerp(w.Base, top, u));
-                windOut[windCount++] = new ParticleSystem.Particle
-                {
-                    position = at,
-                    velocity = Vector3.Cross(Vector3.up, outward) * Mathf.Min(radius * spinRate, 1.4f) * 0.6f + Vector3.up * 0.15f,
-                    startColor = col,
-                    startSize = 0.004f + 0.003f * u,
-                    startLifetime = 10f,
-                    remainingLifetime = 10f
-                };
-            }
-        }
-
-        /// <summary>A point on a whirlwind's funnel at height share <paramref name="u"/> and angle <paramref name="a"/>; its middle sways.</summary>
-        Vector3 Funnel(Whirl w, Vector3 top, float u, float a, float size, float swell, float reach)
-        {
-            var c = Vector3.Lerp(w.Base, top, u);
-            c += (right * Mathf.Sin(u * 3f + Clock * 1.3f) + forward * Mathf.Cos(u * 2.4f + Clock * 1.1f)) * (0.12f * u * (1f - u) * size);
-            float radius = (0.025f + 0.18f * Mathf.Pow(u, 1.4f)) * (0.4f + 0.6f * size) * swell * reach;
-            return c + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * radius;
-        }
-
-        /// <summary>Wind swirling round a hand: motes and three arcs of air, faster on the beat's gusts and as you circle.</summary>
-        void Currents(int s, float p, MusicFrame music, Vector3 eye, float dt)
-        {
-            bool on = p > 0f && tracked[s];
-            airLevel[s] = Mathf.MoveTowards(airLevel[s], on ? 1f : 0f, dt * 2f);
-            float level = airLevel[s] * p;
-            bool show = level > 0.01f && tracked[s];
-            for (int k = 0; k < CurrentsPerHand; k++) currents[s * CurrentsPerHand + k].SetVisible(show);
-            if (!show) return;
-            float spinning = Mathf.Clamp01(turned[s] / (Mathf.PI * 2f));
-            float turn = s == 0 ? 1f : -1f;
-            float speedUp = 1f + gust * 1.2f + spinning * 1.5f + music.Band(3) * 0.4f;
-            airPhase[s] += dt * speedUp * turn;
-            float puff = 1f + gust * 0.4f - spinning * 0.3f;
-            // The air winds round the hand itself, like the water does, from the palm up to the fingers.
-            Around(s, out var axis, out var across, out var side);
-            var c = palm[s];
-            int start = s * windPerHand;
-            for (int j = 0; j < windPerHand && windCount < windOut.Length; j++)
-            {
-                int q = start + j;
-                float a = windAngle[q] + airPhase[s] * windSpeed[q] * 5f;
-                float radius = windRadius[q] * puff;
-                float h = windHeight[q] * (1f - spinning * 0.3f) + Mathf.Sin(a * 2f + q) * 0.008f;
-                var round = across * Mathf.Cos(a) + side * Mathf.Sin(a);
-                var tangent = side * Mathf.Cos(a) - across * Mathf.Sin(a);
-                float twinkle = 0.5f + 0.5f * Mathf.Sin(Clock * 3f + q * 1.7f);
-                var col = Color.Lerp(MainColors[Air], BrightColors[Air], twinkle);
-                col.a = level * (0.2f + 0.45f * twinkle);
-                windOut[windCount++] = new ParticleSystem.Particle
-                {
-                    position = c + axis * h + round * radius,
-                    // Stretched a little along their way, so they read as specks of air rushing round.
-                    velocity = tangent * (radius * windSpeed[q] * 1.6f * speedUp * turn),
-                    startColor = col,
-                    startSize = 0.0032f + 0.0015f * twinkle,
-                    startLifetime = 10f,
-                    remainingLifetime = 10f
-                };
-            }
-            for (int k = 0; k < CurrentsPerHand; k++)
-            {
-                float radius = (0.075f + k * 0.018f) * puff;
-                float h = 0.005f + k * 0.05f;
-                float lead = airPhase[s] * (4.6f + k * 0.9f) + k * 2.6f;
-                for (int i = 0; i < CurrentPoints; i++)
-                {
-                    float u = i / (float)(CurrentPoints - 1);
-                    float a = lead - u * 1.7f * turn;
-                    // Each arc climbs a little as it goes round, a short stretch of a spiral.
-                    path[i] = c + axis * (h - u * 0.02f) + (across * Mathf.Cos(a) + side * Mathf.Sin(a)) * radius;
-                    pathColors[i] = new Color(1f, 1f, 1f, (1f - u) * (1f - u) * Mathf.Clamp01(u * 8f));
-                }
-                var tint = BrightColors[Air];
-                currents[s * CurrentsPerHand + k].Set(path, pathColors, CurrentPoints, 0.0028f * (1f + gust * 0.4f), new Color(tint.r, tint.g, tint.b, level * 0.6f), eye, false);
-            }
-        }
-
-        /// <summary>Each beat sends a gust of streaks across in front of you; every eight beats the wind turns about.</summary>
-        void BeatAir(MusicFrame music)
-        {
-            if (presence[Air] <= 0.2f || View == null) return;
-            gust = 1f;
-            if (Beats % 8 == 0) windSign = -windSign;
-            var eye = View.transform.position;
-            var ahead = Effects.FlatForward(View);
-            var side = Vector3.Cross(Vector3.up, ahead);
-            int n = 6 + (int)(music.Kick * 4f);
-            for (int k = 0; k < n; k++)
-            {
-                int i = nextGust;
-                nextGust = (nextGust + 1) % GustMotes;
-                gustFrom[i] = eye + ahead * Random.Range(0.6f, 1.6f) - side * (windSign * Random.Range(0.6f, 0.9f)) + Vector3.up * Random.Range(-0.55f, 0.15f);
-                gustVelocity[i] = side * (windSign * Random.Range(1.3f, 2f)) + Vector3.up * Random.Range(-0.05f, 0.1f);
-                gustAge[i] = 0f;
-            }
-        }
-
-        void Gusts(float p, float dt)
-        {
-            for (int i = 0; i < GustMotes; i++)
-            {
-                gustAge[i] += dt;
-                if (gustAge[i] > 1.1f || windCount >= windOut.Length) continue;
-                var col = BrightColors[Air];
-                col.a = Mathf.Sin(gustAge[i] / 1.1f * Mathf.PI) * 0.45f * p;
-                windOut[windCount++] = new ParticleSystem.Particle
-                {
-                    position = gustFrom[i] + gustVelocity[i] * gustAge[i],
-                    velocity = gustVelocity[i] * 0.8f,
-                    startColor = col,
-                    startSize = 0.004f,
-                    startLifetime = 10f,
-                    remainingLifetime = 10f
-                };
-            }
-        }
-
-        /// <summary>A slow wind circling the room around you, a mote here and there.</summary>
-        void RoomWind(float p)
-        {
-            if (p <= 0.01f) return;
-            for (int i = 0; i < RoomMotes && windCount < windOut.Length; i++)
-            {
-                float radius = 0.9f + Hash(i) * 1.3f;
-                float speed = (0.25f + Hash(i + 50) * 0.35f) / radius;
-                float a = Hash(i + 100) * Mathf.PI * 2f + roomPhase * speed;
-                float y = floorY + 0.3f + Hash(i + 150) * 1.7f + Mathf.Sin(Clock * 0.7f + i) * 0.05f;
-                var outward = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
-                var col = BrightColors[Air];
-                col.a = Mathf.Sin(Mathf.Repeat(Clock * 0.2f + Hash(i + 200), 1f) * Mathf.PI) * 0.35f * p;
-                windOut[windCount++] = new ParticleSystem.Particle
-                {
-                    position = new Vector3(head.x, y, head.z) + outward * radius,
-                    velocity = Vector3.Cross(Vector3.up, outward) * (speed * radius * windSign),
-                    startColor = col,
-                    startSize = 0.006f,
-                    startLifetime = 10f,
-                    remainingLifetime = 10f
-                };
-            }
-        }
-
         // ---- The room around you ----
 
-        /// <summary>A little of the element drifts through the room: embers rising, drops of water hanging, dust floating.</summary>
+        /// <summary>A little of the element drifts through the room: drops of water hanging, or dust floating.</summary>
         void Ambient(MusicFrame music, Camera view, float dt)
         {
             float p = presence[current];
@@ -1945,10 +1079,6 @@ namespace MusicInYourHands
                 var at = new Vector3(eye.x + Mathf.Cos(a) * reach, 0f, eye.z + Mathf.Sin(a) * reach);
                 switch (current)
                 {
-                    case Fire:
-                        at.y = floorY + Random.Range(0.05f, 0.9f);
-                        Emit(motes, at, Vector3.up * Random.Range(0.1f, 0.25f) + Random.insideUnitSphere * 0.03f, Pick(Fire), Random.Range(0.004f, 0.008f), Random.Range(3f, 5f));
-                        break;
                     case Water:
                         at.y = Random.Range(floorY + 0.4f, eye.y + 0.4f);
                         Emit(motes, at, Random.insideUnitSphere * 0.03f, Pick(Water), Random.Range(0.003f, 0.006f), Random.Range(3f, 5f));
@@ -1980,25 +1110,10 @@ namespace MusicInYourHands
             popped[index] = false;
             var eye = View.transform.position;
             var ahead = Effects.FlatForward(View);
-            var side = Vector3.Cross(Vector3.up, ahead);
             int s = Sung.Index % 2 == 0 ? 1 : 0;
             if (!tracked[s]) s = 1 - s;
             switch (e)
             {
-                case Fire:
-                {
-                    // Rising off the tip of a flame, a little beyond the hand.
-                    Vector3 from;
-                    if (tracked[s] && flameLevel[s] > 0.2f)
-                    {
-                        var tip = palm[s] + normal[s] * 0.03f + Vector3.up * (flameHeight * 0.9f);
-                        from = eye + (tip - eye).normalized * 0.55f;
-                    }
-                    else from = eye + ahead * 0.7f + Vector3.down * 0.18f + side * ((Sung.Index % 3 - 1) * 0.12f);
-                    w.Position = from;
-                    w.Velocity = Vector3.up * 0.06f + (from - eye).normalized * 0.02f;
-                    break;
-                }
                 case Water:
                 {
                     // Out of the ball of water or a stream, drifting to float in front of you.
@@ -2032,65 +1147,28 @@ namespace MusicInYourHands
                             Pick(Earth), Random.Range(0.005f, 0.01f), Random.Range(0.4f, 0.8f));
                     break;
                 }
-                default:
-                {
-                    // Blown in from upwind, slowing as it comes to rest in front of you.
-                    wordAnchor[index] = eye;
-                    wordAim[index] = ahead;
-                    wordStart[index] = -windSign * (30f + w.Seed * 8f);
-                    wordEnd[index] = windSign * (2f + w.Seed * 8f);
-                    wordLift[index] = -0.1f + ((Sung.Index % 3) - 1) * 0.065f;
-                    w.Position = BlownAt(index, w, 0f);
-                    break;
-                }
             }
         }
 
-        void StepWords(MusicFrame music, Camera view, float dt)
+        void StepWords(MusicFrame music, Camera view)
         {
             if (SungWords == null) return;
-            var eye = view.transform.position;
             var words = SungWords.Words;
             for (int i = 0; i < words.Count; i++)
             {
                 var w = words[i];
-                bool bubble = false, trail = false;
+                bool bubble = false;
                 if (w.Active)
                     switch (w.Slot)
                     {
-                        case Fire:
-                            EmberWord(w, eye, music, dt);
-                            break;
                         case Water:
                             bubble = BubbleWord(i, w, view, music);
                             break;
                         case Earth:
                             CarvedWord(i, w, music);
                             break;
-                        default:
-                            trail = BlownWord(i, w, eye, music);
-                            break;
                     }
                 Show(bubbles[i], bubble);
-                trails[i].SetVisible(trail);
-            }
-        }
-
-        /// <summary>A word of fire: it floats up like an ember, flickering, cooling from gold to red, shedding sparks.</summary>
-        void EmberWord(WordLayer.Word w, Vector3 eye, MusicFrame music, float dt)
-        {
-            w.Position += w.Velocity * dt;
-            w.Velocity = Vector3.Lerp(w.Velocity, Vector3.up * 0.035f, 1f - Mathf.Exp(-1.5f * dt));
-            w.Rotation = WordLayer.Facing(w.Position, eye);
-            float heat = Mathf.Clamp01(1f - w.Age / w.Life);
-            float flicker = Mathf.Sin(w.Age * 17f + w.Seed * 30f) * 0.5f + Mathf.Sin(w.Age * 29f + w.Seed * 11f) * 0.5f;
-            w.Color = Color.Lerp(new Color(1f, 0.42f, 0.1f), new Color(1f, 0.84f, 0.38f), heat * 0.85f + flicker * 0.08f);
-            w.Halo = 0.22f + heat * 0.15f + flicker * 0.05f + music.Kick * 0.2f;
-            if (Random.value < dt * 7f)
-            {
-                float height = SungWords.Height(w);
-                var at = w.Position + (w.Rotation * Vector3.right) * (Random.Range(-0.5f, 0.5f) * w.Width * height) + Vector3.up * (height * Random.Range(0f, 0.7f));
-                Emit(motes, at, Vector3.up * Random.Range(0.06f, 0.15f) + Random.insideUnitSphere * 0.03f, Pick(Fire), Random.Range(0.003f, 0.006f), Random.Range(0.5f, 1f));
             }
         }
 
@@ -2151,36 +1229,6 @@ namespace MusicInYourHands
             w.Alpha = Mathf.Clamp01((w.Position.y - r.Ground - 0.02f) / 0.05f);
         }
 
-        /// <summary>A word of air: blown along on the wind with a streak of air behind it, bobbing as it slows.</summary>
-        bool BlownWord(int i, WordLayer.Word w, Vector3 eye, MusicFrame music)
-        {
-            w.Position = BlownAt(i, w, w.Age);
-            w.Rotation = WordLayer.Facing(w.Position, eye) * Quaternion.Euler(0f, 0f, Mathf.Sin(w.Age * 1.9f + w.Seed * 5f) * 6f);
-            w.Color = new Color(0.95f, 0.99f, 1f);
-            w.Halo = 0.06f + music.Kick * 0.15f;
-            float height = SungWords.Height(w);
-            var behind = w.Position - BlownAt(i, w, Mathf.Max(0f, w.Age - 0.05f));
-            var tangent = behind.sqrMagnitude > 1e-8f ? behind.normalized : Vector3.zero;
-            var back = tangent * (w.Width * height * 0.5f + 0.01f);
-            for (int k = 0; k < TrailPoints; k++)
-            {
-                path[k] = BlownAt(i, w, Mathf.Max(0f, w.Age - k * 0.05f)) - back + Vector3.up * (height * 0.3f);
-                pathColors[k] = new Color(1f, 1f, 1f, 1f - k / (float)(TrailPoints - 1));
-            }
-            float alpha = Mathf.Clamp01(w.Age / 0.25f) * Mathf.Clamp01((w.Life - w.Age) / 0.6f) * FadeIn;
-            var tint = MainColors[Air];
-            trails[i].Set(path, pathColors, TrailPoints, 0.006f, new Color(tint.r, tint.g, tint.b, alpha * 0.7f), eye, false);
-            return true;
-        }
-
-        Vector3 BlownAt(int i, WordLayer.Word w, float age)
-        {
-            float u = Mathf.Clamp01(age / w.Life);
-            float ease = 1f - Mathf.Pow(1f - u, 2.4f);
-            var direction = Quaternion.AngleAxis(Mathf.Lerp(wordStart[i], wordEnd[i], ease), Vector3.up) * wordAim[i];
-            return wordAnchor[i] + direction * 0.85f + Vector3.up * (wordLift[i] + Mathf.Sin(age * 2.3f + w.Seed * 6f) * 0.018f);
-        }
-
         // ---- Small helpers ----
 
         /// <summary>
@@ -2222,8 +1270,6 @@ namespace MusicInYourHands
             return r < 0.45f ? MainColors[e] : r < 0.8f ? SecondColors[e] : BrightColors[e];
         }
 
-        static float Hash(int i) => Mathf.Repeat(Mathf.Sin(i * 12.9898f + 78.233f) * 43758.5453f, 1f);
-
         static void Show(Renderer r, bool visible)
         {
             if (r.gameObject.activeSelf != visible) r.gameObject.SetActive(visible);
@@ -2233,22 +1279,19 @@ namespace MusicInYourHands
         float ShaderClock => Mathf.Repeat(Clock, 600f);
 
         /// <summary>
-        /// For previews and screenshots: makes <paramref name="element"/> (0 fire, 1 water, 2 earth, 3 air) the one in
-        /// charge at once, without a burst. With <paramref name="act"/>, the element also makes its own move on the next
-        /// frame: a fireball thrown from the right hand, the rocks raised high, or a whirlwind spinning in front of you.
+        /// For previews and screenshots: makes <paramref name="element"/> (0 water, 1 earth) the one in charge at once,
+        /// without a burst. With <paramref name="act"/>, the earth also makes its own move on the next frame: the rocks
+        /// raised high.
         /// </summary>
         public void PreviewElement(int element, bool act)
         {
             Build();
-            current = Mathf.Clamp(element, 0, 3);
-            for (int e = 0; e < 4; e++) presence[e] = e == current ? 1f : 0f;
+            current = Mathf.Clamp(element, 0, 1);
+            for (int e = 0; e < 2; e++) presence[e] = e == current ? 1f : 0f;
             switchTime = -10f;
             themeFrom = Themes[current];
             HandSkin.Theme = Themes[current];
-            if (!act) return;
-            if (current == Fire) previewThrow = true;
-            else if (current == Earth) previewLift = 0.95f;
-            else if (current == Air) previewWhirl = true;
+            if (act && current == Earth) previewLift = 0.95f;
         }
 
         // ---- Meshes and sounds, made once ----
@@ -2421,50 +1464,10 @@ namespace MusicInYourHands
 
         static void MakeSounds()
         {
-            if (whoosh != null) return;
+            if (splash != null) return;
             int rate = AudioSettings.outputSampleRate > 0 ? AudioSettings.outputSampleRate : 48000;
-            whoosh = WhooshSound(rate);
-            crackle = CrackleSound(rate);
             splash = SplashSound(rate);
             rumble = RumbleSound(rate);
-        }
-
-        /// <summary>A soft rush of air: noise through a filter that opens and closes again.</summary>
-        static AudioClip WhooshSound(int rate)
-        {
-            int n = (int)(rate * 0.55f);
-            var data = new float[n];
-            var random = new System.Random(7);
-            float low = 0f, floor = 0f;
-            for (int i = 0; i < n; i++)
-            {
-                float t = i / (float)rate;
-                float swell = Mathf.Sin(Mathf.Clamp01(t / 0.55f) * Mathf.PI);
-                float cutoff = 250f + 2200f * swell * swell;
-                low += ((float)(random.NextDouble() * 2.0 - 1.0) - low) * (1f - Mathf.Exp(-2f * Mathf.PI * cutoff / rate));
-                floor += (low - floor) * 0.02f;
-                data[i] = (low - floor) * swell * 0.7f;
-            }
-            return Store("Four elements whoosh", data, rate);
-        }
-
-        /// <summary>The crackle of a fireball bursting: sharp little pops over a short hiss.</summary>
-        static AudioClip CrackleSound(int rate)
-        {
-            int n = (int)(rate * 0.6f);
-            var data = new float[n];
-            var random = new System.Random(11);
-            float pop = 0f, hiss = 0f;
-            for (int i = 0; i < n; i++)
-            {
-                float t = i / (float)rate;
-                float white = (float)(random.NextDouble() * 2.0 - 1.0);
-                pop *= 0.93f;
-                if (random.NextDouble() < 0.0022 * Mathf.Exp(-t * 3f)) pop = (float)(random.NextDouble() * 2.0 - 1.0);
-                hiss += (white - hiss) * 0.4f;
-                data[i] = (pop * 0.8f + hiss * 0.3f * Mathf.Exp(-t * 9f)) * Mathf.Min(1f, t / 0.003f) * Mathf.Exp(-t * 4f) * 0.55f;
-            }
-            return Store("Four elements crackle", data, rate);
         }
 
         /// <summary>A splash: a bright burst of noise and a few rising bubble blips.</summary>
@@ -2495,7 +1498,7 @@ namespace MusicInYourHands
                 }
                 data[i] = s * 0.8f;
             }
-            return Store("Four elements splash", data, rate);
+            return Store("Earth and water splash", data, rate);
         }
 
         /// <summary>The low grind of rock moving: deep filtered noise with a hum under it.</summary>
@@ -2514,7 +1517,7 @@ namespace MusicInYourHands
                 float env = Mathf.Min(1f, t / 0.08f) * Mathf.Exp(-t * 2.6f);
                 data[i] = (lower * 9f + Mathf.Sin(2f * Mathf.PI * 48f * t) * 0.3f * (0.7f + 0.3f * Mathf.Sin(t * 37f))) * env * 0.6f;
             }
-            return Store("Four elements rumble", data, rate);
+            return Store("Earth and water rumble", data, rate);
         }
 
         static AudioClip Store(string name, float[] data, int rate)
