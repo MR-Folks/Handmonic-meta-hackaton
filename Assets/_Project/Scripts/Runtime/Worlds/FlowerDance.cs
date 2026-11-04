@@ -29,6 +29,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Hold your palm over a flower and it reaches up to you";
 
+        /// <summary>The garden grows on the floor and the tops of furniture.</summary>
+        public override Space Spaces => Space.Ground;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.12f, 0.2f, 0.1f, 0.5f),
