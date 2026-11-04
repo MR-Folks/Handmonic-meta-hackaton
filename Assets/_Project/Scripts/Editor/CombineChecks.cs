@@ -46,10 +46,13 @@ namespace MusicInYourHands.EditorTools
         /// WorldManager puts worlds together as the menu promises, tried with test worlds (HookProbe): a world that fits
         /// beside those that are on is added; one that clashes swaps out the ones it clashes with; two lyric worlds
         /// clash; past the most at once, the world chosen longest ago gives way; choosing a world that is on turns it
-        /// off, but never the last one; a world on its own replaces them all. OnEnter and OnExit run once for each turn
-        /// on and off. Only the world that shows the words gets OnWord (a lyric world first, else the one chosen last),
-        /// and the words move on when it goes. Only the world that dresses the hands (the one using the Hands space,
-        /// else the one chosen last) changes them: what the others' hooks do to them is undone.
+        /// off, but never the last one; a world on its own replaces them all; a world that throws as it turns off still
+        /// turns off. OnEnter and OnExit run once for each turn on and off. Only the world that shows the words gets
+        /// OnWord (a lyric world first, else the one chosen last that shows words, else the one chosen last), and the
+        /// words move on when it goes. Only the world that dresses the hands (the one using the Hands space, else one
+        /// using the pinch, the fists or what is in front of you, else the one chosen last) changes them: what the
+        /// others' hooks do to them is undone. While the menu is open a world gets no OnPinch, a pinch held as it opens
+        /// gets its OnRelease, and one still held as it closes waits to be opened and closed again.
         /// </summary>
         static bool CheckCombining()
         {
@@ -66,7 +69,7 @@ namespace MusicInYourHands.EditorTools
 
             var holder = new GameObject("Worlds");
             var lettering = ProjectSetup.WorldMaterial(typeof(HookProbe), "letteringMaterial");
-            HookProbe Probe(string name, Space uses, float mark, bool lyric = false)
+            HookProbe Probe(string name, Space uses, float mark, bool lyric = false, bool mute = false, bool broken = false)
             {
                 var go = new GameObject(name);
                 go.transform.SetParent(holder.transform, false);
@@ -75,6 +78,8 @@ namespace MusicInYourHands.EditorTools
                 probe.Uses = uses;
                 probe.Mark = mark;
                 probe.Lyric = lyric;
+                probe.Mute = mute;
+                probe.ThrowOnExit = broken;
                 var so = new SerializedObject(probe);
                 so.FindProperty("letteringMaterial").objectReferenceValue = lettering;
                 so.ApplyModifiedPropertiesWithoutUndo();
@@ -88,7 +93,10 @@ namespace MusicInYourHands.EditorTools
                 Probe("Hands", Space.Hands | Space.Pinch, 0.4f),           // 3
                 Probe("Garden", Space.Ground, 0.5f),                       // 4: clashes with Floor
                 Probe("Alone", Space.All, 0.6f),                           // 5: on its own
-                Probe("Poem", Space.AroundYou, 0.7f, lyric: true)          // 6: clashes with Sky, both lyric
+                Probe("Poem", Space.AroundYou, 0.7f, lyric: true),         // 6: clashes with Sky, both lyric
+                Probe("Front", Space.InFront, 0.8f),                       // 7: played with by the hands
+                Probe("Mute", Space.AroundYou, 0.9f, mute: true),          // 8: shows no words of its own
+                Probe("Broken", Space.Walls, 0.95f, broken: true)          // 9: throws in OnExit
             };
             var manager = holder.AddComponent<WorldManager>();
             var mso = new SerializedObject(manager);
@@ -198,26 +206,77 @@ namespace MusicInYourHands.EditorTools
             Choose(3, Choice.TurnOff, "Floor");
             Expect(manager.HandsWorld == 0 && Mathf.Approximately(HandSkin.Theme.Fill.r, 0.1f), $"after Hands went, {Name(manager.HandsWorld)} dresses the hands, not Floor");
             Hands(0.1f, "Floor alone");
+            // A world the hands play with (things in front of you) keeps dressing them when one that isn't comes after it.
+            Choose(7, Choice.Add, "Floor Front");
+            Choose(1, Choice.Add, "Floor Front Walls");
+            Expect(manager.HandsWorld == 7 && Mathf.Approximately(HandSkin.Theme.Fill.r, 0.8f), $"with Front on, {Name(manager.HandsWorld)} dresses the hands, not Front");
+            Hands(0.8f, "Floor, Front and Walls");
+
+            // The words go to the world chosen last that shows words; with none that does, to the world chosen last.
+            Choose(1, Choice.TurnOff, "Floor Front");
+            Choose(8, Choice.Add, "Floor Front Mute");
+            Expect(manager.WordsWorld == 7, $"the words went to {Name(manager.WordsWorld)}, not to Front (Mute shows none)");
+            Choose(0, Choice.TurnOff, "Front Mute");
+            Choose(7, Choice.TurnOff, "Mute");
+            Expect(manager.WordsWorld == 8, $"with Mute alone the words went to {Name(manager.WordsWorld)}, not to Mute");
+            Frames(0);
+            Expect(probes[8].Words.Count == 1, $"Mute, alone, got \"{string.Join(" ", probes[8].Words)}\", not the word sung");
+
+            // A world that throws as it turns off still turns off, and the world taking its place turns on.
+            Choose(9, Choice.Add, "Mute Broken");
+            Choose(1, Choice.Swap, "Mute Walls", "Broken");
+
+            // While the menu is open a world gets no OnPinch: a pinch held as it opens is let go, and one still held as it
+            // closes has to open and close again.
+            var menu = new GameObject("WorldMenu").AddComponent<WorldMenu>();
+            var walls = probes[1];
+            walls.Hands.Clear();
+            void Pinch(float gap, int frames = 2)
+            {
+                var index = new Vector3(0.2f, 1.3f, 0.35f);
+                var tips = new[]
+                {
+                    index + new Vector3(0f, -gap, 0f), index, index + new Vector3(-0.02f, -0.05f, -0.06f),
+                    index + new Vector3(-0.03f, -0.055f, -0.065f), index + new Vector3(-0.04f, -0.06f, -0.07f)
+                };
+                rig.Push(false, true, new Pose(index + new Vector3(-0.02f, -0.04f, -0.09f), Quaternion.identity), Vector3.left, tips);
+                for (int i = 0; i < frames; i++) Frames(5);
+            }
+            Pinch(0.06f);
+            Pinch(0.008f);
+            menu.Open(camera);
+            Pinch(0.008f);
+            bool sawMenu = walls.SawMenu;
+            Pinch(0.06f);
+            Pinch(0.008f);
+            menu.Close();
+            Pinch(0.008f);
+            Pinch(0.06f);
+            Pinch(0.008f);
+            Expect(sawMenu && !walls.SawMenu && walls.Hands.SequenceEqual(new[] { "pinch R", "release R", "pinch R" }),
+                $"pinching round the menu gave \"{string.Join(", ", walls.Hands)}\" (menu seen while open {sawMenu}), not a pinch, its release as the menu opened, and the next pinch after it closed");
+            UnityEngine.Object.DestroyImmediate(menu.gameObject);
 
             string Name(int index) => index >= 0 ? probes[index].name : "none";
             manager.Switch(0);
             LyricsOption.On = lyricsWere;
             UnityEngine.Object.DestroyImmediate(holder);
             if (problems.Count == 0)
-                Debug.Log("[Check] Worlds combine as the menu says: added when they fit, swapped when they clash (two lyric worlds too), the oldest giving way past three, turned off but never the last, " +
-                          "OnEnter and OnExit once each time; only one world gets the sung words (the lyric one first) and only one dresses the hands.");
+                Debug.Log("[Check] Worlds combine as the menu says: added when they fit, swapped when they clash (two lyric worlds too), the oldest giving way past three, turned off but never the last " +
+                          "(even one that throws as it goes: the exception logged above is on purpose), OnEnter and OnExit once each time; only one world gets the sung words and only one dresses the hands " +
+                          "(the hands' world, else one they play with, else the one chosen last); and no world takes a pinch while the menu is open.");
             else
                 foreach (var problem in problems) Debug.LogError($"[Check] Combining worlds: {problem}.");
             return problems.Count == 0;
         }
 
         /// <summary>
-        /// Every pair of real worlds that can be on together runs together through WorldManager, for a second and a half
-        /// of the demo song around its first chorus with both hands up, with no exceptions or errors. While they run,
-        /// only the world that shows the words shows any (SungWords), and the hands wear the look of the one that
-        /// dresses them.
+        /// Every pair and every set of three real worlds that can be on together runs together through WorldManager,
+        /// pairs for a second and a half and threes for a second of the demo song around its first chorus with both
+        /// hands up, with no exceptions or errors. While they run, only the world that shows the words shows any
+        /// (SungWords), and once the world that dresses the hands has run, the others leave the hands' look as it was.
         /// </summary>
-        static bool CheckWorldPairs()
+        static bool CheckWorldSets()
         {
 #if META_XR_CORE
             LoadSceneSettings();
@@ -254,7 +313,51 @@ namespace MusicInYourHands.EditorTools
             }
             Application.logMessageReceived += Listen;
             const float dt = 1f / 30f;
-            int pairs = 0;
+            int pairs = 0, threes = 0;
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            static bool SameLook(HandTheme a, HandTheme b) =>
+                a.Fill == b.Fill && a.Edge == b.Edge && a.Glow == b.Glow && a.Pattern == b.Pattern && a.PatternColor == b.PatternColor;
+            // Puts a set of worlds together as the menu would and plays them for a while.
+            void Run(int[] set, int frames)
+            {
+                string names = string.Join(" + ", set.Select(i => worlds[i].DisplayName));
+                logged.Clear();
+                try
+                {
+                    manager.Switch(set[0]);
+                    for (int k = 1; k < set.Length; k++) manager.Choose(set[k]);
+                    if (manager.Active.Count != set.Length)
+                    {
+                        problems.Add($"{names}: only {manager.Active.Count} of them came on");
+                        return;
+                    }
+                    var clock = new SongClock { Time = ChorusStart - 1.2f };
+                    bool wordsElsewhere = false, lookChanged = false;
+                    for (int frame = 0; frame < frames; frame++)
+                    {
+                        var music = clock.Advance(dt);
+                        // The world that dresses the hands first: whatever the others do to the hands must be undone.
+                        int owner = manager.HandsWorld;
+                        worlds[owner].Step(rig, music, camera, dt);
+                        var look = HandSkin.Theme;
+                        var focus = HandSkin.FocusPosition;
+                        float strength = HandSkin.FocusStrength, left = HandSkin.Charge[0], right = HandSkin.Charge[1];
+                        foreach (int i in manager.Active)
+                            if (i != owner) worlds[i].Step(rig, music, camera, dt);
+                        if (!SameLook(look, HandSkin.Theme) || focus != HandSkin.FocusPosition || strength != HandSkin.FocusStrength
+                            || left != HandSkin.Charge[0] || right != HandSkin.Charge[1]) lookChanged = true;
+                        foreach (int i in manager.Active)
+                            if (i != manager.WordsWorld && worlds[i].WordsShowing > 0) wordsElsewhere = true;
+                    }
+                    if (wordsElsewhere) problems.Add($"{names}: a world other than {worlds[manager.WordsWorld].DisplayName} showed sung words");
+                    if (lookChanged) problems.Add($"{names}: a world other than {worlds[manager.HandsWorld].DisplayName} changed the hands' look");
+                }
+                catch (Exception e)
+                {
+                    problems.Add($"{names}: {e.GetType().Name}: {e.Message}");
+                }
+                foreach (var message in logged.Distinct()) problems.Add($"{names}: logged \"{message}\"");
+            }
             try
             {
                 for (int a = 0; a < worlds.Count; a++)
@@ -262,36 +365,13 @@ namespace MusicInYourHands.EditorTools
                     {
                         if (!worlds[a].CombinesWith(worlds[b])) continue;
                         pairs++;
-                        string pair = $"{worlds[a].DisplayName} + {worlds[b].DisplayName}";
-                        logged.Clear();
-                        try
+                        Run(new[] { a, b }, 45);
+                        for (int c = b + 1; c < worlds.Count; c++)
                         {
-                            manager.Switch(a);
-                            var choice = manager.Choose(b);
-                            if (choice != Choice.Add || manager.Active.Count != 2)
-                            {
-                                problems.Add($"{pair}: choosing the second {choice} left {manager.Active.Count} on");
-                                continue;
-                            }
-                            var clock = new SongClock { Time = ChorusStart - 1.2f };
-                            bool wordsElsewhere = false, lookElsewhere = false;
-                            for (int frame = 0; frame < 45; frame++)
-                            {
-                                var music = clock.Advance(dt);
-                                foreach (int i in manager.Active) worlds[i].Step(rig, music, camera, dt);
-                                foreach (int i in manager.Active)
-                                    if (i != manager.WordsWorld && worlds[i].WordsShowing > 0) wordsElsewhere = true;
-                                var look = worlds[manager.HandsWorld].Theme;
-                                if (HandSkin.Theme.Fill != look.Fill || HandSkin.Theme.Edge != look.Edge || HandSkin.Theme.Pattern != look.Pattern) lookElsewhere = true;
-                            }
-                            if (wordsElsewhere) problems.Add($"{pair}: a world other than {worlds[manager.WordsWorld].DisplayName} showed sung words");
-                            if (lookElsewhere) problems.Add($"{pair}: the hands didn't keep the look of {worlds[manager.HandsWorld].DisplayName}");
+                            if (!worlds[c].CombinesWith(worlds[a]) || !worlds[c].CombinesWith(worlds[b])) continue;
+                            threes++;
+                            Run(new[] { a, b, c }, 30);
                         }
-                        catch (Exception e)
-                        {
-                            problems.Add($"{pair}: {e.GetType().Name}: {e.Message}");
-                        }
-                        foreach (var message in logged.Distinct()) problems.Add($"{pair}: logged \"{message}\"");
                     }
                 if (worlds.Count > 0) manager.Switch(0);
             }
@@ -304,7 +384,8 @@ namespace MusicInYourHands.EditorTools
                 EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             }
             if (problems.Count == 0)
-                Debug.Log($"[Check] All {pairs} pairs of worlds that can be on together ran together for 1.5 s of the song without errors, one showing the sung words and one dressing the hands.");
+                Debug.Log($"[Check] All {pairs} pairs and {threes} threes of worlds that can be on together ran together (pairs 1.5 s, threes 1 s of the song) without errors, " +
+                          $"one showing the sung words and one dressing the hands, in {watch.Elapsed.TotalSeconds:F0} s.");
             else
                 foreach (var problem in problems) Debug.LogError($"[Check] Worlds together: {problem}.");
             return problems.Count == 0;

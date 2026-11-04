@@ -36,7 +36,7 @@ namespace MusicInYourHands.EditorTools
             ok &= CheckWorldHooks();
             ok &= CheckWorldSpaces();
             ok &= CheckCombining();
-            ok &= CheckWorldPairs();
+            ok &= CheckWorldSets();
             ok &= CheckHandJoints();
             ok &= CheckDebugMaterial(out var material);
             ok &= CheckPreview(material);

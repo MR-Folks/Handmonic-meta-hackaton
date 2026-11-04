@@ -15,10 +15,16 @@ namespace MusicInYourHands
     public sealed class HookProbe : World
     {
         public bool Lyric;
+        /// <summary>Shows no sung words of its own (no SungWordCount), though it still writes down OnWord.</summary>
+        public bool Mute;
+        /// <summary>Throws in OnExit, to check that a world failing as it turns off still turns off.</summary>
+        public bool ThrowOnExit;
         public Space Uses = Space.All;
         /// <summary>When above 0, OnStep sets HandSkin.FocusStrength to it and nudges the left hand by it (in metres).</summary>
         public float Mark;
         public int Built, Placed, Steps, BeatsSeen, Entered, Exited;
+        /// <summary>Whether OnStep last saw the menu open.</summary>
+        public bool SawMenu;
         public readonly List<int> Notes = new List<int>();
         public readonly List<string> Words = new List<string>();
         public readonly List<string> Hands = new List<string>();
@@ -28,14 +34,18 @@ namespace MusicInYourHands
         public override bool IsLyric => Lyric;
         public override Space Spaces => Uses;
         public override HandTheme Theme => new HandTheme { Fill = new Color(Mark, 0f, 0f, 1f) };
-        protected override int SungWordCount => Lyric ? 0 : 3;
+        protected override int SungWordCount => Lyric || Mute ? 0 : 3;
 
         public float Fade => FadeIn;
         public int ShownWords => SungWords == null ? -1 : SungWords.Words.Count(w => w.Active);
 
         protected override void OnBuild() => Built++;
         protected override void OnEnter() => Entered++;
-        protected override void OnExit() => Exited++;
+        protected override void OnExit()
+        {
+            Exited++;
+            if (ThrowOnExit) throw new System.InvalidOperationException("Hook probe throws in OnExit on purpose, for CheckCombining.");
+        }
         protected override void OnPlace(Camera view) => Placed++;
         protected override void OnBeat(MusicFrame music) => BeatsSeen = Beats;
         protected override void OnNote(NoteTrack.Note note) => Notes.Add(note.Midi);
@@ -52,6 +62,7 @@ namespace MusicInYourHands
         protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
         {
             Steps++;
+            SawMenu = MenuOpen;
             if (Mark <= 0f) return;
             HandSkin.FocusStrength = Mark;
             if (rig != null) Effects.OffsetHand(rig.Left, Vector3.right * Mark);
