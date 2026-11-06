@@ -6,7 +6,7 @@ Shader "MusicInYourHands/Bubble"
     Properties
     {
         _Color ("Color", Color) = (1, 0.37, 0.68, 1)
-        _Icon ("Emblem (-1 none, 0-28)", Float) = 0
+        _Icon ("Emblem (-1 none, 0-30)", Float) = 0
         _Hover ("Hover 0-1", Float) = 0
         _Selected ("Current world 0-1", Float) = 0
         _Alpha ("Alpha", Float) = 1
@@ -416,11 +416,17 @@ Shader "MusicInYourHands/Bubble"
                 }
                 else if (icon < 27.5)
                 {
-                    // BEGIN emblem 27 (free)
-                    e = Line(abs(length(p) - 0.45), 0.04);
+                    // BEGIN emblem 27 (Finger frame)
+                    // Two L-shaped hands framing a window, a sun rising and setting inside it.
+                    float2 q = abs(p) - float2(0.42, 0.28);
+                    e = Line(abs(max(q.x, q.y)), 0.02) * 0.45;
+                    e += Line(Segment(p, float2(-0.5, -0.36), float2(-0.5, 0.2)), 0.05) + Line(Segment(p, float2(-0.5, -0.36), float2(0.1, -0.36)), 0.05);
+                    e += Line(Segment(p, float2(0.5, 0.36), float2(0.5, -0.2)), 0.05) + Line(Segment(p, float2(0.5, 0.36), float2(-0.1, 0.36)), 0.05);
+                    float2 sun = p - float2(0, -0.05 + 0.1 * sin(t * 1.5));
+                    e += step(length(sun), 0.12) * step(-0.2, p.y) * 0.9;
                     // END emblem 27
                 }
-                else
+                else if (icon < 28.5)
                 {
                     // BEGIN emblem 28 (Earth and water)
                     // Water and earth in turn, each fading into the other: a drop of water and a rock with two peaks.
@@ -448,6 +454,30 @@ Shader "MusicInYourHands/Bubble"
                         e += smoothstep(0.05, 0.03, length(d)) * (0.35 + 0.65 * show[j]);
                     }
                     // END emblem 28
+                }
+                else if (icon < 29.5)
+                {
+                    // BEGIN emblem 29 (Lightning)
+                    // A bolt striking down, flickering, a ring spreading where it lands.
+                    float d = min(min(Segment(p, float2(0.12, 0.6), float2(-0.12, 0.08)), Segment(p, float2(-0.12, 0.08), float2(0.14, 0.02))),
+                                  Segment(p, float2(0.14, 0.02), float2(-0.08, -0.6)));
+                    e = Line(d, 0.06) * (0.75 + 0.25 * step(0.5, frac(t * 7)));
+                    e += Line(abs(length(float2(p.x * 0.6, (p.y + 0.62) * 2.5)) - 0.25 - 0.1 * frac(t)), 0.03) * (1 - frac(t));
+                    // END emblem 29
+                }
+                else
+                {
+                    // BEGIN emblem 30 (Shadow play)
+                    // A lamp's pool of light on a wall, a hand's shadow waving in it.
+                    e = exp(-dot(p, p) * 2.5) * 0.55;
+                    float wave = 0.15 * sin(t * 2);
+                    float hand = step(length((p - float2(wave, -0.12)) * float2(1, 1.2)), 0.2);
+                    [unroll] for (int k = 0; k < 4; k++)
+                        hand = max(hand, step(Segment(p, float2(wave - 0.15 + k * 0.1, 0), float2(wave - 0.2 + k * 0.13, 0.35 - abs(k - 1.5) * 0.06)), 0.04));
+                    hand = max(hand, step(Segment(p, float2(wave + 0.15, -0.1), float2(wave + 0.35, 0.08)), 0.045));
+                    e *= 1 - hand;
+                    e += Line(abs(length(p) - 0.62), 0.02) * 0.4;
+                    // END emblem 30
                 }
                 return saturate(e);
             }

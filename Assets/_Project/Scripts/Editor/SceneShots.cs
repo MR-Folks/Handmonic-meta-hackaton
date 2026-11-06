@@ -52,6 +52,17 @@ namespace MusicInYourHands.EditorTools
                 handOffset: side => side == "R" ? new Vector3(0.02f, 0.08f, 0.12f) : new Vector3(0f, -0.15f, 0f), lead: 6f);
             Shot<BreathingRoom>("14-breathing-room", HandPose.PalmsToFace, 6f);
             Shot<LightTrails>("15-light-trails", HandPose.BacksToFace, 4f, prepare: world => DrawPreviewSculpture((LightTrails)world));
+            for (int scene = 0; scene < FingerFrame.SceneNames.Length; scene++)
+            {
+                int which = scene;
+                Shot<FingerFrame>($"21{(char)('a' + scene)}-finger-frame", HandPose.BacksToFace, 8f, prepare: world => OpenPreviewWindow((FingerFrame)world, which),
+                    handOffset: _ => new Vector3(0f, 0.12f, 0.06f));
+            }
+            Lightning storm = null;
+            int stormFrames = 0;
+            Shot<Lightning>("22-lightning", HandPose.BacksToFace, 4f, prepare: world => storm = (Lightning)world,
+                holdPose: _ => { if (++stormFrames == 88) storm.PreviewStorm(); });
+            Shot<ShadowPlay>("23-shadow-play", HandPose.BacksToFace, 6f, closeUp: rig => new Vector3(0.25f, 1.6f, 2.6f));
             Shot<NeonSign>("16-neon-sign", HandPose.BacksToFace, 2f, lead: 4f, extra: 1.7f);
             Shot<WordDrift>("17-word-drift", HandPose.PalmsToFace, 2f, lead: 6f);
             WordDrift drift = null;
@@ -76,6 +87,7 @@ namespace MusicInYourHands.EditorTools
             Shot<NeonSign>("16r-neon-sign-room", HandPose.BacksToFace, 2f, lead: 4f, extra: 1.7f, scanned: true);
             Shot<WordSnow>("19r-word-snow-room", HandPose.PalmsUp, 22f, lead: 14f, scanned: true);
             Shot<CeilingStars>("20r-ceiling-stars-room", HandPose.PalmsToFace, -40f, lead: 4f, scanned: true);
+            Shot<ShadowPlay>("23r-shadow-play-room", HandPose.BacksToFace, 6f, scanned: true);
             Shot<NoteRain>("5r-note-rain-room", HandPose.PalmsUp, 30f, scanned: true);
 
             // Every other world (a new one, say) gets a default shot, w-<class>.png: palms to the face, from head height.
@@ -341,6 +353,14 @@ namespace MusicInYourHands.EditorTools
             }
             sheet.Apply();
             File.WriteAllBytes($"{ShotFolder}/{name}-close.png", sheet.EncodeToPNG());
+        }
+
+        /// <summary>The Finger frame window open between the hands on one of its worlds, as if framed there.</summary>
+        static void OpenPreviewWindow(FingerFrame frame, int scene)
+        {
+            var eye = new Vector3(0f, 1.6f, 0f);
+            var at = new Vector3(0f, 1.46f, 0.46f);
+            frame.PreviewWindow(at, Quaternion.LookRotation(at - eye, Vector3.up), new Vector2(0.27f, 0.17f), scene);
         }
 
         /// <summary>A few strokes of light in front of the viewer, as if drawn there, for the Light trails shot.</summary>
