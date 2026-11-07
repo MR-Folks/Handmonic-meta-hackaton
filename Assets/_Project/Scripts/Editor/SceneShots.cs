@@ -355,12 +355,20 @@ namespace MusicInYourHands.EditorTools
             File.WriteAllBytes($"{ShotFolder}/{name}-close.png", sheet.EncodeToPNG());
         }
 
-        /// <summary>The Finger frame window open between the hands on one of its worlds, as if framed there.</summary>
+        /// <summary>
+        /// The Finger frame window open between the hands on one of its worlds, as if framed there: a slanted frame,
+        /// the right hand a little higher and nearer than the left, so the window is neither flat nor rectangular.
+        /// </summary>
         static void OpenPreviewWindow(FingerFrame frame, int scene)
         {
             var eye = new Vector3(0f, 1.6f, 0f);
             var at = new Vector3(0f, 1.46f, 0.46f);
-            frame.PreviewWindow(at, Quaternion.LookRotation(at - eye, Vector3.up), new Vector2(0.27f, 0.17f), scene);
+            var facing = Quaternion.LookRotation(at - eye, Vector3.up);
+            Vector3 Corner(float x, float y, float near) => at + facing * new Vector3(x, y, -near);
+            frame.PreviewWindow(new[]
+            {
+                Corner(-0.14f, -0.1f, 0f), Corner(0.12f, -0.06f, 0.03f), Corner(0.15f, 0.11f, 0.05f), Corner(-0.12f, 0.06f, 0.01f)
+            }, scene);
         }
 
         /// <summary>A few strokes of light in front of the viewer, as if drawn there, for the Light trails shot.</summary>

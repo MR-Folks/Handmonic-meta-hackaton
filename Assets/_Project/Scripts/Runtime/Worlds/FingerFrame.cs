@@ -3,12 +3,13 @@ using UnityEngine;
 namespace MusicInYourHands
 {
     /// <summary>
-    /// The Finger frame world: make a frame with both hands, each thumb and index finger an L, and a window opens
-    /// between them onto another world: a sunset valley, the deep sea, a neon city or an arctic night. That world stays
-    /// put in the room behind the window, so moving the frame or your head looks around inside it, and it moves with
-    /// the music (the sun and the jellyfish pulse on the beat, the city's towers rise with the bands). Pinch, which
-    /// breaks the frame for a moment, and the window holds while the next world swirls in. Sparks drift out of the window
-    /// on the beat, and the sung words float inside it.
+    /// The Finger frame world: hold up both hands and a window opens between your thumbs and index fingers, its four
+    /// corners on the four fingertips (index to index along the top, thumb to thumb along the bottom), so it takes the
+    /// shape your fingers make and bends when you cross them. It looks onto another world: a sunset valley, the deep
+    /// sea, a neon city or an arctic night. That world stays put in the room behind the window, so moving the frame or
+    /// your head looks around inside it, and it moves with the music (the sun and the jellyfish pulse on the beat, the
+    /// city's towers rise with the bands). Pinch and the window holds while the next world swirls in. Sparks drift out
+    /// of the window on the beat, and the sung words float inside it.
     /// </summary>
     public class FingerFrame : World
     {
@@ -56,7 +57,6 @@ namespace MusicInYourHands
         static readonly int SceneBId = Shader.PropertyToID("_SceneB");
         static readonly int MixId = Shader.PropertyToID("_Mix");
         static readonly int OpenId = Shader.PropertyToID("_Open");
-        static readonly int SizeId = Shader.PropertyToID("_Size");
         static readonly int OriginId = Shader.PropertyToID("_Origin");
         static readonly int ForwardId = Shader.PropertyToID("_Forward");
         static readonly int PulseId = Shader.PropertyToID("_Pulse");
@@ -65,16 +65,31 @@ namespace MusicInYourHands
         static readonly int ClockId = Shader.PropertyToID("_Clock");
         static readonly int EdgeColorId = Shader.PropertyToID("_EdgeColor");
 
+        // The window's mesh: a grid stretched between the four corners, so it can bend when the fingertips are not
+        // on one plane. Each vertex also carries its distance to the nearest edge, for the rim.
+        const int Grid = 10;
+
         Renderer window;
+        Mesh windowMesh;
+        readonly Vector3[] gridVertices = new Vector3[(Grid + 1) * (Grid + 1)];
+        readonly Vector2[] gridEdges = new Vector2[(Grid + 1) * (Grid + 1)];
         MaterialPropertyBlock block;
         ParticleSystem sparks;
         AudioPool voices;
         int scene, nextScene;
         float mix = 1f, open, seen = -99f, heldUntil = -99f;
         bool sounded;
-        Vector3 center, origin, forward;
-        Quaternion facing = Quaternion.identity;
-        Vector2 size = new Vector2(0.3f, 0.2f);
+        Vector3 origin, forward;
+        // The window's corners, anticlockwise as you see them from the bottom left: on the fingertips, a little behind.
+        readonly Vector3[] corners = new Vector3[4];
+        readonly Vector3[] found = new Vector3[4];
+        readonly Vector3[] drawn = new Vector3[4];
+        readonly Vector3[] tips = new Vector3[4];
+
+        Vector3 Center => (corners[0] + corners[1] + corners[2] + corners[3]) * 0.25f;
+
+        // About how tall the window is.
+        float Height => ((corners[3] - corners[0]).magnitude + (corners[2] - corners[1]).magnitude) * 0.5f;
 
         /// <summary>The world showing in the window now (the one swirling in, during a change).</summary>
         public int Scene => mix < 1f ? nextScene : scene;
@@ -87,6 +102,24 @@ namespace MusicInYourHands
         {
             block = new MaterialPropertyBlock();
             window = Effects.MakeQuad("Window", transform, portalMaterial);
+            windowMesh = new Mesh { name = "Finger Frame Window" };
+            windowMesh.MarkDynamic();
+            var uvs = new Vector2[gridVertices.Length];
+            var triangles = new int[Grid * Grid * 6];
+            for (int y = 0, t = 0; y <= Grid; y++)
+            for (int x = 0; x <= Grid; x++)
+            {
+                uvs[y * (Grid + 1) + x] = new Vector2(x / (float)Grid, y / (float)Grid);
+                if (x == Grid || y == Grid) continue;
+                int i = y * (Grid + 1) + x;
+                triangles[t++] = i; triangles[t++] = i + Grid + 1; triangles[t++] = i + 1;
+                triangles[t++] = i + 1; triangles[t++] = i + Grid + 1; triangles[t++] = i + Grid + 2;
+            }
+            windowMesh.vertices = gridVertices;
+            windowMesh.uv = uvs;
+            windowMesh.SetUVs(1, gridEdges);
+            windowMesh.triangles = triangles;
+            window.GetComponent<MeshFilter>().sharedMesh = windowMesh;
             window.gameObject.SetActive(false);
             sparks = Effects.MakeSparkSystem("Window Sparks", transform, glowMaterial);
             voices = new AudioPool(transform, 6);
@@ -101,6 +134,11 @@ namespace MusicInYourHands
         }
 
         protected override void OnExit() => window.gameObject.SetActive(false);
+
+        void OnDestroy()
+        {
+            if (windowMesh != null) Discard(windowMesh);
+        }
 
         /// <summary>The world behind the window is anchored where you stand, facing the way you face.</summary>
         protected override void OnPlace(Camera view)
@@ -120,17 +158,14 @@ namespace MusicInYourHands
         {
             if (open < 0.6f) return;
             var palette = ScenePalette[Scene];
+            var center = Center;
             var toEye = (View.transform.position - center).normalized;
-            var across = facing * Vector3.right;
-            var up = facing * Vector3.up;
             for (int i = 0; i < 10; i++)
             {
-                // A random point on the rim.
-                float u = Random.value * 2f - 1f;
-                bool sides = Random.value < size.y / (size.x + size.y);
-                var local = sides ? new Vector2(Mathf.Sign(u) * 0.5f, Random.value - 0.5f) : new Vector2(u * 0.5f, Random.value < 0.5f ? -0.5f : 0.5f);
-                var at = center + across * (local.x * size.x) + up * (local.y * size.y);
-                var outward = (across * local.x + up * local.y).normalized;
+                // A random point on the rim, between two fingertips.
+                int edge = Random.Range(0, 4);
+                var at = Vector3.Lerp(corners[edge], corners[(edge + 1) % 4], Random.value);
+                var outward = Vector3.ProjectOnPlane(at - center, toEye).normalized;
                 sparks.Emit(new ParticleSystem.EmitParams
                 {
                     position = at,
@@ -147,7 +182,7 @@ namespace MusicInYourHands
         {
             var eye = View.transform.position;
             var w = SungWords.Add(word, Color.Lerp(ScenePalette[Scene][0], Color.white, 0.5f), 2.2f, alone: true);
-            var at = open > 0.5f ? center - facing * Vector3.up * (size.y * 0.25f) : eye + Effects.FlatForward(View) * 0.6f + Vector3.down * 0.12f;
+            var at = open > 0.5f ? Center + Vector3.down * (Height * 0.25f) : eye + Effects.FlatForward(View) * 0.6f + Vector3.down * 0.12f;
             // Just in front of the window, so the words sit over the other world.
             if (open > 0.5f) at += (eye - at).normalized * 0.01f;
             w.Position = at;
@@ -156,14 +191,12 @@ namespace MusicInYourHands
 
         protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
         {
-            bool framed = Frame(rig, view, out var c, out var q, out var s);
+            bool framed = Frame(rig, view);
             if (framed)
             {
                 // Snap to the hands as the window opens; afterwards follow them closely but smoothly.
                 float k = open < 0.05f ? 1f : 1f - Mathf.Exp(-30f * dt);
-                center = Vector3.Lerp(center, c, k);
-                facing = Quaternion.Slerp(facing, q, k);
-                size = Vector2.Lerp(size, s, k);
+                for (int i = 0; i < 4; i++) corners[i] = Vector3.Lerp(corners[i], found[i], k);
                 seen = Clock;
             }
 
@@ -191,65 +224,36 @@ namespace MusicInYourHands
         }
 
         /// <summary>
-        /// Finds the frame: both hands tracked, each with thumb and index apart in an L and the middle finger folded
-        /// (so two open hands don't count), the left hand on the left, both at about the same distance. The window is
-        /// the rectangle around the four fingertips as you see them, a little behind them so the fingers stay in front.
+        /// Finds the frame whenever both hands are tracked: its corners are your two thumb tips and two index tips,
+        /// wherever they are, and its edges always run index to index, thumb to thumb, and thumb to index on each hand.
+        /// So the window takes whatever shape your fingers make, and if you cross your fingers over it twists and bends
+        /// with them. Each corner sits 2 cm further away along your line of sight, so the fingers stay in front and the
+        /// window still looks pinned to the tips. Puts the corners in <see cref="found"/>.
         /// </summary>
-        bool Frame(HandRig rig, Camera view, out Vector3 c, out Quaternion q, out Vector2 s)
+        bool Frame(HandRig rig, Camera view)
         {
-            c = default;
-            q = Quaternion.identity;
-            s = default;
             if (rig == null) return false;
             var left = rig.Left;
             var right = rig.Right;
             if (!left.IsTracked || !right.IsTracked || left.InSystemGesture || right.InSystemGesture) return false;
-            if (left.Pinch > 0.35f || right.Pinch > 0.35f) return false;
-            if (!IsL(left) || !IsL(right)) return false;
 
+            // Bottom left, bottom right, top right, top left when you hold an ordinary frame.
+            tips[0] = Tip(left, 0);
+            tips[1] = Tip(right, 0);
+            tips[2] = Tip(right, 1);
+            tips[3] = Tip(left, 1);
             var eye = view.transform.position;
-            Vector3 lt = Tip(left, 0), li = Tip(left, 1), rt = Tip(right, 0), ri = Tip(right, 1);
-            var mid = (lt + li + rt + ri) * 0.25f;
-            var normal = (mid - eye).normalized;
-            var across = Vector3.ProjectOnPlane(view.transform.right, normal).normalized;
-            var up = Vector3.Cross(normal, across);
-            float depth = Vector3.Dot(mid - eye, normal);
-            if (depth < 0.15f) return false;
-            float dl = Vector3.Dot(left.Palm.position - eye, normal), dr = Vector3.Dot(right.Palm.position - eye, normal);
-            if (Mathf.Abs(dl - dr) > 0.25f) return false;
-
-            // Every point as you see it, on the plane through the middle of the fingertips.
-            Vector2 Seen(Vector3 p)
-            {
-                var d = p - eye;
-                var onPlane = eye + d * (depth / Mathf.Max(Vector3.Dot(d, normal), 0.05f)) - mid;
-                return new Vector2(Vector3.Dot(onPlane, across), Vector3.Dot(onPlane, up));
-            }
-            if (Seen(right.Palm.position).x - Seen(left.Palm.position).x < 0.08f) return false;
-
-            Vector2 a = Seen(lt), b = Seen(li), c2 = Seen(rt), d = Seen(ri);
-            var min = Vector2.Min(Vector2.Min(a, b), Vector2.Min(c2, d));
-            var max = Vector2.Max(Vector2.Max(a, b), Vector2.Max(c2, d));
-            var extent = max - min;
-            if (extent.x < 0.08f || extent.y < 0.05f || extent.x > 0.9f || extent.y > 0.7f) return false;
-
-            // Set the window 2 cm behind the fingertips and scale it up to match, so it looks the same size.
+            var look = view.transform.forward;
             const float behind = 0.02f;
-            float grow = (depth + behind) / depth;
-            var middle = (min + max) * 0.5f;
-            c = eye + (mid + across * middle.x + up * middle.y - eye) * grow;
-            q = Quaternion.LookRotation(normal, up);
-            s = extent * grow;
+            for (int i = 0; i < 4; i++)
+            {
+                var d = tips[i] - eye;
+                // A fingertip behind or right at your eyes makes no window.
+                if (Vector3.Dot(d, look) < 0.05f) return false;
+                float distance = d.magnitude;
+                found[i] = eye + d * ((distance + behind) / distance);
+            }
             return true;
-        }
-
-        static bool IsL(HandRig.Hand hand)
-        {
-            var palm = hand.Palm.position;
-            Vector3 thumb = Tip(hand, 0), index = Tip(hand, 1), middle = Tip(hand, 2);
-            if (Vector3.Distance(thumb, index) < 0.05f) return false;
-            if (Vector3.Angle(index - palm, thumb - palm) < 35f) return false;
-            return Vector3.Distance(middle, palm) < Vector3.Distance(index, palm) - 0.015f;
         }
 
         static Vector3 Tip(HandRig.Hand hand, int finger) =>
@@ -265,8 +269,8 @@ namespace MusicInYourHands
             seen = Clock;
             // A rising pair of bells, fitted to the song.
             int a = Musical.Pitch(music, 76), b = Musical.Pitch(music, 81);
-            voices.Play(Synth.Chime(Hz(a)), center, 0.35f, 1f, Musical.Delay(music));
-            voices.Play(Synth.Chime(Hz(b)), center, 0.3f, 1f, Musical.Delay(music) + 0.11f);
+            voices.Play(Synth.Chime(Hz(a)), Center, 0.35f, 1f, Musical.Delay(music));
+            voices.Play(Synth.Chime(Hz(b)), Center, 0.3f, 1f, Musical.Delay(music) + 0.11f);
         }
 
         /// <summary>Three notes ringing out as the window opens.</summary>
@@ -275,7 +279,7 @@ namespace MusicInYourHands
             float delay = Musical.Delay(music);
             int[] wanted = { 64, 69, 72 };
             for (int i = 0; i < wanted.Length; i++)
-                voices.Play(Synth.Soft(Hz(Musical.Pitch(music, wanted[i]))), center, 0.3f, 1f, delay + i * 0.08f);
+                voices.Play(Synth.Soft(Hz(Musical.Pitch(music, wanted[i]))), Center, 0.3f, 1f, delay + i * 0.08f);
         }
 
         static float Hz(int midi) => 440f * Mathf.Pow(2f, (midi - 69) / 12f);
@@ -285,14 +289,12 @@ namespace MusicInYourHands
             bool visible = open > 0.001f;
             if (window.gameObject.activeSelf != visible) window.gameObject.SetActive(visible);
             if (!visible) return;
-            window.transform.SetPositionAndRotation(center, facing);
-            window.transform.localScale = new Vector3(size.x, size.y, 1f);
+            ShapeWindow(Mathf.SmoothStep(0f, 1f, open));
             block.Clear();
             block.SetFloat(SceneAId, scene);
             block.SetFloat(SceneBId, nextScene);
             block.SetFloat(MixId, mix < 1f ? mix : 0f);
             block.SetFloat(OpenId, Mathf.SmoothStep(0f, 1f, open));
-            block.SetVector(SizeId, size);
             block.SetVector(OriginId, origin);
             block.SetVector(ForwardId, forward);
             block.SetFloat(PulseId, music.Kick);
@@ -303,13 +305,55 @@ namespace MusicInYourHands
             window.SetPropertyBlock(block);
         }
 
+        /// <summary>
+        /// Lays the window's grid between the corners, grown from the middle as it opens. Each vertex gets its distance
+        /// to the nearest edge (metres), which the shader uses for the rim.
+        /// </summary>
+        void ShapeWindow(float grown)
+        {
+            var center = Center;
+            for (int i = 0; i < 4; i++) drawn[i] = center + (corners[i] - center) * grown;
+            var toLocal = window.transform.worldToLocalMatrix;
+            for (int y = 0; y <= Grid; y++)
+            {
+                float v = y / (float)Grid;
+                var from = Vector3.Lerp(drawn[0], drawn[3], v);
+                var to = Vector3.Lerp(drawn[1], drawn[2], v);
+                for (int x = 0; x <= Grid; x++)
+                {
+                    var p = Vector3.Lerp(from, to, x / (float)Grid);
+                    float edge = float.MaxValue;
+                    for (int e = 0; e < 4; e++) edge = Mathf.Min(edge, ToSegment(p, drawn[e], drawn[(e + 1) % 4]));
+                    int i = y * (Grid + 1) + x;
+                    gridVertices[i] = toLocal.MultiplyPoint3x4(p);
+                    gridEdges[i] = new Vector2(edge, 0f);
+                }
+            }
+            windowMesh.vertices = gridVertices;
+            windowMesh.SetUVs(1, gridEdges);
+            windowMesh.RecalculateBounds();
+        }
+
+        static float ToSegment(Vector3 p, Vector3 a, Vector3 b)
+        {
+            var ab = b - a;
+            float t = Mathf.Clamp01(Vector3.Dot(p - a, ab) / Mathf.Max(ab.sqrMagnitude, 1e-8f));
+            return (p - a - ab * t).magnitude;
+        }
+
         /// <summary>For previews: opens the window at a place, as if framed by hands, on a given world.</summary>
         public void PreviewWindow(Vector3 at, Quaternion rotation, Vector2 windowSize, int world)
         {
+            var across = rotation * Vector3.right * (windowSize.x * 0.5f);
+            var up = rotation * Vector3.up * (windowSize.y * 0.5f);
+            PreviewWindow(new[] { at - across - up, at + across - up, at + across + up, at - across + up }, world);
+        }
+
+        /// <summary>For previews: opens the window between four corners (anticlockwise from the bottom left) on a given world.</summary>
+        public void PreviewWindow(Vector3[] windowCorners, int world)
+        {
             Build();
-            center = at;
-            facing = rotation;
-            size = windowSize;
+            for (int i = 0; i < 4; i++) corners[i] = windowCorners[i];
             scene = nextScene = world % SceneNames.Length;
             mix = 1f;
             open = 1f;

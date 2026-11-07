@@ -69,6 +69,9 @@ namespace MusicInYourHands.EditorTools
             if (!Application.isBatchMode && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
             var scene = EditorSceneManager.OpenScene(MainScenePath, OpenSceneMode.Single);
             EnsureWorlds();
+#if META_XR_CORE
+            foreach (var feed in Object.FindObjectsByType<OVRHandFeed>(FindObjectsSortMode.None)) ApplyHandLook(feed.gameObject);
+#endif
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             AssetDatabase.SaveAssets();
@@ -370,6 +373,40 @@ namespace MusicInYourHands.EditorTools
             ApplyHandLook(handGo);
         }
 
+        const string HandMeshFolder = Root + "/Meshes";
+
+        /// <summary>
+        /// A copy of a Meta hand mesh that the game can read at runtime. Meta's hand FBX is imported without Read/Write,
+        /// so on the headset its vertices can't be baked (Shadow play projects the posed hand mesh onto the wall). The
+        /// package's import settings can't be changed, so the hands use this copy instead, kept next to the project's
+        /// other assets. Returns the mesh unchanged when it is already readable.
+        /// </summary>
+        static Mesh EnsureReadableHandMesh(Mesh source)
+        {
+            if (source == null || source.isReadable) return source;
+            EnsureFolder(HandMeshFolder);
+            var path = $"{HandMeshFolder}/{source.name}.asset";
+            var copy = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            if (copy == null)
+            {
+                copy = Object.Instantiate(source);
+                copy.name = source.name;
+                AssetDatabase.CreateAsset(copy, path);
+                Debug.Log($"[Setup] Made a readable copy of the hand mesh {source.name} at {path}.");
+            }
+            // A copy keeps its source's Read/Write flag, so turn it on.
+            var serialized = new SerializedObject(copy);
+            var readable = serialized.FindProperty("m_IsReadable");
+            if (!readable.boolValue)
+            {
+                readable.boolValue = true;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(copy);
+                AssetDatabase.SaveAssets();
+            }
+            return copy;
+        }
+
         /// <summary>Gives a Meta hand the project's hand material and a HandSkin to drive it. Safe to repeat.</summary>
         public static void ApplyHandLook(GameObject handGo)
         {
@@ -381,6 +418,7 @@ namespace MusicInYourHands.EditorTools
                 return;
             }
             skin.sharedMaterial = material;
+            skin.sharedMesh = EnsureReadableHandMesh(skin.sharedMesh);
             if (PrefabUtility.IsPartOfPrefabInstance(skin)) PrefabUtility.RecordPrefabInstancePropertyModifications(skin);
 
             var bones = handGo.GetComponentsInChildren<Transform>(true);

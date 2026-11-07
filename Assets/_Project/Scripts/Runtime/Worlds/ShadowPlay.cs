@@ -5,8 +5,9 @@ namespace MusicInYourHands
 {
     /// <summary>
     /// The Shadow play world: the room goes dark and a lamp low behind you lights the wall in front, and your hands cast
-    /// their shadows on it: big and soft when close to you, small and sharp near the wall, as real shadows are. Your head
-    /// casts one too, high up. On every beat your shadow leaves a coloured echo that drifts up and grows as it fades. Small notes
+    /// their shadows on it: the tracked hand mesh itself, every vertex projected from the lamp onto the wall, so the
+    /// shadow has the exact shape your hand makes, big when close to you and small near the wall, as real shadows are.
+    /// Your forearms and head cast softer ones too, your head high up. On every beat your shadow leaves a coloured echo that drifts up and grows as it fades. Small notes
     /// of light float in the lamp's pool; cover one with a shadow and it rings, a higher note higher up the wall, so
     /// your shadow plays along with the song. The lamp breathes with the bass, and the sung words appear on the wall.
     /// </summary>
@@ -84,6 +85,22 @@ namespace MusicInYourHands
             public int Count;
             public float Age = 99f;
             public Color Color;
+            /// <summary>The hands' shadow when the echo was made, flat on the wall.</summary>
+            public Mesh Hands;
+            public bool HasHands;
+            public readonly List<Vector3> Points = new List<Vector3>();
+            public readonly List<int> Triangles = new List<int>();
+        }
+
+        /// <summary>One hand's shadow this frame: its mesh projected onto the wall (x, y in metres, z 0).</summary>
+        sealed class HandShadow
+        {
+            public Mesh Baked, Flat;
+            public readonly List<Vector3> Points = new List<Vector3>();
+            public int[] Triangles;
+            public SkinnedMeshRenderer Source;
+            public bool Valid;
+            public Vector2 Min, Max;
         }
 
         sealed class Note
@@ -111,6 +128,9 @@ namespace MusicInYourHands
         int nextRipple;
         readonly Vector3[] handAlong = { Vector3.up, Vector3.up };
         readonly Vector3[] tips = new Vector3[5];
+        readonly HandShadow[] handShadows = { new HandShadow(), new HandShadow() };
+        readonly MaterialPropertyBlock[] fills = new MaterialPropertyBlock[1 + Echoes];
+        static readonly int FillId = Shader.PropertyToID("_Fill");
 
         readonly List<Vector3> vertices = new List<Vector3>();
         readonly List<Vector2> spots = new List<Vector2>();
@@ -137,7 +157,18 @@ namespace MusicInYourHands
         protected override void OnBuild()
         {
             block = new MaterialPropertyBlock();
-            for (int i = 0; i < Echoes; i++) echoes[i] = new Echo();
+            for (int i = 0; i < Echoes; i++)
+            {
+                echoes[i] = new Echo { Hands = new Mesh { name = $"Shadow Echo {i}" } };
+                echoes[i].Hands.MarkDynamic();
+            }
+            for (int i = 0; i < fills.Length; i++) fills[i] = new MaterialPropertyBlock();
+            foreach (var h in handShadows)
+            {
+                h.Baked = new Mesh { name = "Baked Hand" };
+                h.Flat = new Mesh { name = "Hand Shadow" };
+                h.Flat.MarkDynamic();
+            }
             for (int i = 0; i < ripples.Length; i++)
             {
                 ripples[i] = new Ripple { Ring = Effects.MakeQuad($"Ripple {i}", transform, ringMaterial) };
@@ -185,6 +216,12 @@ namespace MusicInYourHands
             if (mask != null) { mask.Release(); Discard(mask); }
             if (veilInstance != null) Discard(veilInstance);
             if (capsules != null) Discard(capsules);
+            foreach (var e in echoes) if (e?.Hands != null) Discard(e.Hands);
+            foreach (var h in handShadows)
+            {
+                if (h.Baked != null) Discard(h.Baked);
+                if (h.Flat != null) Discard(h.Flat);
+            }
             commands?.Release();
         }
 
@@ -229,14 +266,14 @@ namespace MusicInYourHands
             var room = wall.Size * 0.5f - Vector2.one * poolRadius * 0.6f;
             pool = new Vector2(Mathf.Clamp(pool.x, -Mathf.Max(0f, room.x), Mathf.Max(0f, room.x)), Mathf.Clamp(pool.y, -Mathf.Max(0f, room.y), Mathf.Max(0f, room.y)));
 
-            // Roughly 100 pixels per metre is plenty: the shadows are soft and the texture is filtered.
-            int width = 512, height = Mathf.Clamp(Mathf.RoundToInt(512f * wall.Size.y / Mathf.Max(wall.Size.x, 0.1f)), 128, 512);
+            // About 200 pixels per metre, with 4x antialiasing, keeps the edges of fingers' shadows smooth.
+            int width = 1024, height = Mathf.Clamp(Mathf.RoundToInt(1024f * wall.Size.y / Mathf.Max(wall.Size.x, 0.1f)), 256, 1024);
             if (mask == null || mask.width != width || mask.height != height)
             {
                 if (mask != null) { mask.Release(); Discard(mask); }
                 mask = new RenderTexture(width, height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear)
                 {
-                    name = "Shadow Mask", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp
+                    name = "Shadow Mask", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp, antiAliasing = 4
                 };
                 mask.Create();
             }
@@ -274,15 +311,15 @@ namespace MusicInYourHands
         }
 
         /// <summary>
-        /// The shadow of this frame: each tracked hand as a forearm, a palm and five fingers, and your head, all as
-        /// capsules seen from the lamp.
+        /// The shadow of this frame: each tracked hand's own mesh projected from the lamp onto the wall, plus your
+        /// forearms (which the hand mesh stops short of) and your head as soft capsules.
         /// </summary>
         void Shadows(HandRig rig, Camera view)
         {
             liveCount = 0;
+            foreach (var h in handShadows) h.Valid = false;
             var head = view.transform.position;
             var forward = Effects.FlatForward(view);
-            var right = Vector3.Cross(Vector3.up, forward).normalized;
             AddShadow(head - forward * 0.06f + Vector3.up * 0.04f, head - forward * 0.06f - Vector3.up * 0.04f, 0.085f);
             if (rig == null) return;
             for (int side = 0; side < 2; side++)
@@ -295,19 +332,55 @@ namespace MusicInYourHands
                 var along = (tips[1] + tips[2] + tips[3] + tips[4]) * 0.25f - palm;
                 if (along.magnitude > 0.035f) handAlong[side] = along.normalized;
                 var up = handAlong[side];
-                var across = Vector3.Cross(hand.PalmNormal, up);
-                across = across.sqrMagnitude > 1e-4f ? across.normalized : right;
 
-                AddShadow(palm - up * 0.05f, palm - up * 0.28f, 0.03f);
-                // The palm, up to the knuckles: two wide capsules.
-                AddShadow(palm - up * 0.02f + across * 0.024f, palm - up * 0.02f - across * 0.024f, 0.032f);
-                AddShadow(palm + up * 0.03f + across * 0.026f, palm + up * 0.03f - across * 0.026f, 0.028f);
-                for (int f = 0; f < 5; f++)
-                {
-                    var root = Vector3.Lerp(palm, tips[f], f == 0 ? 0.3f : 0.32f);
-                    AddShadow(root, tips[f], f == 0 ? 0.011f : f == 4 ? 0.008f : 0.0095f);
-                }
+                // The forearm, from just inside the wrist back towards the elbow.
+                AddShadow(palm - up * 0.045f, palm - up * 0.3f, 0.028f);
+                ProjectHand(hand.Mesh, handShadows[side]);
             }
+        }
+
+        /// <summary>
+        /// Projects a hand mesh, as it is posed now, from the lamp onto the wall. Any vertex the lamp cannot cast onto
+        /// the wall (behind the lamp or past the wall) drops this hand's shadow for the frame.
+        /// </summary>
+        void ProjectHand(SkinnedMeshRenderer source, HandShadow shadow)
+        {
+            // The hand mesh must be readable to bake it on the headset (ProjectSetup gives the hands a readable copy).
+            if (source == null || source.sharedMesh == null || !source.sharedMesh.isReadable) return;
+            if (shadow.Source != source)
+            {
+                shadow.Source = source;
+                shadow.Triangles = source.sharedMesh.triangles;
+                shadow.Flat.Clear();
+            }
+            source.BakeMesh(shadow.Baked, true);
+            shadow.Baked.GetVertices(shadow.Points);
+            var t = source.transform;
+            var toWorld = Matrix4x4.TRS(t.position, t.rotation, Vector3.one);
+
+            float lampHeight = Vector3.Dot(lamp - wall.Center, wall.Normal);
+            if (lampHeight < 0.05f) return;
+            var min = Vector2.positiveInfinity;
+            var max = Vector2.negativeInfinity;
+            var points = shadow.Points;
+            for (int i = 0; i < points.Count; i++)
+            {
+                var p = toWorld.MultiplyPoint3x4(points[i]);
+                float height = Vector3.Dot(p - wall.Center, wall.Normal);
+                if (height < 0.003f || height > lampHeight - 0.03f) return;
+                var onWall = lamp + (p - lamp) * (lampHeight / (lampHeight - height)) - wall.Center;
+                var local = new Vector2(Vector3.Dot(onWall, wall.Right), Vector3.Dot(onWall, wall.Up));
+                points[i] = new Vector3(local.x, local.y, 0f);
+                min = Vector2.Min(min, local);
+                max = Vector2.Max(max, local);
+            }
+            var flat = shadow.Flat;
+            flat.SetVertices(points);
+            if (flat.GetIndexCount(0) != (uint)shadow.Triangles.Length) flat.SetTriangles(shadow.Triangles, 0, false);
+            flat.bounds = new Bounds(Vector3.zero, new Vector3(wall.Size.x, wall.Size.y, 2f) * 2f);
+            shadow.Min = min;
+            shadow.Max = max;
+            shadow.Valid = true;
         }
 
         void Remember()
@@ -318,6 +391,24 @@ namespace MusicInYourHands
             e.Count = liveCount;
             e.Age = 0f;
             e.Color = EchoColors[colorIndex++ % EchoColors.Length];
+
+            // Both hands' shadows, as they are on the beat, in one mesh.
+            e.Points.Clear();
+            e.Triangles.Clear();
+            foreach (var h in handShadows)
+            {
+                if (!h.Valid) continue;
+                int start = e.Points.Count;
+                e.Points.AddRange(h.Points);
+                foreach (int i in h.Triangles) e.Triangles.Add(start + i);
+            }
+            e.HasHands = e.Triangles.Count > 0;
+            e.Hands.Clear();
+            if (!e.HasHands) return;
+            e.Hands.indexFormat = e.Points.Count > 65535 ? UnityEngine.Rendering.IndexFormat.UInt32 : UnityEngine.Rendering.IndexFormat.UInt16;
+            e.Hands.SetVertices(e.Points);
+            e.Hands.SetTriangles(e.Triangles, 0, false);
+            e.Hands.bounds = new Bounds(Vector3.zero, new Vector3(wall.Size.x, wall.Size.y, 2f) * 2f);
         }
 
         /// <summary>Draws the shadow and the echoes into the wall's mask texture.</summary>
@@ -366,6 +457,27 @@ namespace MusicInYourHands
             commands.ClearRenderTarget(false, true, Color.clear);
             commands.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.Ortho(-half.x, half.x, -half.y, half.y, -1f, 1f));
             if (triangles.Count > 0) commands.DrawMesh(capsules, Matrix4x4.identity, shadowMaskMaterial, 0, 0);
+
+            // The hands themselves: their projected meshes, solid, in the shadow channel.
+            fills[0].SetVector(FillId, new Vector4(1f, 0f, 0f, 0f));
+            foreach (var h in handShadows)
+                if (h.Valid) commands.DrawMesh(h.Flat, Matrix4x4.identity, shadowMaskMaterial, 0, 1, fills[0]);
+
+            // And their echoes, drifting up and growing from the middle of the pool like the capsules above.
+            for (int k = 0; k < Echoes; k++)
+            {
+                var e = echoes[k];
+                if (e.Age >= echoLife || !e.HasHands) continue;
+                float t = e.Age / echoLife;
+                float grow = 1f + t * 0.45f;
+                var lift = upOnWall * (e.Age * 0.22f);
+                float strength = Mathf.Pow(1f - t, 1.5f) * Mathf.Clamp01(e.Age / 0.05f);
+                var fill = new Vector4(0f, k == 0 ? strength : 0f, k == 1 ? strength : 0f, k == 2 ? strength : 0f);
+                fills[1 + k].SetVector(FillId, fill);
+                var place = Matrix4x4.Translate(new Vector3(pool.x + lift.x, pool.y + lift.y, 0f))
+                    * Matrix4x4.Scale(new Vector3(grow, grow, 1f)) * Matrix4x4.Translate(new Vector3(-pool.x, -pool.y, 0f));
+                commands.DrawMesh(e.Hands, place, shadowMaskMaterial, 0, 1, fills[1 + k]);
+            }
             Graphics.ExecuteCommandBuffer(commands);
         }
 
@@ -424,7 +536,27 @@ namespace MusicInYourHands
                 float h = Mathf.Clamp01(Vector2.Dot(p - c.A, ab) / Mathf.Max(ab.sqrMagnitude, 1e-8f));
                 if ((p - c.A - ab * h).magnitude < c.Radius + c.Soft * 0.3f) return true;
             }
+            foreach (var s in handShadows)
+            {
+                if (!s.Valid || p.x < s.Min.x || p.y < s.Min.y || p.x > s.Max.x || p.y > s.Max.y) continue;
+                var points = s.Points;
+                var tris = s.Triangles;
+                for (int i = 0; i < tris.Length; i += 3)
+                    if (InTriangle(p, points[tris[i]], points[tris[i + 1]], points[tris[i + 2]])) return true;
+            }
             return false;
+        }
+
+        static bool InTriangle(Vector2 p, Vector3 a, Vector3 b, Vector3 c)
+        {
+            // Quick reject on the triangle's box, then which side of each edge the point is on.
+            if (p.x < Mathf.Min(a.x, Mathf.Min(b.x, c.x)) || p.x > Mathf.Max(a.x, Mathf.Max(b.x, c.x))) return false;
+            if (p.y < Mathf.Min(a.y, Mathf.Min(b.y, c.y)) || p.y > Mathf.Max(a.y, Mathf.Max(b.y, c.y))) return false;
+            float d1 = (p.x - b.x) * (a.y - b.y) - (a.x - b.x) * (p.y - b.y);
+            float d2 = (p.x - c.x) * (b.y - c.y) - (b.x - c.x) * (p.y - c.y);
+            float d3 = (p.x - a.x) * (c.y - a.y) - (c.x - a.x) * (p.y - a.y);
+            bool negative = d1 < 0f || d2 < 0f || d3 < 0f, positive = d1 > 0f || d2 > 0f || d3 > 0f;
+            return !(negative && positive);
         }
 
         Vector3 OnWall(Vector2 p, float lift) => wall.Center + wall.Right * p.x + wall.Up * p.y + wall.Normal * lift;

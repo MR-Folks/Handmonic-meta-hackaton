@@ -545,6 +545,7 @@ namespace MusicInYourHands.EditorTools
             var tipJoints = new[] { "XRHand_ThumbTip", "XRHand_IndexTip", "XRHand_MiddleTip", "XRHand_RingTip", "XRHand_LittleTip" }.Select(Bone).ToArray();
             var palm = Bone("XRHand_Palm");
             rig.SetJoints(hand.Left, palm, tipJoints);
+            rig.Get(hand.Left).Mesh = hand.Skin;
             rig.Push(hand.Left, true, new Pose(palm.position, palm.rotation), PalmNormal(Bone, hand.Left), tipJoints.Select(t => t.position).ToArray());
             hand.Root.GetComponent<HandSkin>().Apply();
         }

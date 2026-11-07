@@ -80,6 +80,7 @@ namespace MusicInYourHands.Meta
             {
                 HandRig.Instance.SetJoints(isLeft, palm, tips);
                 HandRig.Instance.Get(isLeft).VisualRoot = skeleton.transform;
+                HandRig.Instance.Get(isLeft).Mesh = skeleton.GetComponentInChildren<SkinnedMeshRenderer>(true);
             }
             return true;
         }

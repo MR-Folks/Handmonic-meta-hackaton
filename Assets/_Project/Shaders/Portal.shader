@@ -1,9 +1,10 @@
-// The Finger frame window: a quad held between the hands that shows another world behind it. The world is drawn from
+// The Finger frame window: a mesh stretched between the four fingertips of the frame (it need not be flat or
+// rectangular) that shows another world behind it. TEXCOORD1.x is each point's distance to the nearest edge (m). The world is drawn from
 // the direction you look through the window, with its hills on planes a few metres to a few dozen metres away from
 // where you stood (_Origin, facing _Forward, its horizon _Tilt below eye level), so it stays put in the room and shifts with parallax as you move the
 // frame or your head, like a real hole in the wall. Four worlds (_SceneA, cross-fading into _SceneB with _Mix), each
-// moving with the music: _Pulse on the beat, _Bands and _High the six bands. _Open opens the window from its middle,
-// and its edge glows.
+// moving with the music: _Pulse on the beat, _Bands and _High the six bands. The script grows the mesh from its middle
+// as the window opens (_Open is 0 while it is closed), and its edge glows.
 Shader "MusicInYourHands/Portal"
 {
     Properties
@@ -12,7 +13,6 @@ Shader "MusicInYourHands/Portal"
         _SceneB ("Next world", Float) = 1
         _Mix ("Change to the next world 0-1", Float) = 0
         _Open ("Open 0-1", Float) = 1
-        _Size ("Window size (m)", Vector) = (0.3, 0.2, 0, 0)
         _Origin ("Where the world was anchored", Vector) = (0, 1.6, 0, 0)
         _Forward ("Which way it faces", Vector) = (0, 0, 1, 0)
         _Tilt ("Horizon below eye level (radians)", Float) = 0.3
@@ -46,7 +46,6 @@ Shader "MusicInYourHands/Portal"
                 float _SceneB;
                 float _Mix;
                 float _Open;
-                float4 _Size;
                 float4 _Origin;
                 float4 _Forward;
                 float _Tilt;
@@ -61,6 +60,7 @@ Shader "MusicInYourHands/Portal"
             {
                 float4 positionOS : POSITION;
                 float2 uv : TEXCOORD0;
+                float2 edge : TEXCOORD1;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -69,6 +69,7 @@ Shader "MusicInYourHands/Portal"
                 float4 positionCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
                 float3 positionWS : TEXCOORD1;
+                float edge : TEXCOORD2;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -80,6 +81,7 @@ Shader "MusicInYourHands/Portal"
                 output.positionWS = TransformObjectToWorld(input.positionOS.xyz);
                 output.positionCS = TransformWorldToHClip(output.positionWS);
                 output.uv = input.uv;
+                output.edge = input.edge.x;
                 return output;
             }
 
@@ -308,12 +310,6 @@ Shader "MusicInYourHands/Portal"
                 return Aurora(v);
             }
 
-            float RoundedBox(float2 p, float2 extent, float radius)
-            {
-                float2 q = abs(p) - extent + radius;
-                return length(max(q, 0)) + min(max(q.x, q.y), 0) - radius;
-            }
-
             half4 frag(Varyings input) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
@@ -330,10 +326,9 @@ Shader "MusicInYourHands/Portal"
                 v.r = dot(v.dir, v.right);
                 v.u = dot(v.dir, v.up);
 
-                // The window opens from its middle; q is the point on it in metres from the centre.
-                float2 q = (input.uv - 0.5) * _Size.xy;
-                float2 extent = _Size.xy * 0.5 * _Open;
-                float d = RoundedBox(q, extent, min(0.012, min(extent.x, extent.y)));
+                // d is the signed distance to the rim (m), negative inside: the rim runs 4 mm in from the mesh's edge,
+                // so its glow fits on the mesh.
+                float d = 0.004 - input.edge;
                 float inside = smoothstep(0.0015, -0.0015, d) * step(0.001, _Open);
 
                 float3 color = 0;
@@ -355,7 +350,7 @@ Shader "MusicInYourHands/Portal"
 
                 // The glowing rim, with sparks running round it.
                 float rim = exp(-abs(d) / 0.0035) * (0.55 + _Pulse * 0.6) * step(0.001, _Open);
-                float around = atan2(q.y / max(_Size.y, 1e-3), q.x / max(_Size.x, 1e-3));
+                float around = atan2(input.uv.y - 0.5, input.uv.x - 0.5);
                 float sparks = pow(saturate(sin(around * 9 - _Clock * 3)), 24) * exp(-abs(d) / 0.006) * 1.2 * step(0.001, _Open);
                 float glow = rim + sparks;
                 float3 rgb = color * inside + _EdgeColor.rgb * glow;

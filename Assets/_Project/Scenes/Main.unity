@@ -721,6 +721,10 @@ PrefabInstance:
       value: LeftHand
       objectReference: {fileID: 0}
     - target: {fileID: 8661073797813907648, guid: deccf1bd75222ab419fef0130b2a4d9e, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: 4300000, guid: 600f9aa468c294c578815ae564f81b68, type: 2}
+    - target: {fileID: 8661073797813907648, guid: deccf1bd75222ab419fef0130b2a4d9e, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 963a4a574989243d1abf4416304468f9, type: 2}
@@ -1758,6 +1762,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: RightHand
       objectReference: {fileID: 0}
+    - target: {fileID: 8897015553105444279, guid: f4f1f0ff232ea644c8a980e61825dd44, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: 4300000, guid: 6ef2d8a9503d74d4ba043eb5b0e40fef, type: 2}
     - target: {fileID: 8897015553105444279, guid: f4f1f0ff232ea644c8a980e61825dd44, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 

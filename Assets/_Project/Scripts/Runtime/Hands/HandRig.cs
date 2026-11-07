@@ -38,6 +38,8 @@ namespace MusicInYourHands
             /// moves away from the real one for a moment) and must put it back to zero when they stop.
             /// </summary>
             public Transform VisualRoot;
+            /// <summary>The visible hand's mesh, when the feed has it, for effects that need its exact shape (shadows).</summary>
+            public SkinnedMeshRenderer Mesh;
 
             internal int LastFrame = -1;
 

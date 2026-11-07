@@ -3,6 +3,8 @@
 // point, TEXCOORD1 the capsule's two ends, TEXCOORD2 its radius, how soft its edge is (the penumbra), which channel it
 // goes to (0 shadow, 1-3 coloured echoes) and its strength. Channels combine by taking the larger value, so overlapping
 // fingers never get darker than one.
+// Pass 1 ("Fill") draws a mesh already flattened onto the wall (the hands' own meshes) solid, with _Fill the amount
+// for each channel.
 Shader "MusicInYourHands/ShadowMask"
 {
     SubShader
@@ -57,6 +59,33 @@ Shader "MusicInYourHands/ShadowMask"
                 float cover = smoothstep(r + soft, r - soft, d) * input.shape.w;
                 float channel = input.shape.z;
                 return float4(channel < 0.5 ? cover : 0, abs(channel - 1) < 0.5 ? cover : 0, abs(channel - 2) < 0.5 ? cover : 0, channel > 2.5 ? cover : 0);
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "Fill"
+            Cull Off
+            ZWrite Off
+            ZTest Always
+            BlendOp Max
+
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            float4 _Fill;
+
+            float4 vert(float4 positionOS : POSITION) : SV_POSITION
+            {
+                return TransformObjectToHClip(positionOS.xyz);
+            }
+
+            float4 frag() : SV_Target
+            {
+                return _Fill;
             }
             ENDHLSL
         }
