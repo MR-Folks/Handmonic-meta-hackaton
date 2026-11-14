@@ -580,8 +580,11 @@ namespace MusicInYourHands
                 n.Rest -= dt;
 
                 bool covered = InShadow(n.Position);
-                if (covered && !n.Covered && n.Rest <= 0f)
+                // While the menu is open the hands are choosing there: their shadows still fall, but ring nothing, and a
+                // light still covered when the menu closes rings only once it is uncovered and covered again.
+                if (covered && !n.Covered && n.Rest <= 0f && !MenuOpen)
                 {
+                    Acted("ring note");
                     float height = Vector2.Dot(n.Position - pool, upOnWall) / poolRadius * 0.5f + 0.5f;
                     var at = OnWall(n.Position, 0.02f);
                     int midi = Musical.Play(voices, music, 60 + Mathf.RoundToInt(Mathf.Clamp01(height) * 19f), at, 0.45f);

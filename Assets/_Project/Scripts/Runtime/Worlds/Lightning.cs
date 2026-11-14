@@ -158,6 +158,7 @@ namespace MusicInYourHands
         {
             if (hand.Fist > 0.8f) return;
             Zap(PinchPoint(hand), left ? 0 : 1, Music, View);
+            Acted("zap");
         }
 
         /// <summary>A pinch held zaps again on every beat.</summary>
@@ -167,7 +168,9 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = Rig.Get(side == 0);
-                if (IsPinching(side == 0) && hand.Fist <= 0.8f) Zap(PinchPoint(hand), side, music, View);
+                if (!IsPinching(side == 0) || hand.Fist > 0.8f) continue;
+                Zap(PinchPoint(hand), side, music, View);
+                Acted("zap on the beat");
             }
         }
 
@@ -196,8 +199,14 @@ namespace MusicInYourHands
             bool fist = tracked && hand.Fist > 0.8f;
             bool open = tracked && hand.Fist < 0.4f && hand.Pinch < 0.6f;
 
-            // Closing a fist calls the big strike.
-            if (fist && !wasFist[side] && cooldown <= 0f) { Strike(hand, music, view); cooldown = 0.45f; }
+            // Closing a fist calls the big strike, but not while the hands are choosing in the menu; a fist still closed
+            // when the menu goes has to open first. The fingertips crackle either way.
+            if (fist && !wasFist[side] && cooldown <= 0f && !MenuOpen)
+            {
+                Strike(hand, music, view);
+                cooldown = 0.45f;
+                Acted("strike");
+            }
             wasFist[side] = fist || (wasFist[side] && tracked && hand.Fist > 0.5f);
 
             // Crackling fingertips: more sparks the louder the music.

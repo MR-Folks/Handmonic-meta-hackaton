@@ -200,7 +200,8 @@ namespace MusicInYourHands
             {
                 cooldown[side] -= dt;
                 var hand = rig.Get(side == 0);
-                if (!hand.IsTracked || cooldown[side] > 0f || hand.PalmNormal.sqrMagnitude < 0.5f) continue;
+                // A palm pressing at the open menu isn't pushing a wall.
+                if (!hand.IsTracked || MenuOpen || cooldown[side] > 0f || hand.PalmNormal.sqrMagnitude < 0.5f) continue;
                 var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
                 var normal = hand.PalmNormal;
                 if (Mathf.Abs(normal.y) > 0.7f) continue;
@@ -210,6 +211,7 @@ namespace MusicInYourHands
                 if (!pushing && distance > 0.12f) continue;
                 AddWave(hit, true);
                 cooldown[side] = 0.45f;
+                Acted("wall wave");
             }
         }
 

@@ -152,7 +152,6 @@ namespace MusicInYourHands
         ParticleSystem motes, falling;
         Vector3 head, forward = Vector3.forward, right = Vector3.right;
         float floorY, ambientDebt;
-        bool menuOpen;
 
         // The hands this frame.
         readonly bool[] tracked = new bool[2];
@@ -434,8 +433,6 @@ namespace MusicInYourHands
 
         protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
         {
-            var menu = WorldMenu.Instance;
-            menuOpen = menu != null && menu.IsOpen;
             ReadHands(rig, dt);
             for (int e = 0; e < 2; e++)
                 presence[e] = Mathf.MoveTowards(presence[e], e == current ? 1f : 0f, dt * (e == current ? 1.6f : 1.2f));
@@ -486,7 +483,7 @@ namespace MusicInYourHands
         /// <summary>Both fists clenched for a moment call up the other element; open a hand before the next change.</summary>
         void Fists(float dt)
         {
-            bool both = tracked[0] && tracked[1] && !gesture[0] && !gesture[1] && !menuOpen;
+            bool both = tracked[0] && tracked[1] && !gesture[0] && !gesture[1] && !MenuOpen;
             bool clenched = both && fist[0] > 0.8f && fist[1] > 0.8f;
             if (!tracked[0] || !tracked[1] || fist[0] < 0.5f || fist[1] < 0.5f) fistArmed = true;
             fistTime = clenched && fistArmed ? fistTime + dt : Mathf.MoveTowards(fistTime, 0f, dt * 3f);
@@ -494,6 +491,7 @@ namespace MusicInYourHands
             fistTime = 0f;
             fistArmed = false;
             Change(Other, true, (palm[0] + palm[1]) * 0.5f);
+            Acted("change element");
         }
 
         void ChangeByItself() => Change(Other, false, BurstPoint());
@@ -626,7 +624,7 @@ namespace MusicInYourHands
         {
             if (captionDue && Clock > 4.8f) ShowCaption(current);
             captionAge += dt;
-            bool show = captionAge >= 0f && captionAge < 3.2f && !menuOpen;
+            bool show = captionAge >= 0f && captionAge < 3.2f && !MenuOpen;
             if (captionRoot.gameObject.activeSelf != show) captionRoot.gameObject.SetActive(show);
             if (!show) return;
             var ahead = Effects.FlatForward(view);
@@ -669,7 +667,7 @@ namespace MusicInYourHands
             float p = presence[Water];
             orbWave += dt;
             bool holding = false;
-            if (p > 0.5f && tracked[0] && tracked[1] && !menuOpen && fist[0] < 0.5f && fist[1] < 0.5f)
+            if (p > 0.5f && tracked[0] && tracked[1] && !MenuOpen && fist[0] < 0.5f && fist[1] < 0.5f)
             {
                 var gap = palm[1] - palm[0];
                 float spread = gap.magnitude;
@@ -685,6 +683,7 @@ namespace MusicInYourHands
                         orbCentre = fresh ? middle : Vector3.Lerp(orbCentre, middle, 1f - Mathf.Exp(-18f * dt));
                         orbRadius = fresh ? radius : Mathf.Lerp(orbRadius, radius, 1f - Mathf.Exp(-10f * dt));
                         lastAction = Clock;
+                        Acted("water ball");
                     }
                 }
             }
@@ -911,7 +910,7 @@ namespace MusicInYourHands
                 foreach (var r in rocks) r.Target = Mathf.Max(r.Target, previewLift * (0.75f + 0.25f * r.Seed));
                 previewLift = -1f;
             }
-            for (int s = 0; s < 2 && active && p > 0.5f && !menuOpen; s++)
+            for (int s = 0; s < 2 && active && p > 0.5f && !MenuOpen; s++)
             {
                 if (!tracked[s] || fist[s] > 0.6f || gesture[s]) continue;
                 float vy = velocity[s].y;
@@ -919,6 +918,7 @@ namespace MusicInYourHands
                 float lift = ny > 0.4f && vy > 0.07f ? vy : ny < -0.4f && vy < -0.07f ? vy : 0f;
                 if (lift == 0f) continue;
                 lastAction = Clock;
+                Acted("move rocks");
                 // The hand moves the rocks on its own side most: across from left to right, it reaches from the
                 // leftmost rock to the rightmost.
                 float side = Mathf.Clamp(Vector3.Dot(palm[s] - head, right) / 0.35f, -1f, 1f) * 60f;

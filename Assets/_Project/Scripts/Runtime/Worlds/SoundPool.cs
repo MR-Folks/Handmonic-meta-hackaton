@@ -471,7 +471,8 @@ namespace MusicInYourHands
                 var hand = rig.Get(side == 0);
                 for (int k = 0; k < 6; k++)
                 {
-                    if (!hand.IsTracked)
+                    // While the menu is open the hands are choosing there: they part no water and muffle nothing.
+                    if (!hand.IsTracked || MenuOpen)
                     {
                         wasUnder[side, k] = false;
                         continue;
@@ -486,6 +487,7 @@ namespace MusicInYourHands
                     bool under = inside && depth > 0f && depth < 0.25f;
                     if (under)
                     {
+                        Acted("dip");
                         dip = Mathf.Max(dip, Mathf.Clamp01(depth / fullDip));
                         float radius = k < 5 ? 0.012f : 0.035f;
                         float speed = dt > 0f ? (point - lastPoint[side, k]).magnitude / dt : 0f;
@@ -522,7 +524,8 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig?.Get(side == 0);
-                bool now = hand != null && hand.IsTracked && hand.Pinch > 0.8f && !hand.InSystemGesture;
+                // A pinch at the open menu pours nothing, nor does one still held from it once it closes.
+                bool now = hand != null && hand.IsTracked && hand.Pinch > 0.8f && !hand.InSystemGesture && PinchFree(side == 0);
                 if (!now)
                 {
                     if (pouring[side])
@@ -541,6 +544,7 @@ namespace MusicInYourHands
                     pourVelocity[side] = hand.Velocity;
                 }
                 pouring[side] = true;
+                Acted("pour water");
                 pourVelocity[side] = Vector3.Lerp(pourVelocity[side], hand.Velocity, 1f - Mathf.Exp(-6f * dt));
                 streamDebt[side] += 80f * dt;
                 int count = (int)streamDebt[side];

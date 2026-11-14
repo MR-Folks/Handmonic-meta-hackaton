@@ -223,8 +223,12 @@ namespace MusicInYourHands
             var right = rig.Right;
             bool tracked = left.IsTracked && right.IsTracked;
             float need = held ? releasePinch : grabPinch;
-            held = tracked && left.Pinch > need && right.Pinch > need && !left.InSystemGesture && !right.InSystemGesture;
-            hold = Mathf.MoveTowards(hold, held ? 1f : 0f, dt * (held ? 6f : 2.5f));
+            // A pinch at the open menu chooses there: the ribbon lets go, and a pinch still held from the menu once it
+            // closes doesn't take it up again.
+            held = tracked && left.Pinch > need && right.Pinch > need && !left.InSystemGesture && !right.InSystemGesture
+                && PinchFree(true) && PinchFree(false);
+            if (held) Acted("hold ribbon");
+            hold =Mathf.MoveTowards(hold, held ? 1f : 0f, dt * (held ? 6f : 2.5f));
 
             // The silk's inside moves on every few beats (OnBeat), taking two seconds over each change.
             look = Mathf.MoveTowards(look, lookTarget, dt * 0.5f);

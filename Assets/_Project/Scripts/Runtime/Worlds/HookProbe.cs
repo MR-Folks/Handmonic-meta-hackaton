@@ -26,6 +26,9 @@ namespace MusicInYourHands
 
         public float Fade => FadeIn;
         public int ShownWords => SungWords == null ? -1 : SungWords.Words.Count(w => w.Active);
+        public bool SeesMenu => MenuOpen;
+        public bool Pinching(bool left) => IsPinching(left);
+        public bool Free(bool left) => PinchFree(left);
 
         protected override void OnBuild() => Built++;
         protected override void OnPlace(Camera view) => Placed++;

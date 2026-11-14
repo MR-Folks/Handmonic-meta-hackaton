@@ -690,8 +690,13 @@ namespace MusicInYourHands
             var grip = grips[left ? 0 : 1];
             grip.Point = PinchPoint(hand);
             int near = Nearest(grip.Point);
-            if (near >= 0) PickUp(grip, near);
-            else grip.Free = true;
+            if (near < 0)
+            {
+                grip.Free = true;
+                return;
+            }
+            PickUp(grip, near);
+            Acted("pick up planet");
         }
 
         protected override void OnRelease(HandRig.Hand hand, bool left)
@@ -905,14 +910,18 @@ namespace MusicInYourHands
             {
                 var hand = rig.Get(s == 0);
                 var grip = grips[s];
-                grip.Tracked = hand.IsTracked && !hand.InSystemGesture;
+                // While the menu is open the hands are choosing there: no planet lights up for them, and no palm warms the
+                // sun. (No pinch picks a planet up then either, and one carried as the menu opens is let go: OnRelease.)
+                grip.Tracked = hand.IsTracked && !hand.InSystemGesture && !MenuOpen;
                 if (hand.IsTracked) grip.Point = PinchPoint(hand);
                 grip.Pinch = grip.Tracked ? hand.Pinch : 0f;
                 grip.Near = grip.Tracked && grip.Held < 0 && !IsPinching(s == 0) ? Nearest(grip.Point) : -1;
+                if (grip.Near >= 0) Acted("light planet");
                 int target = grip.Held >= 0 ? grip.Held : grip.Near;
                 if (target >= 0) grip.Shown = target;
                 grip.Light = Mathf.MoveTowards(grip.Light, target >= 0 ? 1f : 0f, dt * (target >= 0 ? 8f : 4f));
                 if (grip.Held < 0) continue;
+                Acted("carry planet");
 
                 // The carried planet follows the fingers; the offset from where it was picked up eases away, so it
                 // slides in between them. It can't go into the sun.
@@ -1013,6 +1022,7 @@ namespace MusicInYourHands
                 want = w;
                 warmPalm = palm;
             }
+            if (want > 0f) Acted("warm sun");
             warmth = Mathf.MoveTowards(warmth, want, dt / (want > warmth ? warmUp : 2.5f));
             if (warmth > 0.97f && !burst)
             {

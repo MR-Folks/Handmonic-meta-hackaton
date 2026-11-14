@@ -259,7 +259,8 @@ namespace MusicInYourHands
                 for (int s = 0; s < 2; s++)
                 {
                     var hand = rig.Get(s == 0);
-                    if (!hand.IsTracked || hand.InSystemGesture) continue;
+                    // A finger pointing at the open menu isn't pointing at the sky.
+                    if (!hand.IsTracked || hand.InSystemGesture || MenuOpen) continue;
                     var tip = hand.TipJoints[1] != null ? hand.TipJoints[1].position : hand.Tips[1];
                     var shoulder = view.transform.position + Vector3.down * 0.17f + side * (s == 0 ? -0.17f : 0.17f);
                     var dir = (tip - shoulder).normalized;
@@ -277,6 +278,7 @@ namespace MusicInYourHands
             }
             if (best != null)
             {
+                Acted("star pick");
                 if (best != pointed) Glyphs.BuildWord(readingMesh, TypeFace.Bold, best.Text, 1f, 1, 0f, Color.white, Color.white);
                 pointed = best;
                 readHold = 1.2f;

@@ -371,7 +371,8 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                if (!hand.IsTracked) continue;
+                // No palm makes ready to catch while the menu is open.
+                if (!hand.IsTracked || MenuOpen) continue;
                 var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
                 var flat = Vector3.ProjectOnPlane(drop.Position - palm, Vector3.up);
                 float height = drop.Position.y - palm.y;
@@ -390,7 +391,8 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                if (!hand.IsTracked) continue;
+                // While the menu is open the drops fall past the hands choosing there.
+                if (!hand.IsTracked || MenuOpen) continue;
                 var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
                 var cup = palm + hand.PalmNormal * 0.02f;
                 var flat = Vector3.ProjectOnPlane(drop.Position - cup, Vector3.up);
@@ -398,6 +400,7 @@ namespace MusicInYourHands
                 if (flat.magnitude >= catchRadius || height > 0.04f || height < -0.05f) continue;
 
                 var normal = hand.PalmNormal.sqrMagnitude > 0.5f ? hand.PalmNormal : Vector3.up;
+                Acted("catch");
                 if (drop.Drizzle)
                 {
                     // Drizzle just tickles the palm: a little light and a tiny ripple, no chime.

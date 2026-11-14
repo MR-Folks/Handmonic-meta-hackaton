@@ -214,7 +214,8 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                if (!hand.IsTracked) continue;
+                // While the menu is open the fingers are choosing there.
+                if (!hand.IsTracked || MenuOpen) continue;
                 for (int k = 1; k < 3; k++)
                 {
                     var tip = hand.TipJoints[k] != null ? hand.TipJoints[k].position : hand.Tips[k];
@@ -227,6 +228,7 @@ namespace MusicInYourHands
                         w.Buzz = 1f;
                         if (w.LitAt < 0f) w.LitAt = Clock;
                         voices.Play(Synth.Buzz(), tip, 0.3f);
+                        Acted("touch word");
                         for (int s = 0; s < 14; s++)
                             sparks.Emit(new ParticleSystem.EmitParams
                             {

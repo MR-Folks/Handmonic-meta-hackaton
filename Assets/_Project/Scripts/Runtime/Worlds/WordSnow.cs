@@ -219,11 +219,13 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                if (!hand.IsTracked || hand.Fist > 0.5f || hand.PalmNormal.y < 0.5f) continue;
+                // While the menu is open the words fall past the hands choosing there (words already held stay held).
+                if (!hand.IsTracked || hand.Fist > 0.5f || hand.PalmNormal.y < 0.5f || MenuOpen) continue;
                 var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
                 var flat = Vector3.ProjectOnPlane(f.Position - palm, Vector3.up);
                 float above = f.Position.y - palm.y;
                 if (flat.magnitude > 0.1f || above > 0.06f || above < -0.04f) continue;
+                Acted("catch word");
                 f.State = State.Held;
                 f.Hand = side;
                 int stacked = 0;

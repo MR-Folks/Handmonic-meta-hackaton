@@ -150,7 +150,9 @@ namespace MusicInYourHands
         /// <summary>A pinch while the window is open (or just was) brings the next world and holds the window open.</summary>
         protected override void OnPinch(HandRig.Hand hand, bool left)
         {
-            if (Clock - seen <= 0.7f) Change(Music);
+            if (Clock - seen > 0.7f) return;
+            Change(Music);
+            Acted("next world");
         }
 
         /// <summary>On the beat, a few sparks in the world's colours drift out of the window's edge into the room.</summary>
@@ -198,6 +200,7 @@ namespace MusicInYourHands
                 float k = open < 0.05f ? 1f : 1f - Mathf.Exp(-30f * dt);
                 for (int i = 0; i < 4; i++) corners[i] = Vector3.Lerp(corners[i], found[i], k);
                 seen = Clock;
+                Acted("frame");
             }
 
             // A short grace keeps the window from flickering when tracking hesitates for a frame or two.
@@ -232,7 +235,8 @@ namespace MusicInYourHands
         /// </summary>
         bool Frame(HandRig rig, Camera view)
         {
-            if (rig == null) return false;
+            // While the menu is open the hands are choosing there, and no window opens between them.
+            if (rig == null || MenuOpen) return false;
             var left = rig.Left;
             var right = rig.Right;
             if (!left.IsTracked || !right.IsTracked || left.InSystemGesture || right.InSystemGesture) return false;

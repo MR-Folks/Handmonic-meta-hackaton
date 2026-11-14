@@ -14,7 +14,7 @@ namespace MusicInYourHands
     /// away, recenter) or the room scan changes, so the world can set itself up around you.</item>
     /// <item>The frame's events: <b>OnBeat</b> on each beat, <b>OnNote</b> when a melody note starts, <b>OnWord</b>
     /// when a sung word starts (lyric worlds also get the song title's words when a song has no lyrics), and
-    /// <b>OnPinch</b> / <b>OnRelease</b> for each hand.</item>
+    /// <b>OnPinch</b> / <b>OnRelease</b> for each hand (no pinches while the menu is open: see <see cref="MenuOpen"/>).</item>
     /// <item><b>OnStep</b>, the world's own update for the frame. The sung words are drawn after it.</item>
     /// </list>
     /// <b>OnEnter</b> runs each time the world is switched to and <b>OnExit</b> when it is switched away: undo there
@@ -80,10 +80,10 @@ namespace MusicInYourHands
         /// </summary>
         protected virtual void OnWord(string word, bool newLine) { }
 
-        /// <summary>A hand closed a pinch (index and thumb together).</summary>
+        /// <summary>A hand closed a pinch (index and thumb together). Not while the menu is open.</summary>
         protected virtual void OnPinch(HandRig.Hand hand, bool left) { }
 
-        /// <summary>A hand let a pinch go, or was lost while pinching.</summary>
+        /// <summary>A hand let a pinch go, was lost while pinching, or the menu opened while it pinched.</summary>
         protected virtual void OnRelease(HandRig.Hand hand, bool left) { }
 
         /// <summary>The world's own update for this frame, after placing and the events.</summary>
@@ -139,8 +139,53 @@ namespace MusicInYourHands
         protected MusicFrame Music { get; private set; }
         protected Camera View { get; private set; }
 
-        /// <summary>Whether a hand is pinching, by the same rule as OnPinch and OnRelease.</summary>
+        /// <summary>Whether a hand is pinching, by the same rule as OnPinch and OnRelease (so never while the menu is open).</summary>
         protected bool IsPinching(bool left) => pinching[left ? 0 : 1];
+
+        /// <summary>
+        /// True while the world menu is open, its song page included (the page shows inside the menu and closes with
+        /// it). The hands are choosing there, so a world leaves their pinches, touches, fists and pushes alone.
+        /// OnPinch, OnRelease and IsPinching already do: no pinch starts while the menu is open, a pinch held as it
+        /// opens gets its OnRelease, and one still held as it closes counts only once the hand has opened and pinched
+        /// again. A world that reads the hands itself (hand.Pinch, Fist, a fingertip or palm on something) checks this
+        /// too, and <see cref="PinchFree"/> for its own pinches. Following the hands just to look nice (lights on the
+        /// fingertips, a swarm drifting to a palm) may go on.
+        /// </summary>
+        protected bool MenuOpen
+        {
+            get
+            {
+                var menu = WorldMenu.Instance;
+                return menu != null && menu.IsOpen;
+            }
+        }
+
+        /// <summary>
+        /// Whether a hand's pinch is the world's: the menu is closed, and the hand has opened since it last pinched with
+        /// the menu open. A world that reads hand.Pinch itself checks this beside its own strength, so a pinch made at
+        /// the menu neither acts while the menu is open nor carries on into the world once it closes.
+        /// </summary>
+        protected bool PinchFree(bool left) => !MenuOpen && !waitOpen[left ? 0 : 1];
+
+#if UNITY_EDITOR
+        /// <summary>For the editor checks: how many times the world has acted for the hands (see Acted), and the last thing it did.</summary>
+        public int HandActions { get; private set; }
+        public string LastHandAction { get; private set; }
+#endif
+
+        /// <summary>
+        /// Notes that the world just did something for the hands: plucked a string, popped a bubble, poured, struck.
+        /// The editor checks count these to make sure nothing happens while the menu is open; outside the editor the
+        /// call compiles away.
+        /// </summary>
+        [System.Diagnostics.Conditional("UNITY_EDITOR")]
+        protected void Acted(string what)
+        {
+#if UNITY_EDITOR
+            HandActions++;
+            LastHandAction = what;
+#endif
+        }
 
         // ---- The machinery ----
 
@@ -150,6 +195,8 @@ namespace MusicInYourHands
         int nextNote;
         float noteTime;
         readonly bool[] pinching = new bool[2];
+        // Set while the menu is open: the hand must open its pinch (or be lost) before its pinches are the world's again.
+        readonly bool[] waitOpen = new bool[2];
 
         // Re-anchoring: worlds placed in the room move to you when you sit down, stand up, walk elsewhere or
         // recenter, instead of staying where you were when the world started.
@@ -223,6 +270,7 @@ namespace MusicInYourHands
             Sung.Reset();
             noteTrack = null;
             pinching[0] = pinching[1] = false;
+            waitOpen[0] = waitOpen[1] = false;
             beatPending = false;
             if (MusicBus.Instance != null) MusicBus.Instance.Beat += OnBusBeat;
             OnEnter();
@@ -310,14 +358,24 @@ namespace MusicInYourHands
             OnWord(Sung.Word, newLine);
         }
 
-        /// <summary>OnPinch and OnRelease, with hysteresis so a pinch held near the threshold doesn't flicker.</summary>
+        /// <summary>
+        /// OnPinch and OnRelease, with hysteresis so a pinch held near the threshold doesn't flicker, and none for a hand
+        /// in Meta's menu gesture. While the world menu is open the pinches are the menu's: a pinch held as it opens is
+        /// let go (OnRelease), and one still held as it closes counts only once the hand has opened and pinched again.
+        /// </summary>
         void DispatchPinches(HandRig rig)
         {
+            bool menu = MenuOpen;
             for (int s = 0; s < 2; s++)
             {
                 var hand = rig != null ? rig.Get(s == 0) : null;
                 bool was = pinching[s];
-                bool now = hand != null && hand.IsTracked && !hand.InSystemGesture
+                bool tracked = hand != null && hand.IsTracked;
+                // Waiting lasts until the hand opens or is lost, also through Meta's menu gesture, which closes the menu
+                // with a pinch of its own.
+                if (menu) waitOpen[s] = true;
+                else if (!tracked || hand.Pinch < PinchThresholds.y) waitOpen[s] = false;
+                bool now = tracked && !hand.InSystemGesture && !waitOpen[s]
                     && hand.Pinch >= (was ? PinchThresholds.y : PinchThresholds.x);
                 pinching[s] = now;
                 if (now && !was) OnPinch(hand, s == 0);

@@ -259,10 +259,12 @@ namespace MusicInYourHands
                 for (int side = 0; side < 2; side++)
                 {
                     var hand = rig.Get(side == 0);
-                    if (!hand.IsTracked || hand.Fist < 0.6f) continue;
+                    // While the menu is open the hands are choosing there: no fist pulls, no finger pushes (PushFrom).
+                    if (!hand.IsTracked || hand.Fist < 0.6f || MenuOpen) continue;
                     var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
                     if (Vector3.Distance(palm, front) < pullRadius) { fistPull = true; pullTo = palm; }
                 }
+                if (fistPull) Acted("fist pull");
             }
 
             foreach (var l in letters)
@@ -320,7 +322,7 @@ namespace MusicInYourHands
         Vector3 PushFrom(HandRig rig, Vector3 at, float size)
         {
             var push = Vector3.zero;
-            if (rig == null) return push;
+            if (rig == null || MenuOpen) return push;
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
@@ -335,6 +337,7 @@ namespace MusicInYourHands
                     float reach = pushRadius * (size / letterHeight * 0.6f + 0.4f);
                     if (d >= reach || d < 1e-4f) continue;
                     push += away / d * (reach - d) * 1.1f;
+                    Acted("push letter");
                 }
             }
             return push;
@@ -365,7 +368,8 @@ namespace MusicInYourHands
                         var tip = hand.TipJoints[k] != null ? hand.TipJoints[k].position : hand.Tips[k];
                         var move = (tip - lastTips[side, k]) / dt;
                         lastTips[side, k] = tip;
-                        if (!hand.IsTracked || move.magnitude > 6f) continue;
+                        // A fingertip at the open menu spins no ring.
+                        if (!hand.IsTracked || move.magnitude > 6f || MenuOpen) continue;
                         for (int r = 0; r < rings.Length; r++)
                         {
                             // The ring's nearest point to the fingertip, and the ring's direction there.
@@ -377,6 +381,7 @@ namespace MusicInYourHands
                             float push = Vector3.Dot(move, tangent) / ringRadii[r];
                             ringSpinVelocity[r] = Mathf.Lerp(ringSpinVelocity[r], Mathf.Clamp(push, -6f, 6f), 0.5f);
                             ringTouch[r] = 1f;
+                            Acted("spin ring");
                         }
                     }
                 }

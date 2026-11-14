@@ -194,6 +194,10 @@ namespace MusicInYourHands
             }
         }
 
+        /// <summary>
+        /// The fingertips and palms the fish swim round. They only get out of the way, so they keep doing it while the
+        /// menu is open too.
+        /// </summary>
         void CollectObstacles(HandRig rig)
         {
             for (int side = 0; side < 2; side++)

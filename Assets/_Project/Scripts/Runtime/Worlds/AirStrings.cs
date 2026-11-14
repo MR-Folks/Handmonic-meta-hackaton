@@ -231,7 +231,9 @@ namespace MusicInYourHands
                 for (int f = 0; f < 5; f++)
                 {
                     int finger = side * 5 + f;
-                    if (!hand.IsTracked)
+                    // While the menu is open the fingers are choosing there (its bubbles hang just behind the strings),
+                    // not playing; once it closes, a finger starts afresh on whichever side of each string it is.
+                    if (!hand.IsTracked || MenuOpen)
                     {
                         for (int i = 0; i < stringCount; i++) hadSide[finger, i] = false;
                         continue;
@@ -252,6 +254,7 @@ namespace MusicInYourHands
                             float speed = dt > 0f ? Mathf.Abs(sideOf - lastSide[finger, i]) / dt : 0f;
                             Pluck(s, i, closest, along, Mathf.Clamp01(0.35f + speed * 0.6f));
                             shiver[side] = 1f;
+                            Acted("pluck");
                         }
                         lastSide[finger, i] = sideOf;
                         hadSide[finger, i] = true;

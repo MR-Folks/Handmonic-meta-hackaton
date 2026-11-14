@@ -486,6 +486,8 @@ namespace MusicInYourHands
                     lean += toward * (near * 0.75f);
                     open = Mathf.Max(open, near * 0.5f);
                     warm = Mathf.Max(warm, near * 0.3f);
+                    // While the menu is open a flower still leans towards a hand near it, but no palm draws it up.
+                    if (MenuOpen) continue;
                     // Over it: the palm faces down, not far to the side, somewhere above its head.
                     float down = Smooth01((-hand.PalmNormal.y - 0.4f) / 0.35f);
                     float across = new Vector2(palm.x - head.x, palm.z - head.z).magnitude;
@@ -498,6 +500,7 @@ namespace MusicInYourHands
                     f.Palm = palm;
                     stretch = Mathf.Clamp((palm.y - 0.08f - f.Root.y - f.Neck * size) / height - 1f, 0f, maxStretch);
                 }
+                if (over > 0f) Acted("palm over flower");
             }
             float follow = 1f - Mathf.Exp(-dt * 4f);
             f.Lean = Vector2.Lerp(f.Lean, Vector2.Lerp(Vector2.ClampMagnitude(lean, 0.5f), under, over), follow);

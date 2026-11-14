@@ -290,7 +290,8 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                if (!hand.IsTracked) continue;
+                // While the menu is open the fingers are choosing there: they neither pop nor push the bubbles.
+                if (!hand.IsTracked || MenuOpen) continue;
                 for (int k = 0; k < 5; k++)
                 {
                     var tip = hand.TipJoints[k] != null ? hand.TipJoints[k].position : hand.Tips[k];
@@ -299,6 +300,7 @@ namespace MusicInYourHands
                     {
                         Musical.Play(voices, frame, b.Midi, tip, 0.4f);
                         Burst(b, true);
+                        Acted("pop");
                         return true;
                     }
                     nearest = Mathf.Min(nearest, (d - b.Radius) / 0.06f);
@@ -307,7 +309,10 @@ namespace MusicInYourHands
                 var away = b.Position - palm;
                 float reach = b.Radius + 0.05f;
                 if (away.sqrMagnitude < reach * reach && away.sqrMagnitude > 1e-8f)
+                {
                     b.Velocity += away.normalized * 0.25f * (1f - away.magnitude / reach);
+                    Acted("push bubble");
+                }
             }
             b.Near = Mathf.Clamp01(1f - nearest);
             return false;

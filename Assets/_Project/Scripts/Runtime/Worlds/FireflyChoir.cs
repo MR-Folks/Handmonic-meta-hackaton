@@ -191,6 +191,7 @@ namespace MusicInYourHands
         protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
         {
             float t = Now;
+            // The swarm only follows the hands, so it goes on gathering round them while the menu is open.
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);

@@ -244,9 +244,11 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                if (!hand.IsTracked || hand.Pinch > 0.8f) continue;
+                // While the menu is open the hands are choosing there: they hover, plough and pour nothing.
+                if (!hand.IsTracked || hand.Pinch > 0.8f || MenuOpen) continue;
                 var local = plate.InverseTransformPoint(Palm(hand));
                 if (Mathf.Abs(local.x) > half * 1.15f || Mathf.Abs(local.z) > half * 1.15f || local.y < 0.03f || local.y > hoverHeight) continue;
+                Acted("hover");
                 float strength = 1f - Mathf.Clamp01(local.y / hoverHeight);
                 if (strength > best)
                 {
@@ -290,7 +292,7 @@ namespace MusicInYourHands
                 var hand = rig.Get(side == 0);
                 for (int k = 0; k < 6; k++)
                 {
-                    if (!hand.IsTracked) { hadContact[side, k] = false; continue; }
+                    if (!hand.IsTracked || MenuOpen) { hadContact[side, k] = false; continue; }
                     var point = k < 5 ? (hand.TipJoints[k] != null ? hand.TipJoints[k].position : hand.Tips[k]) : Palm(hand);
                     var local = plate.InverseTransformPoint(point);
                     var c = new Vector2(local.x, local.z) / half;
@@ -301,6 +303,7 @@ namespace MusicInYourHands
                     lastContact[side, k] = c;
                     hadContact[side, k] = touching;
                     if (!touching && blow <= 0f) continue;
+                    Acted(touching ? "plough" : "blow");
 
                     float radius = (touching ? (k < 5 ? 0.022f : 0.05f) : 0.1f) / half;
                     float r2 = radius * radius;
@@ -331,13 +334,14 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                bool pouring = hand.IsTracked && hand.Pinch > 0.8f && !hand.InSystemGesture;
+                bool pouring = hand.IsTracked && hand.Pinch > 0.8f && !hand.InSystemGesture && PinchFree(side == 0);
                 if (!pouring) { pourDebt[side] = 0f; continue; }
                 var thumb = hand.TipJoints[0] != null ? hand.TipJoints[0].position : hand.Tips[0];
                 var index = hand.TipJoints[1] != null ? hand.TipJoints[1].position : hand.Tips[1];
                 var from = (thumb + index) * 0.5f;
                 var local = plate.InverseTransformPoint(from);
                 if (Mathf.Abs(local.x) > half * 1.2f || Mathf.Abs(local.z) > half * 1.2f || local.y < 0.02f || local.y > 0.6f) continue;
+                Acted("pour sand");
                 pourDebt[side] += 120f * dt;
                 while (pourDebt[side] >= 1f)
                 {

@@ -186,9 +186,13 @@ namespace MusicInYourHands
         {
             if (++beats % Mathf.Max(1, waveEveryBeats) != 0) return;
             waveHue = (waveHue + 1) % fingerColors.Length;
+            // While the menu is open the palms are choosing there: no waves burst out among its bubbles and on across the
+            // room. The fingertip lights, trails and sparks go on.
+            if (MenuOpen) return;
             float strength = 0.6f + 0.4f * music.Kick;
             if (Rig.Left.IsTracked) SpawnWave(Rig.Left, View, strength);
             if (Rig.Right.IsTracked) SpawnWave(Rig.Right, View, strength);
+            if (Rig.Left.IsTracked || Rig.Right.IsTracked) Acted("palm wave");
         }
 
         /// <summary>
