@@ -110,7 +110,7 @@ namespace MusicInYourHands
         const float TouchContact = 0.005f, TouchRearm = 0.02f;
         // The song page sits this far behind the bubbles.
         const float PageDepth = 0.003f;
-        const string ChooseHint = "Touch or pinch to choose";
+        const string ChooseHint = "Touch or pinch to choose · thumb tap: play/pause · thumb swipe: change song";
 
         Bubble[] bubbles = Array.Empty<Bubble>();
         readonly Pointer[] pointers = { new Pointer(), new Pointer() };

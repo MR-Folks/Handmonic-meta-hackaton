@@ -435,9 +435,10 @@ namespace MusicInYourHands.EditorTools
 
         /// <summary>
         /// The worlds and the menu: a "Worlds" object with WorldManager and one child per World class in the code, in
-        /// MenuOrder, each with its Material fields filled from Materials/ by name; then the bubble WorldMenu and the
-        /// menu button feed. Existing objects are kept and only their references are refreshed, so a new world needs
-        /// nothing but its class: run Configure Project (or Rebuild Main Scene) and it joins the scene and the menu.
+        /// MenuOrder, each with its Material fields filled from Materials/ by name; then the bubble WorldMenu, the music
+        /// gestures (thumb tap and swipes) and the menu button and microgesture feeds. Existing objects are kept and only
+        /// their references are refreshed, so a new world needs nothing but its class: run Configure Project (or Rebuild
+        /// Main Scene) and it joins the scene and the menu.
         /// </summary>
         internal static void EnsureWorlds()
         {
@@ -474,9 +475,16 @@ namespace MusicInYourHands.EditorTools
             if (menu == null) menu = new GameObject("WorldMenu", typeof(WorldMenu)).GetComponent<WorldMenu>();
             SetReferences(menu, ("bubbleMaterial", EnsureMaterial(BubbleMaterialPath, "MusicInYourHands/Bubble")), ("glowMaterial", glow),
                 ("lineMaterial", line), ("panelMaterial", EnsureMaterial(PanelMaterialPath, "MusicInYourHands/Panel")));
+
+            // Thumb tap and thumb swipes pause, play and step the songs in every world.
+            var gestures = Object.FindAnyObjectByType<MusicGestures>(FindObjectsInactive.Include);
+            if (gestures == null) gestures = new GameObject("MusicGestures", typeof(MusicGestures)).GetComponent<MusicGestures>();
+            SetReferences(gestures, ("bubbleMaterial", EnsureMaterial(BubbleMaterialPath, "MusicInYourHands/Bubble")));
 #if META_XR_CORE
             if (Object.FindAnyObjectByType<MenuButtonFeed>(FindObjectsInactive.Include) == null)
                 new GameObject("MenuButton", typeof(MenuButtonFeed));
+            if (Object.FindAnyObjectByType<MicrogestureFeed>(FindObjectsInactive.Include) == null)
+                new GameObject("Microgestures", typeof(MicrogestureFeed));
             if (Object.FindAnyObjectByType<RoomScanFeed>(FindObjectsInactive.Include) == null)
             {
                 var scan = new GameObject("RoomScan");
