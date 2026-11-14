@@ -22,9 +22,6 @@ namespace MusicInYourHands
 
         public override string Hint => "Brush your fingers across the strings";
 
-        /// <summary>The harp stands in front of you, within reach.</summary>
-        public override Space Spaces => Space.InFront;
-
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.06f, 0.18f, 0.16f, 0.55f),
@@ -234,8 +231,7 @@ namespace MusicInYourHands
                 for (int f = 0; f < 5; f++)
                 {
                     int finger = side * 5 + f;
-                    // While the menu is open the fingers are choosing there, not playing.
-                    if (!hand.IsTracked || MenuOpen)
+                    if (!hand.IsTracked)
                     {
                         for (int i = 0; i < stringCount; i++) hadSide[finger, i] = false;
                         continue;

@@ -22,9 +22,6 @@ namespace MusicInYourHands
 
         public override string Hint => "Touch the sand, hover to change the pattern, pinch to pour";
 
-        /// <summary>The plate lies in front of you, and a pinch pours sand onto it.</summary>
-        public override Space Spaces => Space.InFront | Space.Pinch;
-
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.12f, 0.09f, 0.07f, 0.55f),
@@ -247,8 +244,7 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                // While the menu is open the hands are choosing there.
-                if (!hand.IsTracked || hand.Pinch > 0.8f || MenuOpen) continue;
+                if (!hand.IsTracked || hand.Pinch > 0.8f) continue;
                 var local = plate.InverseTransformPoint(Palm(hand));
                 if (Mathf.Abs(local.x) > half * 1.15f || Mathf.Abs(local.z) > half * 1.15f || local.y < 0.03f || local.y > hoverHeight) continue;
                 float strength = 1f - Mathf.Clamp01(local.y / hoverHeight);
@@ -294,7 +290,7 @@ namespace MusicInYourHands
                 var hand = rig.Get(side == 0);
                 for (int k = 0; k < 6; k++)
                 {
-                    if (!hand.IsTracked || MenuOpen) { hadContact[side, k] = false; continue; }
+                    if (!hand.IsTracked) { hadContact[side, k] = false; continue; }
                     var point = k < 5 ? (hand.TipJoints[k] != null ? hand.TipJoints[k].position : hand.Tips[k]) : Palm(hand);
                     var local = plate.InverseTransformPoint(point);
                     var c = new Vector2(local.x, local.z) / half;
@@ -335,7 +331,7 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                bool pouring = hand.IsTracked && hand.Pinch > 0.8f && !hand.InSystemGesture && !MenuOpen;
+                bool pouring = hand.IsTracked && hand.Pinch > 0.8f && !hand.InSystemGesture;
                 if (!pouring) { pourDebt[side] = 0f; continue; }
                 var thumb = hand.TipJoints[0] != null ? hand.TipJoints[0].position : hand.Tips[0];
                 var index = hand.TipJoints[1] != null ? hand.TipJoints[1].position : hand.Tips[1];

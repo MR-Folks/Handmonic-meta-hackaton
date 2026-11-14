@@ -23,9 +23,6 @@ namespace MusicInYourHands
 
         public override string Hint => "Cast shadows on the wall; touch the lights with them";
 
-        /// <summary>The room goes dark, and your shadows play on the wall in front of you.</summary>
-        public override Space Spaces => Space.RoomLight | Space.Walls;
-
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.05f, 0.04f, 0.04f, 0.7f),
@@ -583,8 +580,7 @@ namespace MusicInYourHands
                 n.Rest -= dt;
 
                 bool covered = InShadow(n.Position);
-                // While the menu is open the hands are choosing there, so their shadows ring nothing.
-                if (covered && !n.Covered && n.Rest <= 0f && !MenuOpen)
+                if (covered && !n.Covered && n.Rest <= 0f)
                 {
                     float height = Vector2.Dot(n.Position - pool, upOnWall) / poolRadius * 0.5f + 0.5f;
                     var at = OnWall(n.Position, 0.02f);

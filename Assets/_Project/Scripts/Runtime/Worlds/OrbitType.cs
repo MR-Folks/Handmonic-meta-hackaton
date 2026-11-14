@@ -25,9 +25,6 @@ namespace MusicInYourHands
 
         public override string Hint => "Push the letters, flick a ring, or make a fist";
 
-        /// <summary>The word arrives in front of you, the line circles you, and a fist pulls the word to your hand.</summary>
-        public override Space Spaces => Space.InFront | Space.AroundYou | Space.Fists;
-
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.12f, 0.12f, 0.14f, 0.5f),
@@ -262,8 +259,7 @@ namespace MusicInYourHands
                 for (int side = 0; side < 2; side++)
                 {
                     var hand = rig.Get(side == 0);
-                    // While the menu is open the hands are choosing there.
-                    if (!hand.IsTracked || hand.Fist < 0.6f || MenuOpen) continue;
+                    if (!hand.IsTracked || hand.Fist < 0.6f) continue;
                     var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
                     if (Vector3.Distance(palm, front) < pullRadius) { fistPull = true; pullTo = palm; }
                 }
@@ -328,7 +324,7 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                if (!hand.IsTracked || hand.Fist > 0.6f || MenuOpen) continue;
+                if (!hand.IsTracked || hand.Fist > 0.6f) continue;
                 for (int k = 0; k < 6; k++)
                 {
                     var point = k < 5 ? (hand.TipJoints[k] != null ? hand.TipJoints[k].position : hand.Tips[k])
@@ -369,7 +365,7 @@ namespace MusicInYourHands
                         var tip = hand.TipJoints[k] != null ? hand.TipJoints[k].position : hand.Tips[k];
                         var move = (tip - lastTips[side, k]) / dt;
                         lastTips[side, k] = tip;
-                        if (!hand.IsTracked || move.magnitude > 6f || MenuOpen) continue;
+                        if (!hand.IsTracked || move.magnitude > 6f) continue;
                         for (int r = 0; r < rings.Length; r++)
                         {
                             // The ring's nearest point to the fingertip, and the ring's direction there.

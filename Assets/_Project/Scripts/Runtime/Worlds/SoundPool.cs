@@ -28,9 +28,6 @@ namespace MusicInYourHands
 
         public override string Hint => "Dip your hand into the pool and listen";
 
-        /// <summary>The pool lies in front of you, a pinch pours a stream into it, and its water light plays over the room.</summary>
-        public override Space Spaces => Space.InFront | Space.Pinch | Space.RoomLight;
-
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.05f, 0.14f, 0.2f, 0.5f),
@@ -474,8 +471,7 @@ namespace MusicInYourHands
                 var hand = rig.Get(side == 0);
                 for (int k = 0; k < 6; k++)
                 {
-                    // While the menu is open the hands are choosing there.
-                    if (!hand.IsTracked || MenuOpen)
+                    if (!hand.IsTracked)
                     {
                         wasUnder[side, k] = false;
                         continue;
@@ -526,8 +522,7 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig?.Get(side == 0);
-                // While the menu is open the hands are choosing there.
-                bool now = hand != null && hand.IsTracked && hand.Pinch > 0.8f && !hand.InSystemGesture && !MenuOpen;
+                bool now = hand != null && hand.IsTracked && hand.Pinch > 0.8f && !hand.InSystemGesture;
                 if (!now)
                 {
                     if (pouring[side])

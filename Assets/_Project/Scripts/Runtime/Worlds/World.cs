@@ -14,52 +14,18 @@ namespace MusicInYourHands
     /// away, recenter) or the room scan changes, so the world can set itself up around you.</item>
     /// <item>The frame's events: <b>OnBeat</b> on each beat, <b>OnNote</b> when a melody note starts, <b>OnWord</b>
     /// when a sung word starts (lyric worlds also get the song title's words when a song has no lyrics), and
-    /// <b>OnPinch</b> / <b>OnRelease</b> for each hand (none while the menu is open: see <see cref="MenuOpen"/>).</item>
+    /// <b>OnPinch</b> / <b>OnRelease</b> for each hand.</item>
     /// <item><b>OnStep</b>, the world's own update for the frame. The sung words are drawn after it.</item>
     /// </list>
-    /// <b>OnEnter</b> runs each time the world is turned on and <b>OnExit</b> when it is turned off: undo there
-    /// anything the world changed outside itself. WorldManager turns worlds on and off (their GameObjects with them),
+    /// <b>OnEnter</b> runs each time the world is switched to and <b>OnExit</b> when it is switched away: undo there
+    /// anything the world changed outside itself. WorldManager switches worlds by turning their GameObjects on and off,
     /// and the editor previews call Build and Step directly with hand-made MusicFrames.
-    /// Several worlds can be on at once when they use different parts of the room and your body (<see cref="Spaces"/>).
-    /// Every hook reaches every world that is on, except that only one of them gets the sung words (<see cref="OwnsWords"/>)
-    /// and only one dresses the hands (<see cref="OwnsHands"/>): World undoes what the others do to the hands' look.
     /// To add a world, see "Adding a world" in the README: Update Worlds in Main Scene finds every World class, adds it
     /// to the scene in <see cref="MenuOrder"/> and fills its Material fields from Materials/ by name.
     /// </summary>
     [DefaultExecutionOrder(150)]
     public abstract class World : MonoBehaviour
     {
-        /// <summary>
-        /// The parts of the room and of your body a world uses. Worlds that share none of them can be on together;
-        /// choosing a world that shares one with a world that is on turns that one off. Inside a world, Space means this
-        /// one: write UnityEngine.Space for Unity's own (as in transform.Rotate(axis, angle, UnityEngine.Space.World)).
-        /// </summary>
-        [System.Flags]
-        public enum Space
-        {
-            None = 0,
-            /// <summary>The floor and the tops of furniture: things that stand, grow, land or lie there.</summary>
-            Ground = 1 << 0,
-            /// <summary>The walls.</summary>
-            Walls = 1 << 1,
-            /// <summary>The ceiling, or a sky drawn over it.</summary>
-            Ceiling = 1 << 2,
-            /// <summary>The room's air all around you, out of reach, and things that circle you.</summary>
-            AroundYou = 1 << 3,
-            /// <summary>Within arm's reach in front of you: things that stand there for you to touch.</summary>
-            InFront = 1 << 4,
-            /// <summary>On and between your hands: what they carry or hold, and how they look beyond their colours.</summary>
-            Hands = 1 << 5,
-            /// <summary>What a pinch does (drawing, spraying, pouring, holding). Two worlds never share a pinch.</summary>
-            Pinch = 1 << 6,
-            /// <summary>What clenching your fists does (clearing, switching, pulling).</summary>
-            Fists = 1 << 7,
-            /// <summary>The light of the whole room: dimming it, or washing light over all its surfaces.</summary>
-            RoomLight = 1 << 8,
-            /// <summary>Everything: the world is on its own. A world that doesn't say which spaces it uses gets this.</summary>
-            All = ~0
-        }
-
         [Tooltip("The lettering of the sung words (Materials/Lettering).")]
         [SerializeField] protected Material letteringMaterial;
         [Tooltip("The soft glow of sparks and motes (Materials/Glow).")]
@@ -85,36 +51,18 @@ namespace MusicInYourHands
         /// <summary>True for the worlds built around the song's lyrics; the menu groups them apart.</summary>
         public virtual bool IsLyric => false;
 
-        /// <summary>How the hands look in this world. Applied when the world starts to dress the hands (OwnsHands).</summary>
+        /// <summary>How the hands look in this world. Applied when the world becomes active.</summary>
         public virtual HandTheme Theme => HandTheme.Veins;
-
-        /// <summary>
-        /// The parts of the room and of your body the world uses, so the menu knows which worlds can be on with it. A
-        /// world that doesn't say is on its own: choosing it turns every other world off, and choosing another turns it
-        /// off.
-        /// </summary>
-        public virtual Space Spaces => Space.All;
-
-        /// <summary>
-        /// Whether this world and <paramref name="other"/> can be on together: neither is on its own, they use none of
-        /// the same spaces, and they aren't both lyric worlds (each is made of the sung words, which only one can show).
-        /// </summary>
-        public bool CombinesWith(World other) =>
-            other != null && other != this && Spaces != Space.All && other.Spaces != Space.All
-            && (Spaces & other.Spaces) == 0 && !(IsLyric && other.IsLyric);
-
-        /// <summary>Whether the world shows the sung words: a lyric world, or one with a SungWordCount.</summary>
-        public bool ShowsWords => IsLyric || SungWordCount > 0;
 
         // ---- Hooks, in the order they run ----
 
         /// <summary>Creates the world's objects, once.</summary>
         protected virtual void OnBuild() { }
 
-        /// <summary>The world was turned on (after OnBuild), alone or beside others: start afresh.</summary>
+        /// <summary>The world was switched to (after OnBuild): start afresh.</summary>
         protected virtual void OnEnter() { }
 
-        /// <summary>The world was turned off: hide its things and undo anything it changed outside itself.</summary>
+        /// <summary>The world was switched away: hide its things and undo anything it changed outside itself.</summary>
         protected virtual void OnExit() { }
 
         /// <summary>Sets the world up around the viewer: when it starts, and again once they have moved elsewhere.</summary>
@@ -132,10 +80,10 @@ namespace MusicInYourHands
         /// </summary>
         protected virtual void OnWord(string word, bool newLine) { }
 
-        /// <summary>A hand closed a pinch (index and thumb together). Not while the menu is open.</summary>
+        /// <summary>A hand closed a pinch (index and thumb together).</summary>
         protected virtual void OnPinch(HandRig.Hand hand, bool left) { }
 
-        /// <summary>A hand let a pinch go, was lost while pinching, or the menu opened while it pinched.</summary>
+        /// <summary>A hand let a pinch go, or was lost while pinching.</summary>
         protected virtual void OnRelease(HandRig.Hand hand, bool left) { }
 
         /// <summary>The world's own update for this frame, after placing and the events.</summary>
@@ -168,20 +116,6 @@ namespace MusicInYourHands
 
         public bool IsBuilt { get; private set; }
 
-        /// <summary>
-        /// Whether the world gets the sung words (OnWord). A world on its own always does; with several on, WorldManager
-        /// gives them to one: the lyric world, else the one chosen last that shows words.
-        /// </summary>
-        public bool OwnsWords { get; private set; } = true;
-
-        /// <summary>
-        /// Whether the world dresses the hands: its Theme, HandSkin's focus point and charge, and nudging the visible
-        /// hands. A world on its own always does; with several on, WorldManager picks one (the one that uses the Hands
-        /// space, else one that uses the pinch, the fists or what is in front of you, else the one chosen last), and
-        /// World undoes what the others' hooks do to the hands.
-        /// </summary>
-        public bool OwnsHands { get; private set; } = true;
-
         /// <summary>0 when the world starts, rising to 1 over FadeInSeconds: fade the world in with it.</summary>
         protected float FadeIn { get; private set; }
 
@@ -208,47 +142,14 @@ namespace MusicInYourHands
         /// <summary>Whether a hand is pinching, by the same rule as OnPinch and OnRelease.</summary>
         protected bool IsPinching(bool left) => pinching[left ? 0 : 1];
 
-        /// <summary>
-        /// True while the world menu is open: the hands are choosing there, so a world leaves their pinches, touches and
-        /// fists alone. OnPinch and OnRelease already do (a pinch held as the menu opens is let go), but a world that
-        /// reads the hands itself (hand.Pinch, a fingertip on something, a fist) should check this too.
-        /// </summary>
-        protected bool MenuOpen
-        {
-            get
-            {
-                var menu = WorldMenu.Instance;
-                return menu != null && menu.IsOpen;
-            }
-        }
-
-        /// <summary>Whether the world is on: between Enter (OnEnter) and Exit (OnExit).</summary>
-        public bool IsOn => entered;
-
-        /// <summary>How many of its SungWords the world shows right now (for the editor checks).</summary>
-        public int WordsShowing
-        {
-            get
-            {
-                if (SungWords == null) return 0;
-                int count = 0;
-                var words = SungWords.Words;
-                for (int i = 0; i < words.Count; i++)
-                    if (words[i].Active) count++;
-                return count;
-            }
-        }
-
         // ---- The machinery ----
 
-        bool beatPending, entered;
+        bool beatPending;
         readonly List<NoteTrack.Note> upcoming = new List<NoteTrack.Note>();
         NoteTrack noteTrack;
         int nextNote;
         float noteTime;
         readonly bool[] pinching = new bool[2];
-        // A hand that pinched while the menu was open must open its pinch before its next pinch counts here.
-        readonly bool[] waitOpen = new bool[2];
 
         // Re-anchoring: worlds placed in the room move to you when you sit down, stand up, walk elsewhere or
         // recenter, instead of staying where you were when the world started.
@@ -278,27 +179,9 @@ namespace MusicInYourHands
 
         /// <summary>
         /// One frame of the world: placing, the frame's events, then OnStep and the sung words. The editor previews call
-        /// it directly. When another world dresses the hands, what this one's hooks do to them is undone afterwards.
+        /// it directly.
         /// </summary>
         public void Step(HandRig rig, MusicFrame music, Camera view, float dt)
-        {
-            if (OwnsHands)
-            {
-                Run(rig, music, view, dt);
-                return;
-            }
-            var look = HandSkin.Look.Save(rig);
-            try
-            {
-                Run(rig, music, view, dt);
-            }
-            finally
-            {
-                look.Restore(rig);
-            }
-        }
-
-        void Run(HandRig rig, MusicFrame music, Camera view, float dt)
         {
             Build();
             if (view == null) return;
@@ -328,93 +211,37 @@ namespace MusicInYourHands
             SungWords?.Draw(SungWordsAlpha);
         }
 
-        void OnEnable() => Enter();
-
-        void OnDisable() => Exit();
-
-        /// <summary>
-        /// Starts the world afresh (OnEnter), building it first if need be; a world that dresses the hands puts its Theme
-        /// on them. WorldManager calls it when it turns the world on, as turning the GameObject on does while playing
-        /// (the editor checks have no OnEnable). Does nothing if the world is already on.
-        /// </summary>
-        public void Enter()
+        void OnEnable()
         {
-            if (entered) return;
-            entered = true;
-            var rig = HandRig.Instance;
-            if (OwnsHands) DressHands(rig);
-            var look = HandSkin.Look.Save(rig);
-            try
-            {
-                Build();
-                placed = false;
-                FadeIn = 0f;
-                Beats = 0;
-                Sung.Reset();
-                noteTrack = null;
-                pinching[0] = pinching[1] = false;
-                waitOpen[0] = waitOpen[1] = false;
-                beatPending = false;
-                if (MusicBus.Instance != null) MusicBus.Instance.Beat += OnBusBeat;
-                OnEnter();
-            }
-            finally
-            {
-                if (!OwnsHands) look.Restore(rig);
-            }
+            HandSkin.Theme = Theme;
+            HandSkin.FocusStrength = 0f;
+            HandSkin.Charge[0] = HandSkin.Charge[1] = 0f;
+            Build();
+            placed = false;
+            FadeIn = 0f;
+            Beats = 0;
+            Sung.Reset();
+            noteTrack = null;
+            pinching[0] = pinching[1] = false;
+            beatPending = false;
+            if (MusicBus.Instance != null) MusicBus.Instance.Beat += OnBusBeat;
+            OnEnter();
         }
 
-        /// <summary>
-        /// Stops the world (OnExit) and clears its sung words; a world that dressed the hands puts the visible hands back
-        /// where they belong. WorldManager calls it when it turns the world off. Does nothing if the world is off.
-        /// </summary>
-        public void Exit()
+        void OnDisable()
         {
-            if (!entered) return;
-            entered = false;
             if (MusicBus.Instance != null) MusicBus.Instance.Beat -= OnBusBeat;
             beatPending = false;
             if (!IsBuilt) return;
             SungWords?.Clear();
+            OnExit();
+            // Worlds may nudge the visible hands (fake resistance); put them back.
             var rig = HandRig.Instance;
-            var look = HandSkin.Look.Save(rig);
-            try
+            if (rig != null)
             {
-                OnExit();
+                Effects.OffsetHand(rig.Left, Vector3.zero);
+                Effects.OffsetHand(rig.Right, Vector3.zero);
             }
-            finally
-            {
-                if (!OwnsHands) look.Restore(rig);
-                // Worlds may nudge the visible hands (fake resistance); put them back.
-                else if (rig != null)
-                {
-                    Effects.OffsetHand(rig.Left, Vector3.zero);
-                    Effects.OffsetHand(rig.Right, Vector3.zero);
-                }
-            }
-        }
-
-        /// <summary>
-        /// WorldManager says whether this world gets the sung words and dresses the hands while others are on too. A
-        /// world that hands the words over clears its own (the next owner picks up at the word being sung); one that
-        /// takes the hands over while it runs puts its Theme on them.
-        /// </summary>
-        internal void SetOwners(bool words, bool hands)
-        {
-            if (OwnsWords && !words) SungWords?.Clear();
-            OwnsWords = words;
-            bool dress = hands && !OwnsHands && entered;
-            OwnsHands = hands;
-            if (dress) DressHands(HandRig.Instance);
-        }
-
-        /// <summary>The world's look on the hands, with nothing nudged, focused or charged yet.</summary>
-        void DressHands(HandRig rig)
-        {
-            HandSkin.Dress(Theme);
-            if (rig == null) return;
-            Effects.OffsetHand(rig.Left, Vector3.zero);
-            Effects.OffsetHand(rig.Right, Vector3.zero);
         }
 
         void OnBusBeat() => beatPending = true;
@@ -468,12 +295,9 @@ namespace MusicInYourHands
             noteTime = now;
         }
 
-        /// <summary>OnWord when a new sung word starts, for the world that shows the sung words.</summary>
+        /// <summary>OnWord when a new sung word starts.</summary>
         void DispatchWords(MusicFrame music)
         {
-            // With several worlds on, another one shows them; this one's cursor waits, so it starts at the word being
-            // sung if the words come to it.
-            if (!OwnsWords) return;
             // Without real lyrics, only lyric worlds carry on with the title's words.
             if (!WordsWithoutLyrics && string.IsNullOrEmpty(music.Word))
             {
@@ -486,22 +310,15 @@ namespace MusicInYourHands
             OnWord(Sung.Word, newLine);
         }
 
-        /// <summary>
-        /// OnPinch and OnRelease, with hysteresis so a pinch held near the threshold doesn't flicker. While the menu is
-        /// open the pinches are the menu's: a pinch held as it opens is let go (OnRelease), and one still held as it
-        /// closes only counts once it has opened and closed again.
-        /// </summary>
+        /// <summary>OnPinch and OnRelease, with hysteresis so a pinch held near the threshold doesn't flicker.</summary>
         void DispatchPinches(HandRig rig)
         {
-            bool menu = MenuOpen;
             for (int s = 0; s < 2; s++)
             {
                 var hand = rig != null ? rig.Get(s == 0) : null;
                 bool was = pinching[s];
-                bool usable = hand != null && hand.IsTracked && !hand.InSystemGesture;
-                if (menu) waitOpen[s] = true;
-                else if (!usable || hand.Pinch < PinchThresholds.y) waitOpen[s] = false;
-                bool now = usable && !menu && !waitOpen[s] && hand.Pinch >= (was ? PinchThresholds.y : PinchThresholds.x);
+                bool now = hand != null && hand.IsTracked && !hand.InSystemGesture
+                    && hand.Pinch >= (was ? PinchThresholds.y : PinchThresholds.x);
                 pinching[s] = now;
                 if (now && !was) OnPinch(hand, s == 0);
                 else if (!now && was) OnRelease(hand, s == 0);

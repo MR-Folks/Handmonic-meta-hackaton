@@ -24,9 +24,6 @@ namespace MusicInYourHands
 
         public override string Hint => "Hold out a palm and catch the falling notes";
 
-        /// <summary>The notes fall in front of you onto the floor and furniture, and a drizzle falls all around you.</summary>
-        public override Space Spaces => Space.InFront | Space.Ground | Space.AroundYou;
-
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.07f, 0.13f, 0.28f, 0.5f),
@@ -374,7 +371,7 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                if (!hand.IsTracked || MenuOpen) continue;
+                if (!hand.IsTracked) continue;
                 var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
                 var flat = Vector3.ProjectOnPlane(drop.Position - palm, Vector3.up);
                 float height = drop.Position.y - palm.y;
@@ -393,8 +390,7 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                // While the menu is open the drops fall past the hands choosing there.
-                if (!hand.IsTracked || MenuOpen) continue;
+                if (!hand.IsTracked) continue;
                 var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
                 var cup = palm + hand.PalmNormal * 0.02f;
                 var flat = Vector3.ProjectOnPlane(drop.Position - cup, Vector3.up);

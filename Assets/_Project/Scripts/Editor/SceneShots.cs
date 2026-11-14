@@ -76,18 +76,6 @@ namespace MusicInYourHands.EditorTools
                 handOffset: side => side == "R" ? new Vector3(0.02f, -0.24f, 0.12f) : new Vector3(-0.05f, -0.12f, 0.06f));
             MenuShot();
 
-            // Worlds on together, as the menu puts them: each uses its own part of the room and body.
-            ComboShot("c1-breathing-room-firefly-choir", new[] { typeof(BreathingRoom), typeof(FireflyChoir) }, HandPose.PalmsToFace, 8f);
-            ComboShot("c2-heartbeat-orb-note-rain", new[] { typeof(NoteRain), typeof(HeartbeatOrb) }, HandPose.PalmsFacing, 24f);
-            ComboShot("c3-living-skin-rising-floor", new[] { typeof(LivingSkin), typeof(RisingFloor) }, HandPose.PalmsToFace, 32f, lead: 4f,
-                handOffset: side => side == "L" ? new Vector3(-0.1f, 0.06f, 0f) : new Vector3(0.1f, 0.06f, 0f));
-            ComboShot("c4r-breathing-room-ceiling-stars-room", new[] { typeof(BreathingRoom), typeof(CeilingStars) }, HandPose.PalmsToFace, -14f,
-                lead: 4f, scanned: true);
-            ComboShot("c5r-neon-sign-firefly-choir-room", new[] { typeof(FireflyChoir), typeof(NeonSign) }, HandPose.BacksToFace, 4f, lead: 4f,
-                extra: 1.7f, scanned: true);
-            // The user's own example: flowers on the floor with planets around you, once both say which spaces they use.
-            ComboShot("c6-flower-dance-solar-system", new[] { typeof(FlowerDance), typeof(SolarSystem) }, HandPose.PalmsToFace, 22f);
-
             // The same worlds in a scanned, furnished room: on the real table, walls, ceiling and furniture.
             Shot<SoundPool>("8r-sound-pool-room", HandPose.PalmsDown, 42f, closeUp: rig => rig.Right.Palm.position + Vector3.down * 0.04f,
                 handOffset: side => side == "R" ? new Vector3(-0.03f, -0.53f, 0.15f) : new Vector3(0f, -0.35f, 0.1f), scanned: true);
@@ -383,68 +371,6 @@ namespace MusicInYourHands.EditorTools
             }, scene);
         }
 
-        /// <summary>
-        /// Several worlds on together, from head height: <paramref name="types"/> are chosen in turn through a
-        /// WorldManager, as in the menu, so only one shows the sung words and one dresses the hands; then they play
-        /// through the song to just after the chorus beat as in <see cref="Shot"/>. Skipped while they can't be on
-        /// together (a world that doesn't say which spaces it uses yet is on its own).
-        /// </summary>
-        static void ComboShot(string name, System.Type[] types, HandPose pose, float pitch, float lead = 3f,
-            System.Func<string, Vector3> handOffset = null, float extra = 0f, bool scanned = false)
-        {
-            if (!Wanted(name)) return;
-            var probes = new GameObject("Probes");
-            var together = types.Select(t => (World)probes.AddComponent(t)).ToArray();
-            bool fit = together.All(a => together.All(b => a == b || a.CombinesWith(b)));
-            Object.DestroyImmediate(probes);
-            if (!fit)
-            {
-                Debug.Log($"[Shots] Skipped {name}: {string.Join(" and ", types.Select(t => t.Name))} can't be on together yet.");
-                return;
-            }
-            var camera = StageRoom(pitch, scanned);
-            var rig = new GameObject("HandRig").AddComponent<HandRig>();
-            var hands = PlaceHands(camera, pose, rig, handOffset);
-
-            var holder = new GameObject("Worlds");
-            var worlds = new World[types.Length];
-            for (int i = 0; i < types.Length; i++)
-            {
-                var go = new GameObject(types[i].Name);
-                go.transform.SetParent(holder.transform, false);
-                go.SetActive(false);
-                worlds[i] = (World)go.AddComponent(types[i]);
-                if (SceneSettings.TryGetValue(types[i], out var json)) EditorJsonUtility.FromJsonOverwrite(json, worlds[i]);
-                else ProjectSetup.AssignMaterials(worlds[i]);
-            }
-            var manager = holder.AddComponent<WorldManager>();
-            var mso = new SerializedObject(manager);
-            var list = mso.FindProperty("worlds");
-            list.arraySize = worlds.Length;
-            for (int i = 0; i < worlds.Length; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = worlds[i];
-            mso.ApplyModifiedPropertiesWithoutUndo();
-            manager.Switch(0);
-            for (int i = 1; i < worlds.Length; i++) manager.Choose(i);
-
-            var clock = new SongClock { Time = ChorusStart - lead };
-            const float dt = 1f / 30f;
-            while (clock.Time < ChorusStart + 0.09f + extra)
-            {
-                var music = clock.Advance(dt);
-                foreach (int i in manager.Active)
-                {
-                    worlds[i].Step(rig, music, camera, dt);
-                    worlds[i].SimulateParticles(dt);
-                }
-            }
-            foreach (var hand in hands)
-            {
-                hand.Root.GetComponent<HandSkin>().Apply();
-                SetBeat(hand.Skin, clock.BeatAge, clock.Kick);
-            }
-            File.WriteAllBytes($"{ShotFolder}/{name}.png", Render(camera, 1600, 900).EncodeToPNG());
-        }
-
         /// <summary>A few strokes of light in front of the viewer, as if drawn there, for the Light trails shot.</summary>
         static void DrawPreviewSculpture(LightTrails trails)
         {
@@ -474,8 +400,15 @@ namespace MusicInYourHands.EditorTools
             hands[0].Root.transform.position += new Vector3(-0.05f, -0.22f, 0f);
             PushHand(rig, hands[0]);
 
-            // Three worlds on together, wearing their rings: Living skin, Firefly choir and Ceiling stars.
-            var manager = MakePreviewManager(new GameObject("Worlds"));
+            var managerGo = new GameObject("Worlds");
+            var worlds = WorldCatalog.MakePreviews(managerGo.transform);
+            var manager = managerGo.AddComponent<WorldManager>();
+            var mso = new SerializedObject(manager);
+            var list = mso.FindProperty("worlds");
+            list.arraySize = worlds.Length;
+            for (int i = 0; i < worlds.Length; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = worlds[i];
+            mso.ApplyModifiedPropertiesWithoutUndo();
+            manager.Switch(0);
             HandSkin.Theme = HandTheme.Veins;
 
             var menu = new GameObject("WorldMenu").AddComponent<WorldMenu>();
@@ -489,23 +422,6 @@ namespace MusicInYourHands.EditorTools
             for (int i = 0; i < 24; i++) menu.Step(rig, manager, null, camera, 0.05f);
             foreach (var hand in hands) hand.Root.GetComponent<HandSkin>().Apply();
             File.WriteAllBytes($"{ShotFolder}/7-menu.png", Render(camera, 1600, 900).EncodeToPNG());
-
-            // The right fingertip comes up to Sound wind's bubble: the caption says it would take Firefly choir's place.
-            var menuRoot = menu.transform.Find("Menu");
-            int wind = -1;
-            for (int i = 0; i < manager.Worlds.Count; i++)
-                if (manager.Worlds[i] is SoundWind) wind = i;
-            var reaching = hands[1];
-            var rest = reaching.Root.transform.position;
-            var tip = reaching.Root.GetComponentsInChildren<Transform>().First(t => t.name == "XRHand_IndexTip");
-            reaching.Root.transform.position += menuRoot.Find($"Bubble {wind}").position - menuRoot.forward * 0.03f - tip.position;
-            PushHand(rig, reaching);
-            for (int i = 0; i < 12; i++) menu.Step(rig, manager, null, camera, 0.05f);
-            foreach (var hand in hands) hand.Root.GetComponent<HandSkin>().Apply();
-            File.WriteAllBytes($"{ShotFolder}/7h-menu-swap.png", Render(camera, 1600, 900).EncodeToPNG());
-            reaching.Root.transform.position = rest;
-            PushHand(rig, reaching);
-            for (int i = 0; i < 4; i++) menu.Step(rig, manager, null, camera, 0.05f);
 
             // The song library's pages, with made-up songs.
             SongAsset Song(string title, string artist, bool lyrics)

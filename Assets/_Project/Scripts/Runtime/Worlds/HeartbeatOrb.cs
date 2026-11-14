@@ -23,9 +23,6 @@ namespace MusicInYourHands
 
         public override string Hint => "Hold your palms facing each other, then turn them like a ball";
 
-        /// <summary>The orb is held between your hands.</summary>
-        public override Space Spaces => Space.Hands;
-
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.22f, 0.1f, 0.2f, 0.55f),
@@ -159,8 +156,7 @@ namespace MusicInYourHands
             float kick = music.Kick;
             var left = rig.Left;
             var right = rig.Right;
-            // While the menu is open the hands are choosing there: the orb lets go (and the volume stays put) until it closes.
-            bool holding = left.IsTracked && right.IsTracked && !MenuOpen;
+            bool holding = left.IsTracked && right.IsTracked;
             float spread = 0f;
             if (holding)
             {

@@ -24,9 +24,6 @@ namespace MusicInYourHands
 
         public override string Hint => "Touch a word to make it buzz";
 
-        /// <summary>The sign hangs in front of you, on a wall within reach once the room is scanned.</summary>
-        public override Space Spaces => Space.InFront | Space.Walls;
-
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.16f, 0.07f, 0.14f, 0.55f),
@@ -217,8 +214,7 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                // While the menu is open the fingers are choosing there.
-                if (!hand.IsTracked || MenuOpen) continue;
+                if (!hand.IsTracked) continue;
                 for (int k = 1; k < 3; k++)
                 {
                     var tip = hand.TipJoints[k] != null ? hand.TipJoints[k].position : hand.Tips[k];

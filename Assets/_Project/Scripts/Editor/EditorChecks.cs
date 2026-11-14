@@ -34,9 +34,6 @@ namespace MusicInYourHands.EditorTools
             bool ok = true;
             ok &= CheckWorldCatalog();
             ok &= CheckWorldHooks();
-            ok &= CheckWorldSpaces();
-            ok &= CheckCombining();
-            ok &= CheckWorldSets();
             ok &= CheckHandJoints();
             ok &= CheckDebugMaterial(out var material);
             ok &= CheckPreview(material);
@@ -348,10 +345,7 @@ namespace MusicInYourHands.EditorTools
 #endif
         }
 
-        /// <summary>
-        /// Renders the bubble menu open in front of the viewer, with three worlds on together wearing their rings:
-        /// Logs/preview-menu.png.
-        /// </summary>
+        /// <summary>Renders the bubble menu open in front of the viewer: Logs/preview-menu.png.</summary>
         static bool CheckMenuPreview()
         {
 #if META_XR_CORE
@@ -359,8 +353,16 @@ namespace MusicInYourHands.EditorTools
             var rig = new GameObject("HandRig").AddComponent<HandRig>();
             foreach (var hand in hands) PushHand(rig, hand);
 
+            var glow = ProjectSetup.EnsureMaterial(ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow");
             var managerGo = new GameObject("Worlds");
-            var manager = MakePreviewManager(managerGo);
+            var worlds = WorldCatalog.MakePreviews(managerGo.transform);
+            var manager = managerGo.AddComponent<WorldManager>();
+            var mso = new SerializedObject(manager);
+            var list = mso.FindProperty("worlds");
+            list.arraySize = worlds.Length;
+            for (int i = 0; i < worlds.Length; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = worlds[i];
+            mso.ApplyModifiedPropertiesWithoutUndo();
+            manager.Switch(0);
 
             var menu = new GameObject("WorldMenu").AddComponent<WorldMenu>();
             var wso = new SerializedObject(menu);
@@ -380,37 +382,13 @@ namespace MusicInYourHands.EditorTools
 #endif
         }
 
-        /// <summary>A world for the menu checks, off, with its materials: choosing it in the menu builds it.</summary>
         static T MakePreviewWorld<T>(Transform parent) where T : World
         {
             var go = new GameObject(typeof(T).Name);
             go.transform.SetParent(parent, false);
-            go.SetActive(false);
             var world = go.AddComponent<T>();
-            ProjectSetup.AssignMaterials(world);
+            go.SetActive(false);
             return world;
-        }
-
-        /// <summary>
-        /// A WorldManager with every world, for the menu previews, and three of them on together as a player might
-        /// choose them: Living skin on the hands and walls, Firefly choir around you and Ceiling stars overhead (so the
-        /// menu shows their rings).
-        /// </summary>
-        static WorldManager MakePreviewManager(GameObject holder)
-        {
-            var worlds = WorldCatalog.MakePreviews(holder.transform);
-            foreach (var world in worlds) ProjectSetup.AssignMaterials(world);
-            var manager = holder.AddComponent<WorldManager>();
-            var mso = new SerializedObject(manager);
-            var list = mso.FindProperty("worlds");
-            list.arraySize = worlds.Length;
-            for (int i = 0; i < worlds.Length; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = worlds[i];
-            mso.ApplyModifiedPropertiesWithoutUndo();
-            int Find<T>() where T : World => System.Array.FindIndex(worlds, w => w is T);
-            manager.Switch(Find<LivingSkin>());
-            manager.Choose(Find<FireflyChoir>());
-            manager.Choose(Find<CeilingStars>());
-            return manager;
         }
 
         static MusicFrame Music(float[] bands, float kick, bool beat) => new MusicFrame { Bands = bands, Kick = kick, Beat = beat };

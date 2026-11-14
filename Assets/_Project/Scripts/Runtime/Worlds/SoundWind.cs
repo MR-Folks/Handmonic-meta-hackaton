@@ -22,9 +22,6 @@ namespace MusicInYourHands
 
         public override string Hint => "Put your hand in the school and spread your fingers";
 
-        /// <summary>The school circles you, passing within reach.</summary>
-        public override Space Spaces => Space.AroundYou | Space.InFront;
-
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.12f, 0.1f, 0.24f, 0.5f),

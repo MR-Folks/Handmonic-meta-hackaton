@@ -1,7 +1,6 @@
 // A soap-bubble button for the world menu, drawn on a camera-facing quad: a clear glass body, an iridescent rim,
 // a glossy highlight and a small animated emblem of the world inside. _Icon picks the emblem (-1 for none, as the
-// Bubble notes world uses it for its plain bubbles). A world that is on wears a bright ring (_On), with a glint
-// slowly running round it.
+// Bubble notes world uses it for its plain bubbles).
 Shader "MusicInYourHands/Bubble"
 {
     Properties
@@ -9,8 +8,7 @@ Shader "MusicInYourHands/Bubble"
         _Color ("Color", Color) = (1, 0.37, 0.68, 1)
         _Icon ("Emblem (-1 none, 0-30)", Float) = 0
         _Hover ("Hover 0-1", Float) = 0
-        _Selected ("Brighter rim 0-1 (a toggle that is on)", Float) = 0
-        _On ("World is on 0-1", Float) = 0
+        _Selected ("Current world 0-1", Float) = 0
         _Alpha ("Alpha", Float) = 1
         _Eq ("Music bands for the now-playing emblem", Vector) = (0.5, 0.5, 0.5, 0.5)
         _Paused ("Paused 0-1", Float) = 0
@@ -39,7 +37,6 @@ Shader "MusicInYourHands/Bubble"
                 float _Icon;
                 float _Hover;
                 float _Selected;
-                float _On;
                 float _Alpha;
                 float4 _Eq;
                 float _Paused;
@@ -510,21 +507,8 @@ Shader "MusicInYourHands/Bubble"
                 color += lerp(_Color.rgb, 1, 0.35) * e * (1.1 + _Hover * 0.6);
                 alpha = max(alpha, e * 0.95);
 
-                // A toggle that is on (listen, lyrics) gets a brighter rim.
+                // The current world gets a brighter ring.
                 color += _Color.rgb * _Selected * smoothstep(0.86, 0.95, r) * 0.9;
-
-                // A world that is on wears a bright ring in its colour just inside the rim, drawn in as it turns on,
-                // with a soft glow either side and a glint slowly running round it.
-                float angle = atan2(p.y, p.x);
-                float drawn = step(frac(0.25 - angle / 6.2831), _On * 1.02) * step(0.001, _On);
-                float off = r - 0.87;
-                float band = exp(-off * off / (0.038 * 0.038)) * drawn;
-                float halo = exp(-off * off / (0.1 * 0.1)) * _On;
-                float glint = pow(saturate(cos(angle - t * 0.9) * 0.5 + 0.5), 16);
-                float3 ringColor = lerp(_Color.rgb, 1, 0.2 + glint * 0.6);
-                color = lerp(color, ringColor * (1.2 + glint * 0.5), saturate(band * 0.95));
-                color += _Color.rgb * halo * 0.3;
-                alpha = max(alpha, saturate(band * 0.95 + halo * 0.2));
 
                 alpha *= _Alpha * smoothstep(1.0, 0.96, r);
                 return half4(color, saturate(alpha));

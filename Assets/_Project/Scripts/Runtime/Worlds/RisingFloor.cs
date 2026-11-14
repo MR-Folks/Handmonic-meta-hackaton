@@ -23,9 +23,6 @@ namespace MusicInYourHands
 
         public override string Hint => "Sweep your hand across the words";
 
-        /// <summary>The words rise out of the floor.</summary>
-        public override Space Spaces => Space.Ground;
-
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.06f, 0.12f, 0.2f, 0.5f),
@@ -211,8 +208,7 @@ namespace MusicInYourHands
                     for (int side = 0; side < 2; side++)
                     {
                         var hand = rig.Get(side == 0);
-                        // A hand sweeping at the open menu isn't sweeping the words.
-                        if (!hand.IsTracked || MenuOpen) continue;
+                        if (!hand.IsTracked) continue;
                         var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
                         var flatVelocity = Vector3.ProjectOnPlane(hand.Velocity, Vector3.up);
                         float speed = flatVelocity.magnitude;

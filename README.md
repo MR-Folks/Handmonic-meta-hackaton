@@ -45,7 +45,6 @@ If settings drift, run **Music In Your Hands > Configure Project for Quest**. It
 - Below them, the current lyric line shows with the sung word in pink.
 - Spheres follow your fingertips: they turn pink when you pinch, and the palm sphere turns yellow when your palm faces up.
 - Meta's menu gesture (left palm up, pinch) opens the world menu 44 cm in front of you, within reach (Meta suggests 42 to 46 cm for UI you touch). Touch a bubble or a button on the song page with your index fingertip, or point at it from farther away and pinch. Within 15 cm of the menu the pointer ray gives way to a dot under your fingertip that shrinks as you close in; a press lands when the fingertip reaches the menu, and the next one needs the finger 2 cm back out. Past 20 cm the ray returns.
-- Worlds that use different parts of the room and your body can be on together, up to three: choosing a world adds it, or swaps it in for the worlds it clashes with, and choosing one that is on turns it off. A ring marks each world that is on, and the caption says what a choice will do. The menu stays open while you put worlds together, until you make the menu gesture again (a choice that leaves a single world on closes it too); meanwhile the worlds leave your hands alone (see "Spaces and combining" below).
 
 ## Listen mode
 Poke the coral microphone bubble below the world menu to follow music playing in the room: Spotify on a phone, a speaker, a live instrument. The headset microphone replaces the song, so the bands, beats and every world follow whatever you hear. There are no lyrics or melody notes while listening: Note rain falls from the bands instead, and Air strings play freely without guide beads. Poke it again ("Play song") to go back to the song. The centre bubble pauses listening.
@@ -91,56 +90,21 @@ Each world is one class in `Assets/_Project/Scripts/Runtime/Worlds` that extends
 | Hook | When it runs |
 | --- | --- |
 | `OnBuild()` | Once, to create the world's objects. |
-| `OnEnter()` / `OnExit()` | When the world is turned on or off. Undo in `OnExit` anything it changed outside itself. |
+| `OnEnter()` / `OnExit()` | When the world is switched to, or away. Undo in `OnExit` anything it changed outside itself. |
 | `OnPlace(view)` | When the world starts, and again after you sit, stand, walk away or recenter, or the room scan changes. |
 | `OnBeat(music)` | On each beat. `Beats` counts them since the world started. |
 | `OnNote(note)` | When a note of the song's melody starts. |
-| `OnWord(word, newLine)` | When a sung word starts, for the one world on that shows the words. Lyric worlds also get the title's words when a song has no lyrics. |
+| `OnWord(word, newLine)` | When a sung word starts. Lyric worlds also get the title's words when a song has no lyrics. |
 | `OnPinch(hand, left)` / `OnRelease(hand, left)` | When a hand closes or opens a pinch. |
 | `OnStep(rig, music, view, dt)` | Every frame, after the hooks above. |
 
 A world can also read `FadeIn` (0 to 1 as it starts), `Sung` (the current word and where it is in its line), and `View`, `Rig` and `Music` (this frame's camera, hands and music). Setting `SungWordCount` gives it `SungWords`, a ready-made layer of sung words it only has to place.
 
-### Spaces and combining
-Several worlds can be on at once, as long as they don't get in each other's way: flowers on the floor go well with planets circling you, but not with words rising out of the same floor. So each world says which parts of the room and of your body it uses, with `Spaces`:
-
-| Space | What it covers |
-| --- | --- |
-| `Ground` | The floor and the tops of furniture: things that stand, grow, land or lie there. |
-| `Walls` | The walls. |
-| `Ceiling` | The ceiling, or a sky drawn over it. |
-| `AroundYou` | The room's air all around you, out of reach, and things that circle you. |
-| `InFront` | Within arm's reach in front of you: things that stand there for you to touch. |
-| `Hands` | On and between your hands: what they carry or hold, and how they look beyond their colours. |
-| `Pinch` | What a pinch does (drawing, spraying, pouring, holding). |
-| `Fists` | What clenching your fists does (clearing, switching, pulling). |
-| `RoomLight` | The light of the whole room: dimming it, or washing light over all its surfaces. |
-
-```csharp
-public override Space Spaces => Space.Ground | Space.Hands;
-```
-
-Claim a space when the world's things are there or its gesture means something there; a faint spill of light (a glow on the floor under something) doesn't count. Reacting to where the hands are (leaning flowers, splitting a school of fish, fireflies drawing in round a fist) doesn't need `Hands` or `Fists`; carrying, holding or wearing something, or a gesture that commands something, does. A world that doesn't set `Spaces` is on its own: it combines with nothing, so choosing it turns every other world off.
-
-Inside a world, `Space` means `World.Space`. For Unity's own (as in `transform.Rotate(axis, angle, Space.World)`), write `UnityEngine.Space.World`.
-
-Two worlds can be on together when they share no space and are not both lyric worlds. In the menu, choosing a world adds it beside the ones that are on, or swaps it in for those it shares a space with; choosing one that is on turns it off, though one always stays on. At most three are on at once (**Max Worlds** on `WorldManager`), and past that the one chosen longest ago gives way. In the menu a ring marks each world that is on, and the caption says what a choice will do ("Add Flower dance", "Swap Cube field for Flower dance", "Turn off Solar system"). The menu stays open while you put worlds together; the menu gesture closes it, as the line under the menu says, and so does a choice that leaves a single world on.
-
-`World` shares what several worlds would fight over, so a world needs nothing extra to combine:
-- **Hooks.** Every hook reaches every world that is on, except `OnWord`.
-- **Sung words.** Only one world shows them and gets `OnWord`: the lyric world if one is on, else the one chosen last that shows words (`SungWordCount`), else the one chosen last. When it turns off, the next one picks up at the word being sung.
-- **Hands.** Only one world dresses the hands: the one that uses `Hands`; else one that uses `Pinch`, `Fists` or `InFront`, whose feedback on the hands belongs to what they are doing; else the one chosen last. It sets their `Theme` and may set `HandSkin`'s focus point and charge and nudge the visible hands (`Effects.OffsetHand`); whatever the other worlds' hooks do to these is undone right after them.
-- **The menu.** While it is open the hands are choosing there, so the worlds leave them alone. `OnPinch` and `OnRelease` stop (a pinch held as the menu opens gets its `OnRelease`), and a world that reads the hands itself (`hand.Pinch`, a fingertip touching something, a fist) checks `MenuOpen` and leaves them be.
-- **Menu caption.** With nothing under a finger it names the worlds that are on, in the colour of the one chosen last.
-
-Undo in `OnExit` anything else the world changes outside itself (Heartbeat orb puts the volume back, Sound pool takes its filter off the song), and keep per-frame work light: three worlds share the frame. **Run Editor Checks** runs every pair and every set of three worlds that can be on together for a moment, and lists the worlds that are still on their own.
-
-### Steps
 To add one:
 1. In the Project window, right-click `Assets/_Project/Scripts/Runtime/Worlds`, choose **Create > Music In Your Hands > World** and name it, say `PulseRings`. The new class already works: a ring of sparks on each beat and each pinch, with the sung words above it.
-2. Set its `DisplayName`, `Color`, `MenuOrder` (its place in the menu; the built-in worlds use 0 to 180 in steps of 10), `MenuIcon`, `Hint`, `Spaces`, and `IsLyric` if it is built around the lyrics.
+2. Set its `DisplayName`, `Color`, `MenuOrder` (its place in the menu; the built-in worlds use 0 to 180 in steps of 10), `MenuIcon`, `Hint`, and `IsLyric` if it is built around the lyrics.
 3. Give it `Material` fields named after materials in `Assets/_Project/Materials` (`ringMaterial` gets `Ring.mat`), or name one with `[WorldMaterial("OrbDots")]`. `glowMaterial` and `letteringMaterial` come with `World`.
-4. Run **Music In Your Hands > Update Worlds in Main Scene** (Configure Project for Quest does it too, with the rest of the setup). It finds every World class, adds the new one to the scene in menu order, fills its materials and saves the scene. Then **Run Editor Checks**: it confirms every world is in the scene with its materials, that the hooks fire as described, and that the world runs beside every world it can be on with.
+4. Run **Music In Your Hands > Update Worlds in Main Scene** (Configure Project for Quest does it too, with the rest of the setup). It finds every World class, adds the new one to the scene in menu order, fills its materials and saves the scene. Then **Run Editor Checks**: it confirms every world is in the scene with its materials, and that the hooks fire as described.
 
 Nothing else keeps a list of worlds: the menu, the hints, the demo tour and the menu previews pick a new world up by themselves.
 

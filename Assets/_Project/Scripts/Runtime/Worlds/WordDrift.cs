@@ -24,9 +24,6 @@ namespace MusicInYourHands
 
         public override string Hint => "Touch a word to hold it";
 
-        /// <summary>The words drift through the room towards you, and wait in front of you when touched.</summary>
-        public override Space Spaces => Space.AroundYou | Space.InFront;
-
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.1f, 0.12f, 0.2f, 0.5f),
@@ -301,8 +298,7 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                // While the menu is open the fingers are choosing there.
-                if (!hand.IsTracked || MenuOpen) continue;
+                if (!hand.IsTracked) continue;
                 for (int k = 0; k < 5; k++)
                 {
                     var tip = hand.TipJoints[k] != null ? hand.TipJoints[k].position : hand.Tips[k];

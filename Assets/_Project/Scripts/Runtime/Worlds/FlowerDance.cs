@@ -29,9 +29,6 @@ namespace MusicInYourHands
 
         public override string Hint => "Hold your palm over a flower and it reaches up to you";
 
-        /// <summary>The garden grows on the floor and the tops of furniture.</summary>
-        public override Space Spaces => Space.Ground;
-
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.12f, 0.2f, 0.1f, 0.5f),
@@ -480,8 +477,7 @@ namespace MusicInYourHands
                 for (int s = 0; s < 2; s++)
                 {
                     var hand = rig.Get(s == 0);
-                    // While the menu is open the hands are choosing there.
-                    if (!hand.IsTracked || hand.InSystemGesture || MenuOpen) continue;
+                    if (!hand.IsTracked || hand.InSystemGesture) continue;
                     var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
                     var local = ToLocal(palm - f.Root, f.Yaw);
                     // The lean that would bring its tip under the palm.

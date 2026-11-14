@@ -25,9 +25,6 @@ namespace MusicInYourHands
 
         public override string Hint => "Look up, then point at a star";
 
-        /// <summary>The night sky opens on the ceiling.</summary>
-        public override Space Spaces => Space.Ceiling;
-
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.1f, 0.08f, 0.2f, 0.5f),
@@ -262,8 +259,7 @@ namespace MusicInYourHands
                 for (int s = 0; s < 2; s++)
                 {
                     var hand = rig.Get(s == 0);
-                    // A finger pointing at the open menu isn't pointing at the sky.
-                    if (!hand.IsTracked || hand.InSystemGesture || MenuOpen) continue;
+                    if (!hand.IsTracked || hand.InSystemGesture) continue;
                     var tip = hand.TipJoints[1] != null ? hand.TipJoints[1].position : hand.Tips[1];
                     var shoulder = view.transform.position + Vector3.down * 0.17f + side * (s == 0 ? -0.17f : 0.17f);
                     var dir = (tip - shoulder).normalized;

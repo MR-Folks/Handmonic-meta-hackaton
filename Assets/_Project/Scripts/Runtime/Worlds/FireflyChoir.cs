@@ -23,13 +23,6 @@ namespace MusicInYourHands
 
         public override string Hint => "Hold out a hand and the fireflies gather around it";
 
-        /// <summary>
-        /// The swarm fills the air all around you. It gathers round an open hand and draws in round a closed one, but
-        /// only as a gentle answer that never commands anything, so it claims neither the hands nor the fists: beside
-        /// Light trails or Earth and water, clenching both fists does their thing and the swarm just draws in for a moment.
-        /// </summary>
-        public override Space Spaces => Space.AroundYou;
-
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.3f, 0.24f, 0.17f, 0.42f),
@@ -201,10 +194,8 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                // While the menu is open the swarm keeps out of the way of the hands choosing there.
-                bool calls = hand.IsTracked && !MenuOpen;
-                open[side] = calls && hand.Fist < 0.45f;
-                fist[side] = calls && hand.Fist >= 0.45f;
+                open[side] = hand.IsTracked && hand.Fist < 0.45f;
+                fist[side] = hand.IsTracked && hand.Fist >= 0.45f;
                 landedOn[side] = 0f;
             }
             int calling = (open[0] || fist[0] ? 1 : 0) + (open[1] || fist[1] ? 1 : 0);

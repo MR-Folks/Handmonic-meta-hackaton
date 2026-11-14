@@ -9,14 +9,8 @@ namespace MusicInYourHands
     /// </summary>
     public sealed class LyricCursor
     {
-        // The word shown last, by number so following it makes no garbage each frame: a lyric word (line, word), a
-        // step through the title (TitleKey, step), or none.
-        const int NoKey = int.MinValue, TitleKey = int.MinValue + 1;
-        int keyLine = NoKey, keyWord;
+        string key = "";
         int lastLine = int.MinValue, fallbackStep = -1;
-        // The title split into words, kept until the title changes.
-        string splitTitle;
-        string[] titleWords = System.Array.Empty<string>();
 
         public string Word { get; private set; } = "";
         /// <summary>The line the word belongs to (lyrics) or a counter that changes when the title starts over.</summary>
@@ -30,7 +24,7 @@ namespace MusicInYourHands
 
         public void Reset()
         {
-            keyLine = NoKey;
+            key = "";
             lastLine = int.MinValue;
             fallbackStep = -1;
             Word = "";
@@ -41,12 +35,11 @@ namespace MusicInYourHands
         {
             newLine = false;
             string word = music.Word;
-            int nextLine, nextWord;
+            string next;
             int line, index;
             if (!string.IsNullOrEmpty(word))
             {
-                nextLine = music.Lyric.Line;
-                nextWord = music.Lyric.Word;
+                next = $"{music.Lyric.Line}:{music.Lyric.Word}";
                 line = music.Lyric.Line;
                 index = music.Lyric.Word;
                 LineWords = music.LineWords;
@@ -60,39 +53,26 @@ namespace MusicInYourHands
             {
                 // Between lines of a song with lyrics, wait; without lyrics, step through the title on the beat.
                 if (LyricsOption.On && (music.LineWords != null || (music.Lyrics != null && music.Lyrics.Lines.Count > 0))) return false;
+                var title = music.Bus != null ? music.Bus.Title : "Music";
+                var parts = title.Split(' ');
                 int step = music.Bus != null ? music.Bus.BeatCount / 4 : Mathf.FloorToInt(music.SongTime / 2f);
                 if (step == fallbackStep) return false;
                 fallbackStep = step;
-                var parts = TitleWords(music.Bus != null ? music.Bus.Title : "Music");
                 index = step % parts.Length;
                 line = step / parts.Length;
                 word = parts[index];
-                nextLine = TitleKey;
-                nextWord = step;
+                next = "title:" + step;
                 LineWords = null;
                 LineTexts = parts;
             }
-            if (nextLine == keyLine && nextWord == keyWord) return false;
-            keyLine = nextLine;
-            keyWord = nextWord;
+            if (next == key) return false;
+            key = next;
             newLine = line != lastLine;
             lastLine = line;
             Word = word;
             Line = line;
             Index = index;
             return true;
-        }
-
-        /// <summary>The title's words, split again only when the title changes.</summary>
-        string[] TitleWords(string title)
-        {
-            title ??= "";
-            if (title != splitTitle)
-            {
-                splitTitle = title;
-                titleWords = title.Split(' ');
-            }
-            return titleWords;
         }
     }
 }
