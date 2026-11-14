@@ -45,6 +45,8 @@ If settings drift, run **Music In Your Hands > Configure Project for Quest**. It
 - Below them, the current lyric line shows with the sung word in pink.
 - Spheres follow your fingertips: they turn pink when you pinch, and the palm sphere turns yellow when your palm faces up.
 - Meta's menu gesture (left palm up, pinch) opens the world menu 44 cm in front of you, within reach (Meta suggests 42 to 46 cm for UI you touch). Touch a bubble or a button on the song page with your index fingertip, or point at it from farther away and pinch. Within 15 cm of the menu the pointer ray gives way to a dot under your fingertip that shrinks as you close in; a press lands when the fingertip reaches the menu, and the next one needs the finger 2 cm back out. Past 20 cm the ray returns.
+- With either hand, a thumb tap on the side of your index finger plays or pauses the song, and a thumb swipe left or right steps to the previous or next one (Meta's microgestures, read by `MicrogestureFeed` and acted on by `MusicGestures`). A short caption and a soft note confirm each one. They are ignored while that hand pinches or makes a fist, during Meta's menu gesture, and while the menu is open; in Listen mode they only say "Listening to the room".
+- While the world menu is open, the world behind it leaves your hands alone: pinching or poking a bubble doesn't also draw, spray, pour or pluck.
 
 ## Listen mode
 Poke the coral microphone bubble below the world menu to follow music playing in the room: Spotify on a phone, a speaker, a live instrument. The headset microphone replaces the song, so the bands, beats and every world follow whatever you hear. There are no lyrics or melody notes while listening: Note rain falls from the bands instead, and Air strings play freely without guide beads. Poke it again ("Play song") to go back to the song. The centre bubble pauses listening.
@@ -99,6 +101,8 @@ Each world is one class in `Assets/_Project/Scripts/Runtime/Worlds` that extends
 | `OnStep(rig, music, view, dt)` | Every frame, after the hooks above. |
 
 A world can also read `FadeIn` (0 to 1 as it starts), `Sung` (the current word and where it is in its line), and `View`, `Rig` and `Music` (this frame's camera, hands and music). Setting `SungWordCount` gives it `SungWords`, a ready-made layer of sung words it only has to place.
+
+While the world menu is open the hands are choosing there, and `MenuOpen` is true: no `OnPinch` starts, a pinch held as it opens gets its `OnRelease`, and one held as it closes counts only after the hand opens and pinches again. A world that reads the hands itself (`hand.Pinch`, `Fist`, a fingertip or palm on something) skips its actions while `MenuOpen`, and checks `PinchFree(left)` beside its own pinch strength. Following the hands just to look nice (lights on the fingertips, a swarm drifting to a palm) may go on.
 
 To add one:
 1. In the Project window, right-click `Assets/_Project/Scripts/Runtime/Worlds`, choose **Create > Music In Your Hands > World** and name it, say `PulseRings`. The new class already works: a ring of sparks on each beat and each pinch, with the sung words above it.
