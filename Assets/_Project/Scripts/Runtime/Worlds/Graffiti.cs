@@ -171,12 +171,15 @@ namespace MusicInYourHands
 
         protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
         {
-            // Aim with the pinching hand, else the right, else the left, else the head.
+            // Aim with the pinching hand, else the right, else the left, else the head. A pinch here is World's (IsPinching):
+            // it starts at 0.8 and holds until it drops below 0.6, so a stroke doesn't break up near the threshold, and
+            // none counts in Meta's menu gesture or at the open menu.
             HandRig.Hand aimHand = null;
+            bool rightPinch = IsPinching(false), leftPinch = IsPinching(true);
             if (rig != null)
             {
-                if (rig.Right.IsTracked && rig.Right.Pinch > 0.8f) aimHand = rig.Right;
-                else if (rig.Left.IsTracked && rig.Left.Pinch > 0.8f) aimHand = rig.Left;
+                if (rightPinch) aimHand = rig.Right;
+                else if (leftPinch) aimHand = rig.Left;
                 else if (rig.Right.IsTracked) aimHand = rig.Right;
                 else if (rig.Left.IsTracked) aimHand = rig.Left;
             }
@@ -212,8 +215,7 @@ namespace MusicInYourHands
                 if (!string.IsNullOrEmpty(word)) SprayTag(word, line, hit, normal, onWall, view);
             }
 
-            // A pinch at the open menu chooses there; it doesn't spray.
-            bool pinching = aimHand != null && aimHand.Pinch > 0.8f && PinchFree(aimHand == rig.Left);
+            bool pinching = aimHand != null && (aimHand == rig.Right ? rightPinch : leftPinch);
             if (pinching) Acted("spray");
             HandSkin.FocusStrength = pinching ? 1f : 0.35f;
             Spray(pinching, nozzle, hit, normal, dt);
