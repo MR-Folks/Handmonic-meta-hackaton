@@ -21,6 +21,12 @@ namespace MusicInYourHands
 
         public override string Hint => "Make a fist for thunder; pinch and point to zap";
 
+        /// <summary>
+        /// The storm dims the room, strikes from the ceiling to the floor, and charges your hands: a fist calls the
+        /// strike and a pinch zaps.
+        /// </summary>
+        public override Space Spaces => Space.RoomLight | Space.Ceiling | Space.Ground | Space.Hands | Space.Fists | Space.Pinch;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.06f, 0.08f, 0.16f, 0.55f),
@@ -196,8 +202,8 @@ namespace MusicInYourHands
             bool fist = tracked && hand.Fist > 0.8f;
             bool open = tracked && hand.Fist < 0.4f && hand.Pinch < 0.6f;
 
-            // Closing a fist calls the big strike.
-            if (fist && !wasFist[side] && cooldown <= 0f) { Strike(hand, music, view); cooldown = 0.45f; }
+            // Closing a fist calls the big strike, but not while the hands are choosing in the menu.
+            if (fist && !wasFist[side] && cooldown <= 0f && !MenuOpen) { Strike(hand, music, view); cooldown = 0.45f; }
             wasFist[side] = fist || (wasFist[side] && tracked && hand.Fist > 0.5f);
 
             // Crackling fingertips: more sparks the louder the music.

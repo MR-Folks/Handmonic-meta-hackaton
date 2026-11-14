@@ -43,13 +43,35 @@ namespace MusicInYourHands
         static readonly int GlowId = Shader.PropertyToID("_Glow");
         static readonly int RimId = Shader.PropertyToID("_Rim");
 
+        /// <summary>
+        /// The layer's words, to go through with foreach or by index. foreach gets List's own enumerator, so going
+        /// through them every frame makes no garbage; LINQ works on it too, as on any IReadOnlyList.
+        /// </summary>
+        public sealed class WordList : IReadOnlyList<Word>
+        {
+            readonly List<Word> words;
+
+            internal WordList(List<Word> words) => this.words = words;
+
+            public int Count => words.Count;
+
+            public Word this[int index] => words[index];
+
+            public List<Word>.Enumerator GetEnumerator() => words.GetEnumerator();
+
+            IEnumerator<Word> IEnumerable<Word>.GetEnumerator() => words.GetEnumerator();
+
+            System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => words.GetEnumerator();
+        }
+
         readonly List<Word> words = new List<Word>();
+        readonly WordList list;
         readonly LyricCursor cursor;
         readonly Material material;
         readonly MaterialPropertyBlock block = new MaterialPropertyBlock();
         readonly float letterHeight;
 
-        public IReadOnlyList<Word> Words => words;
+        public WordList Words => list;
 
         /// <summary>Draw order of the words; raise it to draw them over bright, see-through things (the orb).</summary>
         public int RenderQueue
@@ -69,6 +91,7 @@ namespace MusicInYourHands
 
         public WordLayer(string name, Transform parent, Material lettering, int count, float letterHeight, LyricCursor cursor)
         {
+            list = new WordList(words);
             this.letterHeight = letterHeight;
             this.cursor = cursor;
             material = new Material(lettering) { name = $"{name} Lettering", mainTexture = TypeFace.Bold.Atlas };

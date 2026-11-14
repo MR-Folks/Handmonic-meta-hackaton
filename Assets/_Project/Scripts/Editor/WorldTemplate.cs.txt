@@ -21,6 +21,10 @@ namespace MusicInYourHands
 
         public override string Hint => "Pinch to send a ring";
 
+        // The parts of the room and body it uses (World.Space), so the menu can put it on beside worlds that use other
+        // ones: its rings are in front of you and a pinch sends one. Leave this out and the world is always on its own.
+        public override Space Spaces => Space.InFront | Space.Pinch;
+
         // Material fields are filled from Materials/ by name: ringMaterial gets Ring.mat, lineMaterial Line.mat, and
         // so on (or [WorldMaterial("Name")] on the field). glowMaterial and letteringMaterial come with World.
         [SerializeField] Material ringMaterial;

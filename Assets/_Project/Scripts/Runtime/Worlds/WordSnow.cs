@@ -23,6 +23,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Hold out your hand palm up; make a fist to drop";
 
+        /// <summary>The words fall all around you and settle on the floor and furniture.</summary>
+        public override Space Spaces => Space.AroundYou | Space.Ground;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.12f, 0.14f, 0.2f, 0.5f),
@@ -219,7 +222,8 @@ namespace MusicInYourHands
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
-                if (!hand.IsTracked || hand.Fist > 0.5f || hand.PalmNormal.y < 0.5f) continue;
+                // While the menu is open the words fall past the hands choosing there.
+                if (!hand.IsTracked || hand.Fist > 0.5f || hand.PalmNormal.y < 0.5f || MenuOpen) continue;
                 var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
                 var flat = Vector3.ProjectOnPlane(f.Position - palm, Vector3.up);
                 float above = f.Position.y - palm.y;

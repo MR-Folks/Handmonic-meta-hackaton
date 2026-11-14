@@ -22,6 +22,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Pinch with both hands and pull them apart";
 
+        /// <summary>The silk stretches between your hands while they pinch.</summary>
+        public override Space Spaces => Space.Hands | Space.Pinch;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.08f, 0.12f, 0.22f, 0.55f),
@@ -223,7 +226,8 @@ namespace MusicInYourHands
             var right = rig.Right;
             bool tracked = left.IsTracked && right.IsTracked;
             float need = held ? releasePinch : grabPinch;
-            held = tracked && left.Pinch > need && right.Pinch > need && !left.InSystemGesture && !right.InSystemGesture;
+            // A pinch at the open menu chooses there; the ribbon lets go until it closes.
+            held = tracked && left.Pinch > need && right.Pinch > need && !left.InSystemGesture && !right.InSystemGesture && !MenuOpen;
             hold = Mathf.MoveTowards(hold, held ? 1f : 0f, dt * (held ? 6f : 2.5f));
 
             // The silk's inside moves on every few beats (OnBeat), taking two seconds over each change.

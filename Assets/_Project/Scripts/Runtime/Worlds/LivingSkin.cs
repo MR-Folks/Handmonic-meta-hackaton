@@ -23,6 +23,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Hold up your hands and spread your fingers";
 
+        /// <summary>Lights on your fingertips, and waves from your palms that spread over the walls, floor and ceiling.</summary>
+        public override Space Spaces => Space.Hands | Space.Walls | Space.RoomLight;
+
         [Header("Materials")]
         [SerializeField] Material shellMaterial;
         [SerializeField] Material lineMaterial;

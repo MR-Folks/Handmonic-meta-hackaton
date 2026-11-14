@@ -36,6 +36,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Move earth and water with your hands; clench both fists to switch";
 
+        /// <summary>Rocks rise from the floor and furniture, water winds round your hands, and both fists switch between them.</summary>
+        public override Space Spaces => Space.Ground | Space.Hands | Space.Fists;
+
         public override HandTheme Theme => Themes[current];
 
         static readonly string[] Names = { "Water", "Earth" };

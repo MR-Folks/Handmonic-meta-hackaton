@@ -26,6 +26,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Point at a wall and pinch to spray";
 
+        /// <summary>The words are sprayed onto the walls, and a pinch sprays paint.</summary>
+        public override Space Spaces => Space.Walls | Space.Pinch;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.1f, 0.09f, 0.12f, 0.55f),
@@ -212,7 +215,8 @@ namespace MusicInYourHands
                 if (!string.IsNullOrEmpty(word)) SprayTag(word, line, hit, normal, onWall, view);
             }
 
-            bool pinching = aimHand != null && aimHand.Pinch > 0.8f;
+            // A pinch at the open menu chooses there; it doesn't spray.
+            bool pinching = aimHand != null && aimHand.Pinch > 0.8f && !MenuOpen;
             HandSkin.FocusStrength = pinching ? 1f : 0.35f;
             Spray(pinching, nozzle, hit, normal, dt);
             DrawReticle(aimHand != null, hit, normal, pinching, music);

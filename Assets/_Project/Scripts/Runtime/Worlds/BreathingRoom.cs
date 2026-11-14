@@ -22,6 +22,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Push your palm towards a wall";
 
+        /// <summary>The grid traces the walls and the floor.</summary>
+        public override Space Spaces => Space.Walls | Space.Ground;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.14f, 0.1f, 0.26f, 0.5f),
@@ -200,7 +203,8 @@ namespace MusicInYourHands
             {
                 cooldown[side] -= dt;
                 var hand = rig.Get(side == 0);
-                if (!hand.IsTracked || cooldown[side] > 0f || hand.PalmNormal.sqrMagnitude < 0.5f) continue;
+                // A palm pressing at the open menu isn't pushing a wall.
+                if (!hand.IsTracked || MenuOpen || cooldown[side] > 0f || hand.PalmNormal.sqrMagnitude < 0.5f) continue;
                 var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
                 var normal = hand.PalmNormal;
                 if (Mathf.Abs(normal.y) > 0.7f) continue;

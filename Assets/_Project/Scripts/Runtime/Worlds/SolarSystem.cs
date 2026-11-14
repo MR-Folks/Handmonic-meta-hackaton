@@ -41,6 +41,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Pinch a planet to move it; hold a palm out to the sun";
 
+        /// <summary>The planets go round you, the inner ones within reach, and a pinch carries one to a new orbit.</summary>
+        public override Space Spaces => Space.AroundYou | Space.InFront | Space.Pinch;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.1f, 0.08f, 0.16f, 0.5f),
@@ -905,7 +908,8 @@ namespace MusicInYourHands
             {
                 var hand = rig.Get(s == 0);
                 var grip = grips[s];
-                grip.Tracked = hand.IsTracked && !hand.InSystemGesture;
+                // While the menu is open the hands are choosing there: no planet lights up for them, and no palm warms the sun.
+                grip.Tracked = hand.IsTracked && !hand.InSystemGesture && !MenuOpen;
                 if (hand.IsTracked) grip.Point = PinchPoint(hand);
                 grip.Pinch = grip.Tracked ? hand.Pinch : 0f;
                 grip.Near = grip.Tracked && grip.Held < 0 && !IsPinching(s == 0) ? Nearest(grip.Point) : -1;

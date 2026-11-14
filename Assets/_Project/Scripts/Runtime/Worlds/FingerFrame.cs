@@ -23,6 +23,9 @@ namespace MusicInYourHands
 
         public override string Hint => "Frame with both hands; pinch for another world";
 
+        /// <summary>The window opens between your hands, within reach, and a pinch changes the world inside it.</summary>
+        public override Space Spaces => Space.Hands | Space.InFront | Space.Pinch;
+
         public override HandTheme Theme => new HandTheme
         {
             Fill = new Color(0.12f, 0.1f, 0.16f, 0.5f),
@@ -232,7 +235,8 @@ namespace MusicInYourHands
         /// </summary>
         bool Frame(HandRig rig, Camera view)
         {
-            if (rig == null) return false;
+            // While the menu is open the hands are choosing there.
+            if (rig == null || MenuOpen) return false;
             var left = rig.Left;
             var right = rig.Right;
             if (!left.IsTracked || !right.IsTracked || left.InSystemGesture || right.InSystemGesture) return false;

@@ -4,10 +4,10 @@ using UnityEngine;
 namespace MusicInYourHands
 {
     /// <summary>
-    /// Measures the frame rate of each world on the headset and logs it with a "[Perf]" prefix: every few seconds
-    /// while a world runs, and a summary when you leave it. Run the demo tour (see DemoTour) and read
-    /// "adb logcat -s Unity | grep Perf" to get every world's numbers in one go. The first second and a half after a
-    /// switch is skipped, while the world builds and settles.
+    /// Measures the frame rate of each world on the headset, and of each set of worlds that are on together, and logs
+    /// it with a "[Perf]" prefix: every few seconds while they run, and a summary when they change. Run the demo tour
+    /// (see DemoTour) and read "adb logcat -s Unity | grep Perf" to get every world's numbers in one go. The first
+    /// second and a half after a change is skipped, while the worlds build and settle.
     /// </summary>
     public class FrameMeter : MonoBehaviour
     {
@@ -15,7 +15,8 @@ namespace MusicInYourHands
         [SerializeField] float settle = 1.5f;
 
         readonly List<float> frames = new List<float>(2048);
-        int world = -1;
+        int version = -1;
+        string label = "none";
         float since, next;
 
         void Start()
@@ -26,11 +27,12 @@ namespace MusicInYourHands
         void Update()
         {
             var manager = WorldManager.Instance;
-            int current = manager != null ? manager.Current : -1;
-            if (current != world)
+            int now = manager != null ? manager.Version : -1;
+            if (now != version)
             {
                 Report("left", true);
-                world = current;
+                version = now;
+                label = Names(manager);
                 since = 0f;
                 next = settle + interval;
             }
@@ -44,13 +46,24 @@ namespace MusicInYourHands
             }
         }
 
-        /// <summary>Average and 1%-low frame rate, and the slowest frame, since the world started.</summary>
+        /// <summary>The worlds that are on, as "Flower dance + Solar system".</summary>
+        static string Names(WorldManager manager)
+        {
+            if (manager == null || manager.Active.Count == 0) return "none";
+            var names = new System.Text.StringBuilder();
+            foreach (int index in manager.Active)
+            {
+                if (names.Length > 0) names.Append(" + ");
+                names.Append(manager.Worlds[index].DisplayName);
+            }
+            return names.ToString();
+        }
+
+        /// <summary>Average and 1%-low frame rate, and the slowest frame, since the worlds that are on changed.</summary>
         void Report(string when, bool reset)
         {
             if (frames.Count > 10)
             {
-                var manager = WorldManager.Instance;
-                string name = manager != null && world >= 0 && world < manager.Worlds.Count ? manager.Worlds[world].DisplayName : "none";
                 float total = 0f, worst = 0f;
                 foreach (float f in frames)
                 {
@@ -60,7 +73,7 @@ namespace MusicInYourHands
                 var sorted = new List<float>(frames);
                 sorted.Sort();
                 float low = sorted[Mathf.Min(sorted.Count - 1, (int)(sorted.Count * 0.99f))];
-                Debug.Log($"[Perf] {when} {name}: avg {frames.Count / total:F1} fps, 1% low {1f / low:F1} fps, worst {worst * 1000f:F0} ms, {frames.Count} frames");
+                Debug.Log($"[Perf] {when} {label}: avg {frames.Count / total:F1} fps, 1% low {1f / low:F1} fps, worst {worst * 1000f:F0} ms, {frames.Count} frames");
             }
             if (reset) frames.Clear();
         }
