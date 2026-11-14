@@ -54,6 +54,8 @@ namespace MusicInYourHands
             Pinch = 1 << 6,
             /// <summary>What clenching your fists does (clearing, switching, pulling).</summary>
             Fists = 1 << 7,
+            /// <summary>The light of the whole room: dimming it, or washing light over all its surfaces.</summary>
+            RoomLight = 1 << 8,
             /// <summary>Everything: the world is on its own. A world that doesn't say which spaces it uses gets this.</summary>
             All = ~0
         }

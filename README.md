@@ -114,6 +114,7 @@ Several worlds can be on at once, as long as they don't get in each other's way:
 | `Hands` | On and between your hands: what they carry or hold, and how they look beyond their colours. |
 | `Pinch` | What a pinch does (drawing, spraying, pouring, holding). |
 | `Fists` | What clenching your fists does (clearing, switching, pulling). |
+| `RoomLight` | The light of the whole room: dimming it, or washing light over all its surfaces. |
 
 ```csharp
 public override Space Spaces => Space.Ground | Space.Hands;
