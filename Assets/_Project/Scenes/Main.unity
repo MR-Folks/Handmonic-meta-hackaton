@@ -201,6 +201,55 @@ Transform:
   m_Children: []
   m_Father: {fileID: 298916677}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &64110406
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 64110408}
+  - component: {fileID: 64110407}
+  m_Layer: 0
+  m_Name: Body
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &64110407
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 64110406}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ce520b0b63d8d4845b4ad2d3040bb51f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Meta::MusicInYourHands.Meta.BodyFeed
+  highFidelity: 1
+  startAttempts: 3
+  retrySeconds: 5
+  logBody: 1
+  reportSeconds: 10
+--- !u!4 &64110408
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 64110406}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &112429294
 GameObject:
   m_ObjectHideFlags: 0
@@ -894,9 +943,19 @@ MonoBehaviour:
   shadowMaskMaterial: {fileID: 2100000, guid: 72c2490677e6b4d8eaedbad34b2b2e2b, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
   darkness: 0.86
-  lampOffset: {x: 0.3, y: -0.55, z: -0.9}
-  lampRadius: 0.025
+  lampOffset: {x: 0.25, y: -0.7, z: -1.25}
+  lampRadius: 0.032
   lampColor: {r: 1, g: 0.78, b: 0.52, a: 1}
+  wristRadius: 0.025
+  forearmRadius: 0.038
+  upperArmRadius: {x: 0.041, y: 0.046}
+  shoulderRadius: {x: 0.055, y: 0.05}
+  neckRadius: 0.048
+  estimatedForearm: 0.255
+  armFade: 0.35
+  forearmLength: {x: 0.18, y: 0.34}
+  upperArmLength: {x: 0.2, y: 0.4}
+  wristMismatch: 0.15
   echoLife: 1.8
   lightNotes: 22
 --- !u!4 &481971617
@@ -3204,3 +3263,4 @@ SceneRoots:
   - {fileID: 176874512}
   - {fileID: 194342434}
   - {fileID: 1919429420}
+  - {fileID: 64110408}

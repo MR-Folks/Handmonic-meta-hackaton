@@ -211,9 +211,39 @@ namespace MusicInYourHands.EditorTools
             config.insightPassthroughSupport = OVRProjectConfig.FeatureSupport.Supported;
             // The room scan (walls, tables, floor) the worlds place themselves on.
             config.sceneSupport = OVRProjectConfig.FeatureSupport.Supported;
+            // Shadow play's arms follow the tracked body (see EnableBodyTracking).
+            config.bodyTrackingSupport = OVRProjectConfig.FeatureSupport.Supported;
             OVRProjectConfig.CommitProjectConfig(config);
 #endif
         }
+
+#if META_XR_CORE
+        /// <summary>
+        /// Body tracking, for the worlds that follow your arms (Shadow play): Supported, not Required, in Meta's project
+        /// config, so Meta's build step adds the body tracking feature to the manifest (required="false") and its
+        /// permission; and never asked for when the app starts (the scene's OVRManager doesn't request it), since
+        /// BodyFeed asks the first time a world wants the body.
+        /// </summary>
+        internal static void EnableBodyTracking()
+        {
+            var config = OVRProjectConfig.CachedProjectConfig;
+            if (config.bodyTrackingSupport != OVRProjectConfig.FeatureSupport.Supported)
+            {
+                config.bodyTrackingSupport = OVRProjectConfig.FeatureSupport.Supported;
+                OVRProjectConfig.CommitProjectConfig(config);
+                Debug.Log("[Setup] Body tracking is Supported in Meta's project config.");
+            }
+            foreach (var manager in Object.FindObjectsByType<OVRManager>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                var so = new SerializedObject(manager);
+                var ask = so.FindProperty("requestBodyTrackingPermissionOnStartup");
+                if (ask == null || !ask.boolValue) continue;
+                ask.boolValue = false;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                Debug.Log("[Setup] OVRManager no longer asks for body tracking at startup; BodyFeed asks when a world needs it.");
+            }
+        }
+#endif
 
         static void RunMetaFixAll(bool exitWhenDone)
         {
@@ -450,7 +480,7 @@ namespace MusicInYourHands.EditorTools
         /// <summary>
         /// The worlds and the menu: a "Worlds" object with WorldManager and one child per World class in the code, in
         /// MenuOrder, each with its Material fields filled from Materials/ by name; then the bubble WorldMenu, the music
-        /// gestures (thumb tap and swipes) and the menu button and microgesture feeds. Existing objects are kept and only
+        /// gestures (thumb tap and swipes) and the menu button, microgesture and body feeds. Existing objects are kept and only
         /// their references are refreshed, so a new world needs nothing but its class: run Configure Project (or Rebuild
         /// Main Scene) and it joins the scene and the menu.
         /// </summary>
@@ -499,6 +529,10 @@ namespace MusicInYourHands.EditorTools
                 new GameObject("MenuButton", typeof(MenuButtonFeed));
             if (Object.FindAnyObjectByType<MicrogestureFeed>(FindObjectsInactive.Include) == null)
                 new GameObject("Microgestures", typeof(MicrogestureFeed));
+            // Body tracking, only while a world wants the body; its project config with it.
+            if (Object.FindAnyObjectByType<BodyFeed>(FindObjectsInactive.Include) == null)
+                new GameObject("Body", typeof(BodyFeed));
+            EnableBodyTracking();
 #if UNITY_OPENXR
             // The microgestures arrive through OpenXR's hand interaction profile, so make sure it is on.
             EnableOpenXRFeatures();

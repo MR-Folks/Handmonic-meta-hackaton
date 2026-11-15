@@ -7,7 +7,11 @@ namespace MusicInYourHands
     /// The Shadow play world: the room goes dark and a lamp low behind you lights the wall in front, and your hands cast
     /// their shadows on it: the tracked hand mesh itself, every vertex projected from the lamp onto the wall, so the
     /// shadow has the exact shape your hand makes, big when close to you and small near the wall, as real shadows are.
-    /// Your forearms and head cast softer ones too, your head high up. On every beat your shadow leaves a coloured echo that drifts up and grows as it fades. Small notes
+    /// Your arms, shoulders, neck and head cast softer ones too, your head high up. With body tracking the arms follow
+    /// your real joints: each forearm runs from the hand's own wrist to your elbow, the upper arm on to your shoulder, and
+    /// the shoulders and neck join them, so the silhouette bends at the elbow and holds together like a real arm. Without
+    /// a body (no permission, or not tracked) each forearm is estimated from the hand alone and the rest fades away.
+    /// On every beat your shadow leaves a coloured echo that drifts up and grows as it fades. Small notes
     /// of light float in the lamp's pool; cover one with a shadow and it rings, a higher note higher up the wall, so
     /// your shadow plays along with the song. The lamp breathes with the bass, and the sung words appear on the wall.
     /// </summary>
@@ -40,11 +44,33 @@ namespace MusicInYourHands
         [Header("Lamp")]
         [Tooltip("How dark the rest of the room gets (0 not at all, 1 black).")]
         [SerializeField, Range(0f, 1f)] float darkness = 0.86f;
-        [Tooltip("Where the lamp is from your head when the world starts (m): to the right, up, and forward (negative is behind). Low behind you, like a floor lamp, so your hands' shadows land in the middle of the wall and your head's falls high above them.")]
-        [SerializeField] Vector3 lampOffset = new Vector3(0.3f, -0.55f, -0.9f);
+        [Tooltip("Where the lamp is from your head when the world starts (m): to the right, up, and forward (negative is behind). Low behind you, like a floor lamp, so your hands' shadows land in the middle of the wall and your head's falls high above them. " +
+                 "Far enough back that your shoulders, nearer the lamp than your hands, don't cast giant shadows.")]
+        [SerializeField] Vector3 lampOffset = new Vector3(0.25f, -0.7f, -1.25f);
         [Tooltip("The lamp's radius (m): bigger makes softer shadow edges.")]
-        [SerializeField] float lampRadius = 0.025f;
+        [SerializeField] float lampRadius = 0.032f;
         [SerializeField] Color lampColor = new Color(1f, 0.78f, 0.52f);
+
+        [Header("Arms")]
+        [Tooltip("The arm's radius (m) at the wrist, where its shadow meets the hand's.")]
+        [SerializeField] float wristRadius = 0.025f;
+        [Tooltip("The forearm's radius (m) at the elbow; it widens evenly from the wrist.")]
+        [SerializeField] float forearmRadius = 0.038f;
+        [Tooltip("The upper arm's radius (m) at the elbow and at the shoulder.")]
+        [SerializeField] Vector2 upperArmRadius = new Vector2(0.041f, 0.046f);
+        [Tooltip("The shoulders' radius (m) at the neck and at each shoulder.")]
+        [SerializeField] Vector2 shoulderRadius = new Vector2(0.055f, 0.05f);
+        [SerializeField] float neckRadius = 0.048f;
+        [Tooltip("Without a tracked body: how far (m) the estimated forearm reaches back from the wrist.")]
+        [SerializeField] float estimatedForearm = 0.255f;
+        [Tooltip("Seconds the arms take to change between your tracked body and the hands-only estimate.")]
+        [SerializeField] float armFade = 0.35f;
+        [Tooltip("Believable lengths (m) of a forearm (hand's wrist to elbow) and an upper arm (elbow to shoulder). " +
+                 "Outside them the body's joints are not trusted and the arm fades to the estimate.")]
+        [SerializeField] Vector2 forearmLength = new Vector2(0.18f, 0.34f);
+        [SerializeField] Vector2 upperArmLength = new Vector2(0.2f, 0.4f);
+        [Tooltip("How far (m) the body's wrist may be from the hand's before the body's arm is not trusted.")]
+        [SerializeField] float wristMismatch = 0.15f;
 
         [Header("Music")]
         [Tooltip("Seconds a beat's coloured echo of your shadow lasts.")]
@@ -72,11 +98,19 @@ namespace MusicInYourHands
         const int CapsPerShadow = 20;
         const int Echoes = 3;
 
-        /// <summary>A capsule on the wall, in metres along the wall's Right and Up.</summary>
+        /// <summary>The parts of the shadow drawn as capsules.</summary>
+        public enum ShadowPart { Head, Neck, Shoulder, Forearm, UpperArm }
+
+        /// <summary>
+        /// A tapered capsule on the wall, in metres along the wall's Right and Up: radius and soft edge at each end, and how
+        /// dark it is (1 a full shadow; less while a part fades in or out).
+        /// </summary>
         struct Cap
         {
             public Vector2 A, B;
-            public float Radius, Soft;
+            public float Radius, RadiusB, Soft, SoftB, Strength;
+            public ShadowPart Part;
+            public bool Left;
         }
 
         sealed class Echo
@@ -128,6 +162,15 @@ namespace MusicInYourHands
         int nextRipple;
         readonly Vector3[] handAlong = { Vector3.up, Vector3.up };
         readonly Vector3[] tips = new Vector3[5];
+        // Per hand: the wrist joint of the visible hand (and the mesh it came from), which way the forearm leaves the
+        // hand, how far the arm has faded to the body (0 estimate, 1 body), and the last believable elbow and shoulder.
+        readonly Transform[] wristJoints = new Transform[2];
+        readonly SkinnedMeshRenderer[] wristSources = new SkinnedMeshRenderer[2];
+        readonly Vector3[] handBack = { Vector3.down, Vector3.down };
+        readonly float[] armBlend = new float[2];
+        readonly Vector3[] lastElbow = new Vector3[2], lastShoulder = new Vector3[2], lastShoulders = new Vector3[2];
+        float torsoBlend;
+        Vector3 lastNeck, lastHead;
         readonly HandShadow[] handShadows = { new HandShadow(), new HandShadow() };
         readonly MaterialPropertyBlock[] fills = new MaterialPropertyBlock[1 + Echoes];
         static readonly int FillId = Shader.PropertyToID("_Fill");
@@ -136,6 +179,7 @@ namespace MusicInYourHands
         readonly List<Vector2> spots = new List<Vector2>();
         readonly List<Vector4> ends = new List<Vector4>();
         readonly List<Vector4> shapes = new List<Vector4>();
+        readonly List<Vector2> tapers = new List<Vector2>();
         readonly List<int> triangles = new List<int>();
 
         Room.Surface wall;
@@ -202,10 +246,14 @@ namespace MusicInYourHands
         protected override void OnEnter()
         {
             foreach (var e in echoes) e.Age = 99f;
+            // The arms follow the tracked body while you are here; body tracking runs only then.
+            BodyRig.Wanted = true;
+            armBlend[0] = armBlend[1] = torsoBlend = 0f;
         }
 
         protected override void OnExit()
         {
+            BodyRig.Wanted = false;
             HandSkin.FocusStrength = 0f;
             foreach (var n in notes) n.Light.gameObject.SetActive(false);
             foreach (var r in ripples) { r.Age = 99f; r.Ring.gameObject.SetActive(false); }
@@ -233,7 +281,7 @@ namespace MusicInYourHands
 
         protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
         {
-            Shadows(rig, view);
+            Shadows(rig, view, dt);
             foreach (var e in echoes) e.Age += dt;
             DrawMask();
 
@@ -301,42 +349,138 @@ namespace MusicInYourHands
             return true;
         }
 
-        /// <summary>Adds the shadow of a capsule between two points: magnified, with an edge as soft as the lamp makes it.</summary>
-        void AddShadow(Vector3 a, Vector3 b, float radius)
+        /// <summary>
+        /// Adds the shadow of a tapered capsule between two points, <paramref name="radiusA"/> thick at the first and
+        /// <paramref name="radiusB"/> at the second, each end magnified and softened as much as the lamp makes it there,
+        /// and <paramref name="strength"/> dark.
+        /// </summary>
+        void AddShadow(Vector3 a, Vector3 b, float radiusA, float radiusB, float strength = 1f, ShadowPart part = ShadowPart.Head, bool left = false)
         {
             if (liveCount >= CapsPerShadow) return;
             if (!Project(a, out var la, out float ma) || !Project(b, out var lb, out float mb)) return;
-            float magnify = (ma + mb) * 0.5f;
-            live[liveCount++] = new Cap { A = la, B = lb, Radius = radius * magnify, Soft = lampRadius * (magnify - 1f) * 0.5f + 0.003f };
+            live[liveCount++] = new Cap
+            {
+                A = la, B = lb, Radius = radiusA * ma, RadiusB = radiusB * mb, Soft = Penumbra(ma), SoftB = Penumbra(mb),
+                Strength = strength, Part = part, Left = left
+            };
         }
 
+        /// <summary>How wide the soft edge of a shadow is where a point is magnified this much (m on the wall).</summary>
+        float Penumbra(float magnify) => lampRadius * (magnify - 1f) * 0.5f + 0.003f;
+
+        static float Ease(float t) => t * t * (3f - 2f * t);
+
         /// <summary>
-        /// The shadow of this frame: each tracked hand's own mesh projected from the lamp onto the wall, plus your
-        /// forearms (which the hand mesh stops short of) and your head as soft capsules.
+        /// The shadow of this frame: each tracked hand's own mesh projected from the lamp onto the wall, plus your arms,
+        /// shoulders, neck and head as soft capsules.
         /// </summary>
-        void Shadows(HandRig rig, Camera view)
+        void Shadows(HandRig rig, Camera view, float dt)
         {
             liveCount = 0;
             foreach (var h in handShadows) h.Valid = false;
             var head = view.transform.position;
             var forward = Effects.FlatForward(view);
-            AddShadow(head - forward * 0.06f + Vector3.up * 0.04f, head - forward * 0.06f - Vector3.up * 0.04f, 0.085f);
+            // The head, on the headset's own pose.
+            AddShadow(head - forward * 0.06f + Vector3.up * 0.04f, head - forward * 0.06f - Vector3.up * 0.04f, 0.085f, 0.085f);
+            Shoulders(dt);
             if (rig == null) return;
             for (int side = 0; side < 2; side++)
             {
                 var hand = rig.Get(side == 0);
                 if (!hand.IsTracked) continue;
-                var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
-                for (int f = 0; f < 5; f++) tips[f] = hand.TipJoints[f] != null ? hand.TipJoints[f].position : hand.Tips[f];
-                // Which way the hand points: towards the fingers, or as last seen when they curl into a fist.
-                var along = (tips[1] + tips[2] + tips[3] + tips[4]) * 0.25f - palm;
-                if (along.magnitude > 0.035f) handAlong[side] = along.normalized;
-                var up = handAlong[side];
-
-                // The forearm, from just inside the wrist back towards the elbow.
-                AddShadow(palm - up * 0.045f, palm - up * 0.3f, 0.028f);
+                Arm(hand, side, dt);
                 ProjectHand(hand.Mesh, handShadows[side]);
             }
+        }
+
+        /// <summary>
+        /// One arm. The forearm always starts at the visible hand's own wrist joint, so it meets the hand's shadow exactly.
+        /// With a believable tracked body it runs to your real elbow and the upper arm on to your shoulder; otherwise it
+        /// reaches back from the wrist the way the hand points, from the palm through the wrist (joints that stay put when
+        /// the fingers curl, so a fist doesn't swing it). The two fade into each other as the body comes and goes.
+        /// </summary>
+        void Arm(HandRig.Hand hand, int side, float dt)
+        {
+            bool left = side == 0;
+            var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
+            var wrist = HandWrist(hand, side, palm);
+            var estimatedElbow = wrist + handBack[side] * estimatedForearm;
+
+            var arm = BodyRig.Get(left);
+            bool believable = BodyRig.IsTracked && arm.Valid && Believable(wrist, arm);
+            if (believable)
+            {
+                lastElbow[side] = arm.Elbow;
+                lastShoulder[side] = arm.Shoulder;
+            }
+            armBlend[side] = Mathf.MoveTowards(armBlend[side], believable ? 1f : 0f, dt / Mathf.Max(armFade, 0.01f));
+            float body = Ease(armBlend[side] * BodyRig.Blend);
+
+            var elbow = Vector3.Lerp(estimatedElbow, lastElbow[side], body);
+            AddShadow(wrist, elbow, wristRadius, forearmRadius, 1f, ShadowPart.Forearm, left);
+            if (body > 0.01f) AddShadow(elbow, lastShoulder[side], upperArmRadius.x, upperArmRadius.y, body, ShadowPart.UpperArm, left);
+        }
+
+        /// <summary>Whether the body's arm fits this hand: a forearm and upper arm of believable lengths, wrists together.</summary>
+        bool Believable(Vector3 wrist, BodyRig.Arm arm)
+        {
+            float forearm = Vector3.Distance(wrist, arm.Elbow);
+            float upper = Vector3.Distance(arm.Elbow, arm.Shoulder);
+            return forearm >= forearmLength.x && forearm <= forearmLength.y && upper >= upperArmLength.x && upper <= upperArmLength.y
+                && Vector3.Distance(arm.Wrist, wrist) <= wristMismatch;
+        }
+
+        /// <summary>
+        /// The visible hand's wrist joint (its mesh's root bone), noting which way the forearm leaves the hand: from the
+        /// palm back through the wrist. Without the hand's skeleton, estimated from the fingertips as last seen.
+        /// </summary>
+        Vector3 HandWrist(HandRig.Hand hand, int side, Vector3 palm)
+        {
+            var mesh = hand.Mesh;
+            if (mesh != wristSources[side])
+            {
+                wristSources[side] = mesh;
+                wristJoints[side] = mesh != null ? mesh.rootBone : null;
+            }
+            var joint = wristJoints[side];
+            if (joint != null)
+            {
+                var wrist = joint.position;
+                var back = wrist - palm;
+                if (back.sqrMagnitude > 0.02f * 0.02f) handBack[side] = back.normalized;
+                return wrist;
+            }
+            for (int f = 0; f < 5; f++) tips[f] = hand.TipJoints[f] != null ? hand.TipJoints[f].position : hand.Tips[f];
+            var along = (tips[1] + tips[2] + tips[3] + tips[4]) * 0.25f - palm;
+            if (along.magnitude > 0.035f) handAlong[side] = along.normalized;
+            handBack[side] = -handAlong[side];
+            return palm - handAlong[side] * 0.045f;
+        }
+
+        /// <summary>
+        /// The shoulders and neck, from the tracked body: a line from the neck out to each shoulder, where the upper arms
+        /// start, and the neck up to the head. They fade in with a believable body and out without one.
+        /// </summary>
+        void Shoulders(float dt)
+        {
+            var l = BodyRig.Left;
+            var r = BodyRig.Right;
+            float width = Vector3.Distance(l.Shoulder, r.Shoulder);
+            float neck = Vector3.Distance(BodyRig.Neck, BodyRig.Head);
+            bool believable = BodyRig.IsTracked && BodyRig.SpineValid && l.Valid && r.Valid && width > 0.22f && width < 0.6f && neck < 0.3f;
+            if (believable)
+            {
+                lastNeck = BodyRig.Neck;
+                lastHead = BodyRig.Head;
+                lastShoulders[0] = l.Shoulder;
+                lastShoulders[1] = r.Shoulder;
+            }
+            torsoBlend = Mathf.MoveTowards(torsoBlend, believable ? 1f : 0f, dt / Mathf.Max(armFade, 0.01f));
+            float body = Ease(torsoBlend * BodyRig.Blend);
+            if (body <= 0.01f) return;
+            AddShadow(lastNeck, lastShoulders[0], shoulderRadius.x, shoulderRadius.y, body, ShadowPart.Shoulder, true);
+            AddShadow(lastNeck, lastShoulders[1], shoulderRadius.x, shoulderRadius.y, body, ShadowPart.Shoulder, false);
+            AddShadow(lastNeck, lastHead, neckRadius, neckRadius, body, ShadowPart.Neck);
         }
 
         /// <summary>
@@ -387,8 +531,10 @@ namespace MusicInYourHands
         {
             var e = echoes[nextEcho];
             nextEcho = (nextEcho + 1) % Echoes;
-            System.Array.Copy(live, e.Caps, liveCount);
-            e.Count = liveCount;
+            // The echo is the hands, forearms and head: upper arms and shoulders, grown and coloured, would fill the wall.
+            e.Count = 0;
+            for (int i = 0; i < liveCount; i++)
+                if (live[i].Part == ShadowPart.Head || live[i].Part == ShadowPart.Forearm) e.Caps[e.Count++] = live[i];
             e.Age = 0f;
             e.Color = EchoColors[colorIndex++ % EchoColors.Length];
 
@@ -419,6 +565,7 @@ namespace MusicInYourHands
             spots.Clear();
             ends.Clear();
             shapes.Clear();
+            tapers.Clear();
             triangles.Clear();
             for (int i = 0; i < liveCount; i++) AddQuad(live[i], 0, 1f);
 
@@ -438,7 +585,9 @@ namespace MusicInYourHands
                     c.A = pool + (c.A - pool) * grow + lift;
                     c.B = pool + (c.B - pool) * grow + lift;
                     c.Radius *= grow;
+                    c.RadiusB *= grow;
                     c.Soft += t * 0.05f;
+                    c.SoftB += t * 0.05f;
                     AddQuad(c, 1 + k, strength);
                 }
             }
@@ -448,6 +597,7 @@ namespace MusicInYourHands
             capsules.SetUVs(0, spots);
             capsules.SetUVs(1, ends);
             capsules.SetUVs(2, shapes);
+            capsules.SetUVs(3, tapers);
             capsules.SetTriangles(triangles, 0);
             capsules.bounds = new Bounds(Vector3.zero, new Vector3(wall.Size.x, wall.Size.y, 2f) * 2f);
 
@@ -483,12 +633,13 @@ namespace MusicInYourHands
 
         void AddQuad(Cap c, int channel, float strength)
         {
-            float pad = c.Radius + c.Soft;
+            float pad = Mathf.Max(c.Radius + c.Soft, c.RadiusB + c.SoftB);
             var min = Vector2.Min(c.A, c.B) - Vector2.one * pad;
             var max = Vector2.Max(c.A, c.B) + Vector2.one * pad;
             int v = vertices.Count;
             var ab = new Vector4(c.A.x, c.A.y, c.B.x, c.B.y);
-            var shape = new Vector4(c.Radius, c.Soft, channel, strength);
+            var shape = new Vector4(c.Radius, c.Soft, channel, strength * c.Strength);
+            var taper = new Vector2(c.RadiusB, c.SoftB);
             for (int k = 0; k < 4; k++)
             {
                 var corner = new Vector2(k == 1 || k == 2 ? max.x : min.x, k >= 2 ? max.y : min.y);
@@ -496,6 +647,7 @@ namespace MusicInYourHands
                 spots.Add(corner);
                 ends.Add(ab);
                 shapes.Add(shape);
+                tapers.Add(taper);
             }
             triangles.Add(v); triangles.Add(v + 1); triangles.Add(v + 2);
             triangles.Add(v); triangles.Add(v + 2); triangles.Add(v + 3);
@@ -532,18 +684,24 @@ namespace MusicInYourHands
             for (int i = 0; i < liveCount; i++)
             {
                 var c = live[i];
+                // A part only half faded in doesn't ring anything yet.
+                if (c.Strength < 0.5f) continue;
                 var ab = c.B - c.A;
                 float h = Mathf.Clamp01(Vector2.Dot(p - c.A, ab) / Mathf.Max(ab.sqrMagnitude, 1e-8f));
-                if ((p - c.A - ab * h).magnitude < c.Radius + c.Soft * 0.3f) return true;
+                if ((p - c.A - ab * h).magnitude < Mathf.Lerp(c.Radius + c.Soft * 0.3f, c.RadiusB + c.SoftB * 0.3f, h)) return true;
             }
             foreach (var s in handShadows)
-            {
-                if (!s.Valid || p.x < s.Min.x || p.y < s.Min.y || p.x > s.Max.x || p.y > s.Max.y) continue;
-                var points = s.Points;
-                var tris = s.Triangles;
-                for (int i = 0; i < tris.Length; i += 3)
-                    if (InTriangle(p, points[tris[i]], points[tris[i + 1]], points[tris[i + 2]])) return true;
-            }
+                if (InHandShadow(s, p)) return true;
+            return false;
+        }
+
+        static bool InHandShadow(HandShadow s, Vector2 p)
+        {
+            if (!s.Valid || p.x < s.Min.x || p.y < s.Min.y || p.x > s.Max.x || p.y > s.Max.y) return false;
+            var points = s.Points;
+            var tris = s.Triangles;
+            for (int i = 0; i < tris.Length; i += 3)
+                if (InTriangle(p, points[tris[i]], points[tris[i + 1]], points[tris[i + 2]])) return true;
             return false;
         }
 
@@ -662,13 +820,41 @@ namespace MusicInYourHands
         void Sing(MusicFrame music, Camera view, float dt)
         {
             var facing = Quaternion.LookRotation(-wall.Normal, Vector3.up);
-            foreach (var w in SungWords.Words)
+            // By index: a foreach over the read-only list would allocate an enumerator every frame.
+            var words = SungWords.Words;
+            for (int i = 0; i < words.Count; i++)
             {
+                var w = words[i];
                 if (!w.Active) continue;
                 w.Position += w.Velocity * dt;
                 w.Rotation = facing;
                 w.Halo = 0.3f + music.Kick * 0.3f;
             }
         }
+
+#if UNITY_EDITOR
+        /// <summary>For the editor checks: how many capsules this frame's shadow has (the hands' own meshes aside).</summary>
+        public int PreviewCapsuleCount => liveCount;
+
+        /// <summary>For the editor checks: one of this frame's capsules, on the wall in metres along its Right and Up.</summary>
+        public void PreviewCapsule(int i, out ShadowPart part, out bool left, out Vector2 a, out Vector2 b, out float radiusA,
+            out float radiusB, out float strength)
+        {
+            var c = live[i];
+            part = c.Part;
+            left = c.Left;
+            a = c.A;
+            b = c.B;
+            radiusA = c.Radius;
+            radiusB = c.RadiusB;
+            strength = c.Strength;
+        }
+
+        /// <summary>For the editor checks: where the lamp casts a point's shadow on the wall.</summary>
+        public bool PreviewProject(Vector3 p, out Vector2 onWall) => Project(p, out onWall, out _);
+
+        /// <summary>For the editor checks: whether a point on the wall is inside one hand's own shadow (0 left, 1 right).</summary>
+        public bool PreviewInHandShadow(int side, Vector2 p) => InHandShadow(handShadows[side], p);
+#endif
     }
 }

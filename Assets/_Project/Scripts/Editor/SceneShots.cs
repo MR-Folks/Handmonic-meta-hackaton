@@ -62,7 +62,10 @@ namespace MusicInYourHands.EditorTools
             int stormFrames = 0;
             Shot<Lightning>("22-lightning", HandPose.BacksToFace, 4f, prepare: world => storm = (Lightning)world,
                 holdPose: _ => { if (++stormFrames == 88) storm.PreviewStorm(); });
-            Shot<ShadowPlay>("23-shadow-play", HandPose.BacksToFace, 6f, closeUp: rig => new Vector3(0.25f, 1.6f, 2.6f));
+            // Shadow play with a tracked body (arms bent, elbows out), and with the hands alone, as without body tracking.
+            Shot<ShadowPlay>("23-shadow-play", HandPose.BacksToFace, 6f, holdPose: rig => PreviewBody(rig, 1f / 30f),
+                closeUp: rig => new Vector3(0.12f, 1.95f, 2.6f), handOffset: ShadowPlayHands);
+            Shot<ShadowPlay>("23h-shadow-play-hands-only", HandPose.BacksToFace, 6f, handOffset: ShadowPlayHands);
             Shot<NeonSign>("16-neon-sign", HandPose.BacksToFace, 2f, lead: 4f, extra: 1.7f);
             Shot<WordDrift>("17-word-drift", HandPose.PalmsToFace, 2f, lead: 6f);
             WordDrift drift = null;
@@ -87,7 +90,8 @@ namespace MusicInYourHands.EditorTools
             Shot<NeonSign>("16r-neon-sign-room", HandPose.BacksToFace, 2f, lead: 4f, extra: 1.7f, scanned: true);
             Shot<WordSnow>("19r-word-snow-room", HandPose.PalmsUp, 22f, lead: 14f, scanned: true);
             Shot<CeilingStars>("20r-ceiling-stars-room", HandPose.PalmsToFace, -40f, lead: 4f, scanned: true);
-            Shot<ShadowPlay>("23r-shadow-play-room", HandPose.BacksToFace, 6f, scanned: true);
+            Shot<ShadowPlay>("23r-shadow-play-room", HandPose.BacksToFace, 6f, holdPose: rig => PreviewBody(rig, 1f / 30f),
+                handOffset: ShadowPlayHands, scanned: true);
             Shot<NoteRain>("5r-note-rain-room", HandPose.PalmsUp, 30f, scanned: true);
 
             // Every other world (a new one, say) gets a default shot, w-<class>.png: palms to the face, from head height.
@@ -199,6 +203,9 @@ namespace MusicInYourHands.EditorTools
                 });
         }
 
+        /// <summary>For Shadow play: the hands raised a little and apart, the way you hold them up to make shadows.</summary>
+        static Vector3 ShadowPlayHands(string side) => new Vector3(side == "L" ? -0.06f : 0.06f, 0.12f, -0.02f);
+
         /// <summary>Both hands about 35 cm in front, at chest height, held the way the world asks for.</summary>
         static List<PreviewHand> PlaceHands(Camera camera, HandPose pose, HandRig rig, System.Func<string, Vector3> offset = null)
         {
@@ -302,6 +309,8 @@ namespace MusicInYourHands.EditorTools
         {
             ShotTypes.Add(type);
             if (!Wanted(name)) return;
+            // No body unless the shot makes one up (see PreviewBody).
+            BodyRig.Clear();
             var camera = StageRoom(pitch, scanned);
             var rig = new GameObject("HandRig").AddComponent<HandRig>();
             var hands = PlaceHands(camera, pose, rig, handOffset);
