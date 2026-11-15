@@ -37,7 +37,9 @@ namespace MusicInYourHands.EditorTools
             { ("GlassRoom", "Glass Room"), ("NeonTide", "Neon Tide"), ("RainyWindow", "Rainy Window"), ("PaperBoat", "Paper Boat") };
         public const string MainScenePath = Root + "/Scenes/Main.unity";
         const string ApplicationId = "com.musicinyourhands.app";
-        static readonly string[] OpenXRFeaturesToEnable = { "MetaQuestFeature", "MetaXRFeature" };
+        // The OpenXR features the app turns on for Android. HandInteractionProfile (XR_EXT_hand_interaction) carries Meta's
+        // thumb microgestures: without it the runtime reports valid hands but never a tap or a swipe.
+        static readonly string[] OpenXRFeaturesToEnable = { "MetaQuestFeature", "MetaXRFeature", "HandInteractionProfile" };
 
         [MenuItem("Music In Your Hands/Configure Project for Quest")]
         public static void Configure()
@@ -172,22 +174,34 @@ namespace MusicInYourHands.EditorTools
             XRPackageMetadataStore.AssignLoader(settings.Manager, "UnityEngine.XR.OpenXR.OpenXRLoader", BuildTargetGroup.Android);
             FeatureHelpers.RefreshFeatures(BuildTargetGroup.Android);
 
-            var openXR = OpenXRSettings.GetSettingsForBuildTargetGroup(BuildTargetGroup.Android);
-            foreach (var feature in openXR.GetFeatures<OpenXRFeature>())
-            {
-                if (OpenXRFeaturesToEnable.Contains(feature.GetType().Name) && !feature.enabled)
-                {
-                    feature.enabled = true;
-                    EditorUtility.SetDirty(feature);
-                }
-            }
-            EditorUtility.SetDirty(openXR);
+            EnableOpenXRFeatures();
             EditorUtility.SetDirty(settings);
             AssetDatabase.SaveAssets();
 #else
             Debug.LogWarning("[Setup] OpenXR package not installed; skipped XR configuration.");
 #endif
         }
+
+#if UNITY_OPENXR
+        /// <summary>Turns on, for Android, the OpenXR features in <see cref="OpenXRFeaturesToEnable"/> that are off.</summary>
+        internal static void EnableOpenXRFeatures()
+        {
+            var openXR = OpenXRSettings.GetSettingsForBuildTargetGroup(BuildTargetGroup.Android);
+            if (openXR == null) return;
+            bool changed = false;
+            foreach (var feature in openXR.GetFeatures<OpenXRFeature>())
+            {
+                if (!OpenXRFeaturesToEnable.Contains(feature.GetType().Name) || feature.enabled) continue;
+                feature.enabled = true;
+                EditorUtility.SetDirty(feature);
+                changed = true;
+                Debug.Log($"[Setup] Turned on the OpenXR feature {feature.GetType().Name} for Android.");
+            }
+            if (!changed) return;
+            EditorUtility.SetDirty(openXR);
+            AssetDatabase.SaveAssets();
+        }
+#endif
 
         static void ConfigureMetaProject()
         {
@@ -485,6 +499,10 @@ namespace MusicInYourHands.EditorTools
                 new GameObject("MenuButton", typeof(MenuButtonFeed));
             if (Object.FindAnyObjectByType<MicrogestureFeed>(FindObjectsInactive.Include) == null)
                 new GameObject("Microgestures", typeof(MicrogestureFeed));
+#if UNITY_OPENXR
+            // The microgestures arrive through OpenXR's hand interaction profile, so make sure it is on.
+            EnableOpenXRFeatures();
+#endif
             if (Object.FindAnyObjectByType<RoomScanFeed>(FindObjectsInactive.Include) == null)
             {
                 var scan = new GameObject("RoomScan");

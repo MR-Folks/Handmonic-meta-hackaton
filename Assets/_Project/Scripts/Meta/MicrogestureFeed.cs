@@ -15,25 +15,38 @@ namespace MusicInYourHands.Meta
         [Tooltip("The tracked hands. Left empty, they are found under the camera rig's hand anchors.")]
         [SerializeField] OVRHand leftHand;
         [SerializeField] OVRHand rightHand;
+        [Tooltip("Log each gesture Meta reports, and every few seconds how many frames each hand had no valid gesture " +
+                 "state, to see on the headset (adb logcat -s Unity) whether gestures arrive at all.")]
+        [SerializeField] bool logGestures = true;
+        [SerializeField] float reportSeconds = 5f;
 
         readonly OVRHand.MicrogestureType[] last = { OVRHand.MicrogestureType.NoGesture, OVRHand.MicrogestureType.NoGesture };
-        float nextLookup;
+        readonly int[] invalidFrames = new int[2], quietFrames = new int[2], gestureCount = new int[2];
+        float nextLookup, nextReport;
+
+        void Awake() => MusicGestures.LogGestures = logGestures;
 
         void Update()
         {
             if ((leftHand == null || rightHand == null) && Time.unscaledTime >= nextLookup) FindHands();
             Read(leftHand, 0);
             Read(rightHand, 1);
+            if (logGestures && Time.unscaledTime >= nextReport) Report();
         }
 
         void Read(OVRHand hand, int side)
         {
             if (hand == null) return;
             var type = hand.GetMicrogestureType();
+            if (type == OVRHand.MicrogestureType.Invalid) invalidFrames[side]++;
+            else if (type == OVRHand.MicrogestureType.NoGesture) quietFrames[side]++;
             bool repeat = type == last[side];
             last[side] = type;
+            if (repeat || type == OVRHand.MicrogestureType.Invalid || type == OVRHand.MicrogestureType.NoGesture) return;
+            gestureCount[side]++;
+            if (logGestures) Debug.Log($"[Microgestures] {(side == 0 ? "left" : "right")} hand: Meta reports {type}");
             var gestures = MusicGestures.Instance;
-            if (repeat || gestures == null) return;
+            if (gestures == null) return;
             switch (type)
             {
                 case OVRHand.MicrogestureType.ThumbTap: gestures.Recognize(side == 0, Microgesture.ThumbTap); break;
@@ -43,6 +56,18 @@ namespace MusicInYourHands.Meta
                 case OVRHand.MicrogestureType.SwipeBackward: gestures.Recognize(side == 0, Microgesture.SwipeBackward); break;
             }
         }
+
+        /// <summary>Every few seconds: whether each hand was found, and how its gesture state looked frame by frame.</summary>
+        void Report()
+        {
+            nextReport = Time.unscaledTime + reportSeconds;
+            Debug.Log($"[Microgestures] last {reportSeconds:0} s: left {Describe(leftHand, 0)}; right {Describe(rightHand, 1)}; " +
+                      $"MusicGestures {(MusicGestures.Instance != null ? "present" : "missing")}");
+            for (int s = 0; s < 2; s++) invalidFrames[s] = quietFrames[s] = gestureCount[s] = 0;
+        }
+
+        string Describe(OVRHand hand, int side) => hand == null ? "hand not found"
+            : $"tracked {hand.IsTracked}, frames invalid {invalidFrames[side]} / no gesture {quietFrames[side]}, gestures {gestureCount[side]}";
 
         void FindHands()
         {

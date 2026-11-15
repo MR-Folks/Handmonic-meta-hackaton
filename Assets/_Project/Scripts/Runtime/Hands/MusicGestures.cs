@@ -70,6 +70,12 @@ namespace MusicInYourHands
 
         public static MusicGestures Instance { get; private set; }
 
+        /// <summary>
+        /// Logs each reported gesture with what became of it (acted, or which gate held it) and the hand's pinch and fist
+        /// then, for tuning on the headset. The Meta hand feed turns it on; editor checks leave it off.
+        /// </summary>
+        public static bool LogGestures;
+
         static readonly int ColorId = Shader.PropertyToID("_Color");
         static readonly int IconId = Shader.PropertyToID("_Icon");
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
@@ -112,6 +118,7 @@ namespace MusicInYourHands
         readonly bool[] pinching = new bool[2];
         // Each hand is ignored until this time (on clock).
         readonly float[] quietUntil = new float[2];
+        readonly string[] quietReason = { "", "" };
         float clock, lastCommand = -99f, menuQuietUntil;
 
         Transform root, content;
@@ -165,13 +172,27 @@ namespace MusicInYourHands
                 var hand = rig != null ? rig.Get(s == 0) : null;
                 bool tracked = hand != null && hand.IsTracked;
                 pinching[s] = tracked && hand.Pinch >= (pinching[s] ? pinchThresholds.y : pinchThresholds.x);
-                if (!tracked || hand.InSystemGesture || pinching[s] || hand.Fist >= fistThreshold) quietUntil[s] = clock + settle;
+                string quiet = !tracked ? "hand not tracked" : hand.InSystemGesture ? "Meta's menu gesture"
+                    : pinching[s] ? "pinching" : hand.Fist >= fistThreshold ? "fist" : null;
+                if (quiet != null)
+                {
+                    quietUntil[s] = clock + settle;
+                    quietReason[s] = quiet;
+                }
             }
             for (int s = 0; s < 2; s++)
             {
                 int gesture = pending[s];
                 pending[s] = -1;
-                if (gesture < 0 || music == null || clock < quietUntil[s] || clock < menuQuietUntil || clock - lastCommand < cooldown) continue;
+                if (gesture < 0) continue;
+                string held = music == null ? "no music" : clock < quietUntil[s] ? quietReason[s] + " (or just before)"
+                    : clock < menuQuietUntil ? "menu open (or just closed)" : clock - lastCommand < cooldown ? "cooldown" : null;
+                if (LogGestures)
+                {
+                    var h = rig != null ? rig.Get(s == 0) : null;
+                    Debug.Log($"[Gestures] {(s == 0 ? "left" : "right")} {(Microgesture)gesture}: {held ?? "acted"} (pinch {(h != null ? h.Pinch : -1f):0.00}, fist {(h != null ? h.Fist : -1f):0.00})");
+                }
+                if (held != null) continue;
                 if (Act((Microgesture)gesture, music, rig.Get(s == 0))) lastCommand = clock;
             }
             Await(music);

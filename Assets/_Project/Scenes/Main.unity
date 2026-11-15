@@ -2815,6 +2815,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: MusicInYourHands.Meta::MusicInYourHands.Meta.MicrogestureFeed
   leftHand: {fileID: 0}
   rightHand: {fileID: 0}
+  logGestures: 1
+  reportSeconds: 5
 --- !u!4 &1919429420
 Transform:
   m_ObjectHideFlags: 0
