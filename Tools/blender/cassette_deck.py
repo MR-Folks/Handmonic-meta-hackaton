@@ -11,11 +11,10 @@ and UV range, checks the triangle budgets and that every mesh shell is closed wi
 set on the table (--only cassette scene ... renders just those). --blend FILE saves the built scene as a
 .blend; keep it out of Assets/ so Unity doesn't import it.
 
-Conventions: metres, Blender Z up, the front (the side the player sees) faces -Y while modelling. Unity's
-FBX importer mirrors X, so with the exporter's -Z forward / Y up axes Blender -Y would land on Unity +Z.
-The spec wants the front on Unity -Z, so the export turns each model 180 degrees about the vertical (data
-only; every node keeps an identity rotation). In Unity the front then faces -Z, the player's left is -X and
-up is +Y. Re-imported into Blender the fronts face +Y. --no-front-flip exports without that turn.
+Conventions: metres, Blender Z up, the front (the side the player sees) faces -Y. The models are exported
+as modelled with -Z forward / Y up and baked transforms, and Unity then shows Blender (x, y, z) at (x, z, y):
+the front faces Unity -Z, the player's left is -X, up is +Y, and every node has identity rotation, scale 1.
+(Checked in Unity: it does not mirror X for these files.)
 """
 import argparse
 import math
@@ -630,28 +629,14 @@ def build_table():
 # ---------------------------------------------------------------------------------------------------------
 # Export
 
-def flip_front(root):
-    """Turn a model 180 degrees about its vertical axis, in the data, keeping identity node rotations."""
-    rot = Matrix.Rotation(math.pi, 4, "Z")
-    for ch in root.children:
-        ch.location = (rot @ ch.location.to_4d()).to_3d()
-        if ch.type == "MESH":
-            ch.data.transform(rot)
-            ch.data.update()
-
-
-def export_fbx(root, path, flip=True):
-    obs = [root, *root.children]
-    if flip:
-        flip_front(root)
-    select_only(obs)
+def export_fbx(root, path):
+    """Export one model as modelled; Unity then shows Blender (x, y, z) at (x, z, y), so the front is on -Z."""
+    select_only([root, *root.children])
     bpy.ops.export_scene.fbx(
         filepath=str(path), use_selection=True, axis_forward="-Z", axis_up="Y", apply_unit_scale=True,
         apply_scale_options="FBX_SCALE_ALL", bake_space_transform=True, object_types={"EMPTY", "MESH"},
         use_mesh_modifiers=True, mesh_smooth_type="FACE", add_leaf_bones=False, bake_anim=False,
         use_custom_props=False, path_mode="AUTO", embed_textures=False)
-    if flip:
-        flip_front(root)  # back to the modelling orientation for the previews
 
 
 # ---------------------------------------------------------------------------------------------------------
@@ -927,7 +912,7 @@ def shell_report(me):
 
 def check(out_dir):
     ok = True
-    print("\n=== Re-import check (Blender Z-up; Unity = (-x, z, -y) of these) ===")
+    print("\n=== Re-import check (Blender Z-up; Unity shows (x, z, y) of these) ===")
     for name in ASSETS:
         path = out_dir / f"{name}.fbx"
         bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -947,7 +932,7 @@ def check(out_dir):
             rot = tuple(round(math.degrees(a), 2) for a in o.matrix_world.to_euler())
             scl = tuple(round(s, 4) for s in o.matrix_world.to_scale())
             line = (f"  {o.name:<12} parent={o.parent.name if o.parent else '-':<10} pivot=({p.x:+.4f}, {p.y:+.4f}, {p.z:+.4f})"
-                    f" unity=({-p.x:+.4f}, {p.z:+.4f}, {-p.y:+.4f}) rot={rot} scale={scl}")
+                    f" unity=({p.x:+.4f}, {p.z:+.4f}, {p.y:+.4f}) rot={rot} scale={scl}")
             if o.type == "MESH":
                 blo, bhi = world_bbox([o])
                 mats = [m.name for m in o.data.materials]
@@ -983,7 +968,6 @@ def main():
     ap.add_argument("--render", type=pathlib.Path, help="folder for deck-*.png previews")
     ap.add_argument("--blend", type=pathlib.Path, help="also save the built scene as this .blend")
     ap.add_argument("--no-check", action="store_true", help="skip the re-import check")
-    ap.add_argument("--no-front-flip", action="store_true", help="export with the front on Blender -Y as modelled")
     ap.add_argument("--only", nargs="*", help="render only these previews (asset names or 'scene')")
     args = ap.parse_args(argv)
 
@@ -996,7 +980,7 @@ def main():
     args.out.mkdir(parents=True, exist_ok=True)
     for name, root in roots.items():
         path = args.out / f"{name}.fbx"
-        export_fbx(root, path, flip=not args.no_front_flip)
+        export_fbx(root, path)
         print(f"Exported {path} ({sum(tris(o) for o in root.children)} tris)")
 
     if args.blend:
