@@ -417,13 +417,21 @@ Shader "MusicInYourHands/Bubble"
                 else if (icon < 27.5)
                 {
                     // BEGIN emblem 27 (Finger frame)
-                    // Two L-shaped hands framing a window, a sun rising and setting inside it.
+                    // Two L-shaped hands framing a window. Inside it, in turn, a sun rising and setting (another world)
+                    // and the dotted print of a camera filter, the one wiping across into the other.
                     float2 q = abs(p) - float2(0.42, 0.28);
                     e = Line(abs(max(q.x, q.y)), 0.02) * 0.45;
                     e += Line(Segment(p, float2(-0.5, -0.36), float2(-0.5, 0.2)), 0.05) + Line(Segment(p, float2(-0.5, -0.36), float2(0.1, -0.36)), 0.05);
                     e += Line(Segment(p, float2(0.5, 0.36), float2(0.5, -0.2)), 0.05) + Line(Segment(p, float2(0.5, 0.36), float2(-0.1, 0.36)), 0.05);
+                    float inside = step(max(q.x, q.y), -0.05);
                     float2 sun = p - float2(0, -0.05 + 0.1 * sin(t * 1.5));
-                    e += step(length(sun), 0.12) * step(-0.2, p.y) * 0.9;
+                    float world = step(length(sun), 0.12) * step(-0.2, p.y) * 0.9;
+                    float2 cell = frac(p / 0.1) - 0.5;
+                    float print = step(length(cell), 0.12 + 0.2 * saturate(0.5 - p.y * 0.9 + p.x * 0.3) * (0.85 + 0.15 * sin(t * 6))) * 0.8;
+                    float phase = frac(t / 7);
+                    float wipe = saturate(phase * 4.2 - 0.25) - saturate(phase * 4.2 - 2.35);
+                    float filtered = step(p.x * 0.55 + 0.5, wipe * 1.1);
+                    e += lerp(world, print, filtered) * inside + Line(abs(p.x - (wipe * 1.1 - 0.5) / 0.55), 0.03) * inside * step(0.01, wipe) * step(wipe, 0.99) * 0.6;
                     // END emblem 27
                 }
                 else if (icon < 28.5)

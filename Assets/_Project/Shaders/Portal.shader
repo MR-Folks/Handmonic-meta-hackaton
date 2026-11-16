@@ -1,16 +1,19 @@
 // The Finger frame window: a mesh stretched between the four fingertips of the frame (it need not be flat or
-// rectangular) that shows another world behind it. TEXCOORD1.x is each point's distance to the nearest edge (m). The world is drawn from
-// the direction you look through the window, with its hills on planes a few metres to a few dozen metres away from
-// where you stood (_Origin, facing _Forward, its horizon _Tilt below eye level), so it stays put in the room and shifts with parallax as you move the
-// frame or your head, like a real hole in the wall. Four worlds (_SceneA, cross-fading into _SceneB with _Mix), each
-// moving with the music: _Pulse on the beat, _Bands and _High the six bands. The script grows the mesh from its middle
-// as the window opens (_Open is 0 while it is closed), and its edge glows.
+// rectangular) that shows the room through a camera filter or another world behind it. TEXCOORD1 and TEXCOORD2 are
+// each point's distances to the lines of its four edges (m), whose least is its distance to the rim. The camera
+// filters (_SceneA or _SceneB 10 and up) redraw the real room behind the window, lined up with it, from the headset's
+// camera (see FingerFrameFilters.hlsl). The worlds (0 to 3) are drawn from the direction you look through the window,
+// with their hills on planes a few metres to a few dozen metres away from where you stood (_Origin, facing _Forward,
+// its horizon _Tilt below eye level), so they stay put in the room and shift with parallax as you move the frame or
+// your head, like a real hole in the wall. One view swirls into the next (_SceneA into _SceneB with _Mix), each moving
+// with the music: _Pulse on the beat, _Bands and _High the six bands. The script grows the mesh from its middle as the
+// window opens (_Open is 0 while it is closed), and its edge glows.
 Shader "MusicInYourHands/Portal"
 {
     Properties
     {
-        _SceneA ("World (0 valley, 1 ocean, 2 neon city, 3 aurora)", Float) = 0
-        _SceneB ("Next world", Float) = 1
+        _SceneA ("View (0 valley, 1 ocean, 2 neon city, 3 aurora, 10-15 camera filters)", Float) = 0
+        _SceneB ("Next view", Float) = 1
         _Mix ("Change to the next world 0-1", Float) = 0
         _Open ("Open 0-1", Float) = 1
         _Origin ("Where the world was anchored", Vector) = (0, 1.6, 0, 0)
@@ -61,6 +64,7 @@ Shader "MusicInYourHands/Portal"
                 float4 positionOS : POSITION;
                 float2 uv : TEXCOORD0;
                 float2 edge : TEXCOORD1;
+                float2 edgeFar : TEXCOORD2;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -69,9 +73,15 @@ Shader "MusicInYourHands/Portal"
                 float4 positionCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
                 float3 positionWS : TEXCOORD1;
-                float edge : TEXCOORD2;
+                float4 edges : TEXCOORD2;
+                float2 centre : TEXCOORD3;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
+
+            float Hash1(float n) { return frac(sin(n * 12.9898) * 43758.5453); }
+            float Hash2(float2 p) { return frac(sin(dot(p, float2(127.1, 311.7))) * 43758.5453); }
+
+            #include "FingerFrameFilters.hlsl"
 
             Varyings vert(Attributes input)
             {
@@ -81,12 +91,11 @@ Shader "MusicInYourHands/Portal"
                 output.positionWS = TransformObjectToWorld(input.positionOS.xyz);
                 output.positionCS = TransformWorldToHClip(output.positionWS);
                 output.uv = input.uv;
-                output.edge = input.edge.x;
+                output.edges = float4(input.edge, input.edgeFar);
+                // Only the camera filters use it: where the camera saw the room behind the window's middle.
+                output.centre = _SceneA > 9.5 || _SceneB > 9.5 ? CentreUV() : 0;
                 return output;
             }
-
-            float Hash1(float n) { return frac(sin(n * 12.9898) * 43758.5453); }
-            float Hash2(float2 p) { return frac(sin(dot(p, float2(127.1, 311.7))) * 43758.5453); }
 
             float Noise(float x)
             {
@@ -310,6 +319,15 @@ Shader "MusicInYourHands/Portal"
                 return Aurora(v);
             }
 
+            // A camera filter (10 and up) or another world.
+            float3 ViewColor(float id, View v, Lens l)
+            {
+                float3 color;
+                if (id > 9.5) color = CameraFilter(id - 10, l);
+                else color = Scene(id, v);
+                return color;
+            }
+
             half4 frag(Varyings input) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
@@ -328,20 +346,23 @@ Shader "MusicInYourHands/Portal"
 
                 // d is the signed distance to the rim (m), negative inside: the rim runs 4 mm in from the mesh's edge,
                 // so its glow fits on the mesh.
-                float d = 0.004 - input.edge;
+                float d = 0.004 - min(min(input.edges.x, input.edges.y), min(input.edges.z, input.edges.w));
                 float inside = smoothstep(0.0015, -0.0015, d) * step(0.001, _Open);
 
                 float3 color = 0;
                 if (inside > 0)
                 {
-                    color = Scene(_SceneA, v);
+                    // Where this pixel looks into the real room, for the camera filters.
+                    Lens l = (Lens)0;
+                    if (_SceneA > 9.5 || _Mix > 0.001 && _SceneB > 9.5) l = MakeLens(eye, v.dir, input.uv, input.centre);
+                    color = ViewColor(_SceneA, v, l);
                     if (_Mix > 0.001)
                     {
                         // The next world swirls in from the middle.
                         float2 p = input.uv - 0.5;
                         float rr = length(p) * 1.4 + 0.08 * sin(atan2(p.y, p.x) * 5 + _Clock * 4);
                         float m = smoothstep(rr - 0.12, rr + 0.12, _Mix * 1.35);
-                        if (m > 0.001) color = lerp(color, Scene(_SceneB, v), m);
+                        if (m > 0.001) color = lerp(color, ViewColor(_SceneB, v, l), m);
                         color += _EdgeColor.rgb * exp(-abs(_Mix * 1.35 - rr) * 25) * (1 - _Mix) * 1.5;
                     }
                     // A little shade just inside the rim, so the window reads as having depth.
