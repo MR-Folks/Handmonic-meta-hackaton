@@ -12,6 +12,7 @@ namespace MusicInYourHands
     /// starts playing straight away, then the page offers to add its lyrics. The menu steps aside while the file
     /// picker's window is open and comes back when it is done. The Audius tab lists the songs the app streams, each with
     /// the credit its license asks for; a song's Credits page adds the link to its page on Audius.
+    /// The page is reached from the cassette deck's song list button, and its Back button goes back to the deck.
     /// </summary>
     public sealed class SongLibrary
     {
@@ -100,6 +101,9 @@ namespace MusicInYourHands
         /// <summary>Raised when the file picker opens, so the menu steps out of its way.</summary>
         public event Action PickerOpened;
 
+        /// <summary>Raised by the page's Back button, after it hides: the menu goes back to the cassette deck.</summary>
+        public event Action BackPressed;
+
         public SongLibrary(Transform parent, Material panelMaterial, Vector2 center)
         {
             this.center = center;
@@ -169,6 +173,12 @@ namespace MusicInYourHands
 
         public void Hide() => IsOpen = false;
 
+        void Back()
+        {
+            Hide();
+            BackPressed?.Invoke();
+        }
+
         /// <summary>Fills the page with made-up songs, for the editor screenshots.</summary>
         public void Preview(IReadOnlyList<SongAsset> list, SongAsset current, int previewView)
         {
@@ -182,10 +192,15 @@ namespace MusicInYourHands
             if (view == View.List) toast.Label.Text = "Lyrics added to Sunday Morning";
         }
 
-        /// <summary>Takes in what the file picker did. True when the menu should come back to show it.</summary>
-        public bool Poll(MusicBus bus)
+        /// <summary>
+        /// Takes in what the file picker did. True when the menu should come back to show it; <paramref name="outcome"/>
+        /// says what happened.
+        /// </summary>
+        public bool Poll(MusicBus bus, out SongPicker.Outcome outcome)
         {
+            outcome = SongPicker.Outcome.Cancelled;
             if (bus == null || !SongPicker.TryTake(out var result)) return false;
+            outcome = result.Outcome;
             Show();
             tab = view = View.List;
             switch (result.Outcome)
@@ -381,7 +396,7 @@ namespace MusicInYourHands
             LayOutTabs(bus);
             if (songs.Count > 0) Show(count, songs.Count == 1 ? "1 song" : $"{songs.Count} songs", new Vector2(-Width * 0.5f + 0.03f, 0.145f), Soft);
             Put(add, new Vector2(0.17f, 0.165f), new Vector2(0.19f, 0.05f), "+  Add a song", Primary, () => Pick(SongPicker.Kind.Song, null));
-            Put(back, new Vector2(-0.215f, -0.178f), new Vector2(0.11f, 0.042f), "Back", Secondary, Hide);
+            Put(back, new Vector2(-0.215f, -0.178f), new Vector2(0.11f, 0.042f), "Back", Secondary, Back);
 
             if (songs.Count == 0)
             {
@@ -422,7 +437,7 @@ namespace MusicInYourHands
         void LayOutAudius(MusicBus bus)
         {
             LayOutTabs(bus);
-            Put(back, new Vector2(-0.215f, -0.178f), new Vector2(0.11f, 0.042f), "Back", Secondary, Hide);
+            Put(back, new Vector2(-0.215f, -0.178f), new Vector2(0.11f, 0.042f), "Back", Secondary, Back);
             var status = previewSongs != null ? AudiusSongs.Status.Ready : bus != null ? bus.AudiusStatus : AudiusSongs.Status.Unreachable;
             if (status == AudiusSongs.Status.NotAsked) bus?.AskAudius();
 

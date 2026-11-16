@@ -140,13 +140,17 @@ namespace MusicInYourHands.EditorTools
             bool pinched = manager.Current == 1;
             Run(0.6f);
 
-            // A touch presses the song page's buttons: open the page from its bubble, then touch the Audius tab, which
-            // shows "Try again" here since there is no MusicBus to ask Audius.
+            // The song bubble opens the cassette deck and the menu steps aside. A touch presses the song page's buttons:
+            // open the page (as the deck's song list button does), then touch the Audius tab, which shows "Try again"
+            // here since there is no MusicBus to ask Audius.
             OpenMenu();
             var library = Bubble("Bubble Library");
             Move(library - toward * 0.1f, 8);
             Move(library + toward * 0.01f, 6);
             Move(library - toward * 0.08f, 8);
+            Run(0.7f);
+            bool deckOpened = menu.Deck != null && menu.Deck.IsOpen && !root.gameObject.activeSelf;
+            menu.ShowSongList(camera);
             Run(0.7f);
             var page = root.Find("Song Library");
             bool pageShown = page.gameObject.activeSelf;
@@ -159,11 +163,11 @@ namespace MusicInYourHands.EditorTools
 
             menu.Close();
             LyricsOption.On = lyricsWere;
-            bool ok = !early && reached && ignored && cameBack && once && twice && pinched && pageShown && tabbed;
-            if (ok) Debug.Log("[Check] The menu answers touch and pinch: a fingertip presses a bubble as it reaches it, once per tap and never from behind, a far hand still points and pinches, and a touch presses the song page's buttons.");
+            bool ok = !early && reached && ignored && cameBack && once && twice && pinched && deckOpened && pageShown && tabbed;
+            if (ok) Debug.Log("[Check] The menu answers touch and pinch: a fingertip presses a bubble as it reaches it, once per tap and never from behind, a far hand still points and pinches, the song bubble opens the cassette deck, and a touch presses the song page's buttons.");
             else Debug.LogError($"[Check] Menu touch: pressed early {early}, pressed on arrival {reached}, ignored from behind {ignored}, " +
                                 $"pressed after coming back out {cameBack}, held press counted once {once}, second tap {twice}, " +
-                                $"pinch from afar {pinched}, song page opened {pageShown}, page tab touched {tabbed}.");
+                                $"pinch from afar {pinched}, song bubble opened the deck {deckOpened}, song page opened {pageShown}, page tab touched {tabbed}.");
             return ok;
         }
     }

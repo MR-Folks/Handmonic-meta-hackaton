@@ -348,9 +348,23 @@ Shader "MusicInYourHands/Bubble"
                 }
                 else if (icon < 24.5)
                 {
-                    // Add a song: a plus, gently breathing.
-                    float size = 0.46 + 0.03 * sin(t * 2.5);
-                    e = max(step(abs(p.x), 0.075) * step(abs(p.y), size), step(abs(p.y), 0.075) * step(abs(p.x), size));
+                    // The cassette deck: a cassette with a label band along its top and its two reels slowly turning.
+                    float2 q = abs(p - float2(0, 0.02)) - float2(0.56, 0.34);
+                    float shell = length(max(q, 0)) + min(max(q.x, q.y), 0) - 0.1;
+                    e = Line(abs(shell), 0.035);
+                    e += step(abs(p.x), 0.44) * step(abs(p.y - 0.25), 0.065) * 0.5;
+                    [unroll] for (int k = 0; k < 2; k++)
+                    {
+                        float2 c = p - float2(k == 0 ? -0.25 : 0.25, -0.07);
+                        float d = length(c);
+                        e += Line(abs(d - 0.13), 0.028);
+                        float a = atan2(c.y, c.x) - t * 1.1;
+                        e += pow(abs(cos(a * 1.5)), 30) * step(0.035, d) * step(d, 0.12) * 0.85;
+                    }
+                    e += Line(Segment(p, float2(-0.25, 0.06), float2(0.25, 0.06)), 0.02) * 0.35;
+                    e += Line(Segment(p, float2(-0.32, -0.42), float2(-0.22, -0.3)), 0.022) * 0.6
+                       + Line(Segment(p, float2(-0.22, -0.3), float2(0.22, -0.3)), 0.022) * 0.6
+                       + Line(Segment(p, float2(0.22, -0.3), float2(0.32, -0.42)), 0.022) * 0.6;
                 }
                 else if (icon < 25.5)
                 {

@@ -12,13 +12,15 @@ A hand-tracked mixed reality music visualizer for Meta Quest 3. You play with th
 Assets/_Project/
   Audio/      four demo songs (WAV), their word-timed lyrics (LRC) and melody notes (.notes)
   Songs/      SongAsset files: audio + lyrics + offset
-  Resources/  AudiusSongs.txt (the songs streamed from Audius) and the baked lettering
+  Resources/  AudiusSongs.txt (the songs streamed from Audius), the baked lettering, and CassetteDeck/ (the cassette
+              deck's four models and their materials)
   Scenes/     Main.unity
   Scripts/
     Runtime/Music/   MusicBus (bands, beats, song time), SongAsset, AddedSongs, AudiusSongs
     Runtime/Lyrics/  LyricsTrack (LRC parser and current line/word lookup)
     Runtime/Hands/   HandRig (palm, fingertips, pinch, fist, palm-up for every world)
     Runtime/Worlds/  World (the base every world builds on), the worlds, the menu and its song page
+    Runtime/Deck/    CassetteDeck (choosing a song by putting its cassette in a radio)
     Runtime/Debug/   MusicDebugView and HandDebugView (in-headset checks)
     Meta/            OVRHandFeed (Meta hand tracking into HandRig)
     Editor/          Quest setup, scene builder, APK build, LRC importer
@@ -28,6 +30,7 @@ Tools/
   render_songs.py        renders the demo songs, their LRC lyrics and .notes melodies
   songkit.py             the instruments, voice and file writers the songs share
   songs/                 one script per demo song
+  blender/cassette_deck.py  builds the cassette deck's models in Blender and exports them to Resources/CassetteDeck
 ```
 
 ## Setup
@@ -47,6 +50,17 @@ If settings drift, run **Music In Your Hands > Configure Project for Quest**. It
 - Meta's menu gesture (left palm up, pinch) opens the world menu 44 cm in front of you, within reach (Meta suggests 42 to 46 cm for UI you touch). Touch a bubble or a button on the song page with your index fingertip, or point at it from farther away and pinch. Within 15 cm of the menu the pointer ray gives way to a dot under your fingertip that shrinks as you close in; a press lands when the fingertip reaches the menu, and the next one needs the finger 2 cm back out. Past 20 cm the ray returns.
 - With either hand, a thumb tap on the side of your index finger plays or pauses the song, and a thumb swipe left or right steps to the previous or next one (Meta's microgestures, read by `MicrogestureFeed` and acted on by `MusicGestures`). A short caption and a soft note confirm each one. They are ignored while that hand pinches or makes a fist, during Meta's menu gesture, and while the menu is open; in Listen mode they only say "Listening to the room".
 - While the world menu is open, the world behind it leaves your hands alone: pinching or poking a bubble doesn't also draw, spray, pour or pluck.
+
+## The cassette deck
+The menu's song bubble (the cassette) opens the cassette deck, where you choose a song by hand. The menu steps aside and a small table rises out of the floor in front of you, the world playing on behind it: 68 cm high when you sit, taller when you stand, with the front cassette about 41 cm ahead and everything you touch within about 25° of the middle of your view.
+
+- **Choosing.** A turntable on the left holds one cassette per song, labels out, coloured by where the song comes from (warm for the demo songs, green for your own, blue for Audius), with a music note on the label of songs with lyrics. The cassette nearest you is the front one: it lights up, and its title, artist and lyrics show on a plate over the middle of the turntable (for a song from Audius, also its credit).
+- **Turning.** Pinch the turntable's edge and drag it round, or sweep an open hand across the cassettes. It coasts, then settles with one cassette at the front.
+- **Playing.** Pinch a cassette (or close your hand round it) to pick it up and bring it to the radio's open door: a glowing outline shows where it goes, and letting go drops it in. The door shuts with a clunk, the light comes on and the song plays, with the reels turning and the speakers pumping with the bass. Let go anywhere else and it floats home; a new cassette pops the old one back to its place. The radio's keys play or pause, stop and eject, pressed with a fingertip like the menu's buttons; Play with the radio empty plays the front cassette.
+- **Adding a song.** Put the blank cassette at the end of the ring in the radio to open the headset's file picker; the new song gets its own cassette.
+- **Song list.** The **Song list** button on the table opens the song page (adding or changing lyrics, removing songs, the Audius tab and credits). Its **Back** button returns to the deck.
+- **Closing.** The table's **Close** button or Meta's menu gesture closes the deck and leaves you in your world. Listen mode, the lyrics switch and the previous and next song stay in the menu's song row.
+- **Models.** The cassette, radio, turntable and table are made by `Tools/blender/cassette_deck.py` (`blender -b --factory-startup -P Tools/blender/cassette_deck.py`), which exports them to `Assets/_Project/Resources/CassetteDeck`. The deck finds their parts by name and gives each material slot the deck's material of the same name (`Resources/CassetteDeck/Materials`, set up by **Update Cassette Deck Materials**), so a new export needs no code change.
 
 ## Listen mode
 Poke the coral microphone bubble below the world menu to follow music playing in the room: Spotify on a phone, a speaker, a live instrument. The headset microphone replaces the song, so the bands, beats and every world follow whatever you hear. There are no lyrics or melody notes while listening: Note rain falls from the bands instead, and Air strings play freely without guide beads. Poke it again ("Play song") to go back to the song. The centre bubble pauses listening.
@@ -78,11 +92,11 @@ People can play their own music: they copy an audio file (`.mp3`, `.ogg` or `.wa
 - The app only plays these files and shows their lyrics to the person wearing the headset; nothing is uploaded or shared.
 
 ## Songs from Audius
-The app also streams a short, hand-picked list of songs from [Audius](https://audius.co), a free music service for independent artists. They come after your own songs in the arrow bubbles, and the song page has an **Audius** tab that lists them, each with its credit.
+The app also streams a short, hand-picked list of songs from [Audius](https://audius.co), a free music service for independent artists. They come after your own songs in the arrow bubbles and on the cassette deck's turntable, and the song page (the deck's **Song list** button) has an **Audius** tab that lists them, each with its credit.
 
 - The list is `Assets/_Project/Resources/AudiusSongs.txt`: one track per line, its id and then its page. The first time the menu opens, the app asks Audius for those tracks in one request. A song's audio, a whole MP3 of 5 to 15 MB, streams in when it is chosen, stays compressed while it plays (decoding a whole song at once froze the headset for 0.7 s), and is freed when another song plays. The headset's log notes each one (`[Audius] Streamed <title>: <size> in <time>`). No account or API key is needed, and each play counts towards the track's plays on Audius.
 - **Picking songs.** A track's id is `data.id` at `https://api.audius.co/v1/resolve?url=<the song's page>&app_name=MusicInYourHands`. Only pick tracks published by their own artist or label, with no remixes, mashups, covers, DJ mixes, samples of other people's music or explicit lyrics: anyone can upload to Audius, and its license only holds if the publisher owns the song. Listen to each one all the way through before a release. The first ten picks (1 Nov 2026) are electronic, house, lo-fi, ambient, jazz, drum and bass and trance tracks from verified artists and labels, chosen by these rules from Audius's track details alone; nobody has listened to them yet.
-- **Credits.** Audius's [Open Music License](https://openaudiofoundation.org/open-music-license.pdf) lets music players stream its tracks. For commercial use (§1.5) it asks for the publisher's name, a copyright notice, a mention of the license and a link to the track. Each song on the Audius tab shows "© publisher", its **Credits** page shows all four, and while a song from Audius plays the menu shows a credit line under the song row. If an artist asks to be left out, take their song off the list.
+- **Credits.** Audius's [Open Music License](https://openaudiofoundation.org/open-music-license.pdf) lets music players stream its tracks. For commercial use (§1.5) it asks for the publisher's name, a copyright notice, a mention of the license and a link to the track. Each song on the Audius tab shows "© publisher", its **Credits** page shows all four, and while a song from Audius plays the menu shows a credit line under the song row. On the cassette deck, a song from Audius shows its title, publisher and license over the turntable when it is at the front, and its credit above the radio while it plays. If an artist asks to be left out, take their song off the list.
 - Without internet, the Audius tab says it couldn't reach Audius and offers **Try again**, and a song that can't stream says so in the menu. Everything else works offline. If an artist removes or locks a track, it drops off the list; **Run Editor Checks** warns when a picked song can't play any more, and fails if a streamed song takes 100 ms or more to get ready.
 - The app sends Audius nothing about the person, but Audius and the servers its music comes from see each request, including the headset's IP address, so the app's privacy policy should mention it. The `INTERNET` permission this needs is in `Assets/Plugins/Android/AndroidManifest.xml`.
 

@@ -143,8 +143,9 @@ namespace MusicInYourHands
         protected bool IsPinching(bool left) => pinching[left ? 0 : 1];
 
         /// <summary>
-        /// True while the world menu is open, its song page included (the page shows inside the menu and closes with
-        /// it). The hands are choosing there, so a world leaves their pinches, touches, fists and pushes alone.
+        /// True while the world menu, the cassette deck or the song page is open (the deck opens from the menu, and the
+        /// page from the deck). The hands are choosing there, so a world leaves their pinches, touches, fists and pushes
+        /// alone.
         /// OnPinch, OnRelease and IsPinching already do: no pinch starts while the menu is open, a pinch held as it
         /// opens gets its OnRelease, and one still held as it closes counts only once the hand has opened and pinched
         /// again. A world that reads the hands itself (hand.Pinch, Fist, a fingertip or palm on something) checks this

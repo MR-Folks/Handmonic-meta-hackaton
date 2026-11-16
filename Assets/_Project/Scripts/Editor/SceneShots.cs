@@ -79,6 +79,8 @@ namespace MusicInYourHands.EditorTools
             Shot<SandTable>("11-sand-table", HandPose.PalmsDown, 40f, closeUp: rig => rig.Right.Palm.position + Vector3.down * 0.08f,
                 handOffset: side => side == "R" ? new Vector3(0.02f, -0.24f, 0.12f) : new Vector3(-0.05f, -0.12f, 0.06f));
             MenuShot();
+            CassetteDeckSetup.EnsureMaterials();
+            DeckShots();
 
             // The same worlds in a scanned, furnished room: on the real table, walls, ceiling and furniture.
             Shot<SoundPool>("8r-sound-pool-room", HandPose.PalmsDown, 42f, closeUp: rig => rig.Right.Palm.position + Vector3.down * 0.04f,
