@@ -684,7 +684,6 @@ MonoBehaviour:
   ringsMaterial: {fileID: 2100000, guid: 24dd6462e955ec54a8715367bdb02cd6, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
-  skyMaterial: {fileID: 2100000, guid: a377da8a64af84ae68901afb43ab9d32, type: 2}
   orbitDrop: 0.32
   headRoom: 0.22
   headGap: 0.3
@@ -703,10 +702,6 @@ MonoBehaviour:
   grabReach: 0.05
   warmAim: 28
   warmUp: 1.5
-  cometLife: 3.6
-  wordRing: 1
-  wordDrop: 0.12
-  cometSweep: 12
   starReach: {x: 0.9, y: 2}
   starSpread: 50
   starLabelHeight: 0.07
