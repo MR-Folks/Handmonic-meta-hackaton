@@ -1,12 +1,17 @@
 // Low-poly beads: solid shapes with flat facets (each face has its own normal in the mesh), lit softly from above with
 // a glint where a facet catches the light and a glow at the silhouette. Drawn instanced, one draw call for all of them;
 // each bead's colour comes from _Tint (rgb), and its alpha makes the bead glow brighter. Opaque, so beads under the
-// water show through its tint like things in it.
+// water show through its tint like things in it. _Shade, _Glint, _GlintPower and _Rim tune how lively the facets are;
+// their defaults are the original look, and a world wanting calmer beads sets its own on a copy of the material.
 Shader "MusicInYourHands/Facet"
 {
     Properties
     {
         _Light ("Light direction", Vector) = (0.3, 1, -0.25, 0)
+        _Shade ("How much the facets differ in light, 0-1", Float) = 0.65
+        _Glint ("Glint where a facet catches the light", Float) = 0.7
+        _GlintPower ("Glint sharpness (higher is smaller)", Float) = 24
+        _Rim ("Glow at the silhouette", Float) = 0.5
     }
 
     SubShader
@@ -28,6 +33,10 @@ Shader "MusicInYourHands/Facet"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _Light;
+                float _Shade;
+                float _Glint;
+                float _GlintPower;
+                float _Rim;
             CBUFFER_END
 
             UNITY_INSTANCING_BUFFER_START(Beads)
@@ -70,9 +79,9 @@ Shader "MusicInYourHands/Facet"
                 float3 n = normalize(input.normalWS);
                 float3 v = normalize(GetWorldSpaceViewDir(input.positionWS));
                 float3 l = normalize(_Light.xyz);
-                float lit = saturate(dot(n, l)) * 0.65 + 0.35;
-                float glint = pow(saturate(dot(reflect(-l, n), v)), 24) * 0.7;
-                float rim = pow(1 - saturate(abs(dot(n, v))), 2) * 0.5;
+                float lit = saturate(dot(n, l)) * _Shade + (1 - _Shade);
+                float glint = pow(saturate(dot(reflect(-l, n), v)), _GlintPower) * _Glint;
+                float rim = pow(1 - saturate(abs(dot(n, v))), 2) * _Rim;
                 float3 color = tint.rgb * (lit + rim) * (1 + tint.a) + glint;
                 return half4(color, 1);
             }

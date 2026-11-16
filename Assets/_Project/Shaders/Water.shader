@@ -1,7 +1,8 @@
 // The Sound pool's liquid surface: a see-through teal sheet whose heights come from SoundPool's wave simulation.
 // Slopes catch a soft highlight and the edges fade into a thin glowing lip so the pool sits in the room without a
 // hard box. (The specks of light in the water are real 3D particles, drawn by SoundPool.) It draws before the
-// hands, so a hand in the water always shows through, tinted by its own underwater effect.
+// hands, so a hand in the water always shows through, tinted by its own underwater effect. While you hold the pool up
+// with both hands, a soft light gathers in the water over each palm (_PalmL, _PalmR).
 Shader "MusicInYourHands/Water"
 {
     Properties
@@ -12,6 +13,12 @@ Shader "MusicInYourHands/Water"
         _Dots ("Dot lattice (columns, rows)", Vector) = (56, 40, 0, 0)
         _Kick ("Beat 0-1 (set by SoundPool)", Float) = 0
         _Alpha ("Fade (set by SoundPool)", Float) = 1
+        _Spec ("Highlight strength", Float) = 1.6
+        _SpecPower ("Highlight sharpness (higher is smaller)", Float) = 60
+        _LipBeat ("How much the beat brightens the edge", Float) = 0.5
+        _CrestGain ("How quickly the water turns crest-coloured as it rises or falls", Float) = 140
+        _PalmL ("Left palm holding the pool: position, glow (set by SoundPool)", Vector) = (0, 0, 0, 0)
+        _PalmR ("Right palm holding the pool: position, glow (set by SoundPool)", Vector) = (0, 0, 0, 0)
     }
 
     SubShader
@@ -39,6 +46,12 @@ Shader "MusicInYourHands/Water"
                 float4 _Dots;
                 float _Kick;
                 float _Alpha;
+                float _Spec;
+                float _SpecPower;
+                float _LipBeat;
+                float _CrestGain;
+                float4 _PalmL;
+                float4 _PalmR;
             CBUFFER_END
 
             struct Attributes
@@ -83,19 +96,24 @@ Shader "MusicInYourHands/Water"
 
                 // Highlight from a soft light above and behind the viewer.
                 float3 light = normalize(float3(0.25, 1, -0.35));
-                float spec = pow(saturate(dot(reflect(-light, n), v)), 60) * 1.6;
+                float spec = pow(saturate(dot(reflect(-light, n), v)), _SpecPower) * _Spec;
 
-                float crest = saturate(abs(input.height) * 140 + slope * 0.4);
+                float crest = saturate(abs(input.height) * _CrestGain + slope * 0.4);
                 float3 color = lerp(_Deep.rgb, _Shallow.rgb, saturate(crest * 0.7 + fresnel * 0.4));
 
                 // Soft edges with a thin glowing lip.
                 float2 e = min(input.uv, 1 - input.uv);
                 float edge = min(e.x * 1.4, e.y);
                 float inside = smoothstep(0.0, 0.05, edge);
-                float lip = exp(-pow((edge - 0.012) / 0.006, 2)) * (0.7 + _Kick * 0.5);
+                float lip = exp(-pow((edge - 0.012) / 0.006, 2)) * (0.7 + _Kick * _LipBeat);
 
-                color += spec + _Lip.rgb * lip;
-                float alpha = _Deep.a * 0.5 + fresnel * 0.3 + crest * 0.25 + spec;
+                // The light gathered over the palms holding the pool, about a hand wide.
+                float2 dl = input.positionWS.xz - _PalmL.xz;
+                float2 dr = input.positionWS.xz - _PalmR.xz;
+                float held = _PalmL.w * exp(-dot(dl, dl) / 0.008) + _PalmR.w * exp(-dot(dr, dr) / 0.008);
+
+                color += spec + _Lip.rgb * (lip + held * 0.7);
+                float alpha = _Deep.a * 0.5 + fresnel * 0.3 + crest * 0.25 + spec + held * 0.3;
                 alpha = saturate(alpha) * inside + lip;
                 return half4(color, saturate(alpha) * _Alpha);
             }

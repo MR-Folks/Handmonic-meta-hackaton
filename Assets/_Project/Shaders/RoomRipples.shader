@@ -3,7 +3,9 @@
 // in world space at the same scale, as bright as under the pool there (_Origin: where that is, and its strength) and
 // fading away with distance, so it climbs a little way up the walls and is gone before the far side of the room. Each
 // wave the pool sends (_Waves: world position, age; _WaveColors: colour, strength) travels out from it as a brighter
-// swell of that same web, fading just the same.
+// swell of that same web, fading just the same. _Sharpness, _Fill, _Smooth, _RingWidth, _RingGain and _Drift set how
+// sharp and lively the light is; their defaults are the original look, and Sound pool sets calmer ones on its own copy
+// of the material.
 Shader "MusicInYourHands/RoomRipples"
 {
     Properties
@@ -17,6 +19,12 @@ Shader "MusicInYourHands/RoomRipples"
         _Size ("Quad size (m) (set by RoomWaves)", Vector) = (3, 2.5, 0, 0)
         _Pulse ("Bass 0-1 (set by RoomWaves)", Float) = 0
         _Alpha ("Fade (set by RoomWaves)", Float) = 1
+        _Sharpness ("How thin and bright the web's lines are", Float) = 12
+        _Fill ("Soft even light between the lines, 0-1", Float) = 0
+        _Smooth ("Soften detail too fine to see sharply (far away, at a slant), 0-1", Float) = 0
+        _RingWidth ("Width (m) of each wave's swell", Float) = 0.3
+        _RingGain ("How much brighter a wave makes the light", Float) = 0.9
+        _Drift ("How fast the web shifts", Float) = 0.8
     }
 
     SubShader
@@ -47,9 +55,18 @@ Shader "MusicInYourHands/RoomRipples"
                 float4 _Size;
                 float _Pulse;
                 float _Alpha;
-                float4 _Waves[8];
-                float4 _WaveColors[8];
+                float _Sharpness;
+                float _Fill;
+                float _Smooth;
+                float _RingWidth;
+                float _RingGain;
+                float _Drift;
             CBUFFER_END
+
+            // Set per quad through a property block, so they stay out of the per-material buffer: arrays inside it
+            // don't reach the shader on Quest.
+            float4 _Waves[8];
+            float4 _WaveColors[8];
 
             struct Attributes
             {
@@ -78,14 +95,14 @@ Shader "MusicInYourHands/RoomRipples"
             }
 
             // The same web as the light under the pool (Caustics shader): two warped interference grids, with light
-            // gathering where either crosses zero.
-            float Caustic(float2 p, float t)
+            // gathering where either crosses zero; the higher the sharpness, the thinner the lines.
+            float Caustic(float2 p, float t, float sharpness)
             {
                 float2 a = p + float2(sin(p.y * 1.7 + t * 0.9), cos(p.x * 1.3 - t * 0.7)) * 0.65;
                 float2 b = p * 1.37 + float2(cos(p.y * 1.1 - t * 0.6), sin(p.x * 1.9 + t * 0.8)) * 0.65;
                 float l1 = abs(sin(a.x * 2.0) * sin(a.y * 2.0));
                 float l2 = abs(sin(b.x * 2.0 + 1.3) * sin(b.y * 2.0 + 0.7));
-                return pow(1.0 - l1, 12.0) * 0.7 + pow(1.0 - l2, 12.0) * 0.55;
+                return pow(1.0 - l1, sharpness) * 0.7 + pow(1.0 - l2, sharpness) * 0.55;
             }
 
             half4 frag(Varyings input) : SV_Target
@@ -95,7 +112,13 @@ Shader "MusicInYourHands/RoomRipples"
                 // Floor and ceiling take the pattern across x and z, as under the pool; walls across their own face.
                 float3 n = normalize(cross(ddy(p), ddx(p)));
                 float2 plane = abs(n.y) > 0.5 ? p.xz : abs(n.x) > abs(n.z) ? p.zy : p.xy;
-                float web = saturate(Caustic(plane * _Scale, _Time.y * 0.8));
+                float2 q = plane * _Scale;
+                float web = saturate(Caustic(q, _Time.y * _Drift, _Sharpness));
+                // Where the lines get finer than the eye can follow (far away, or seen at a slant) they would shimmer as
+                // you move; there they melt into an even glow instead. Also a little even light between the lines.
+                float blur = length(fwidth(q));
+                web = lerp(web, 0.3, _Smooth * smoothstep(0.05, 0.3, blur));
+                web = lerp(web, 0.3, _Fill);
 
                 // As bright as under the pool there, fading smoothly to nothing at _Reach.
                 float d = distance(p, _Origin.xyz);
@@ -107,9 +130,9 @@ Shader "MusicInYourHands/RoomRipples"
                     float age = _Waves[i].w;
                     if (age < 0 || age > _Life) continue;
                     float reach = age * _Speed;
-                    float swell = exp(-pow((distance(p, _Waves[i].xyz) - reach) / 0.3, 2));
+                    float swell = exp(-pow((distance(p, _Waves[i].xyz) - reach) / _RingWidth, 2));
                     float fade = (1 - age / _Life) * (1 - age / _Life) * _WaveColors[i].a;
-                    strength += swell * fade * 0.9;
+                    strength += swell * fade * _RingGain;
                 }
 
                 // The same colour and brightness as the Caustics patch, so the two meet without a seam.
