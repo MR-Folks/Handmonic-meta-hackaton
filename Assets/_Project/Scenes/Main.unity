@@ -486,6 +486,7 @@ MonoBehaviour:
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
+  drumMaterial: {fileID: 2100000, guid: afc5be5cdf2cee3448b418a9fe252c2b, type: 2}
   stringCount: 8
   distance: 0.42
   width: 0.62
@@ -493,6 +494,10 @@ MonoBehaviour:
   curve: 0.1
   points: 72
   reach: 0.035
+  strikeSpeed: 0.35
+  fullStrikeSpeed: 2
+  strikeRest: 0.12
+  wakeWithoutBeat: 1.2
 --- !u!4 &179923060
 Transform:
   m_ObjectHideFlags: 0
