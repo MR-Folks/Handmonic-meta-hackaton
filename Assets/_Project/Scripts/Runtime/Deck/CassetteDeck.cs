@@ -658,6 +658,8 @@ namespace MusicInYourHands
             }
             noPickerUntil = clock + 4f;
             Eject(blank);
+            // The song that was playing goes back in, since it is still playing.
+            busKnown = false;
         }
 
         /// <summary>One frame of every cassette: on the ring, in a hand, or on its way somewhere.</summary>
@@ -852,6 +854,18 @@ namespace MusicInYourHands
 
         /// <summary>The song <paramref name="steps"/> places round from the front (positive to the right).</summary>
         public SongAsset SongBeside(int steps) => ring.Count > 0 ? ring[turning.Wrap(turning.Front + steps)].Song : null;
+
+        /// <summary>The middle of the blank cassette, in the world.</summary>
+        public Vector3 BlankCenter => blank.Root.position;
+
+        /// <summary>Whether the blank cassette is in the radio.</summary>
+        public bool BlankInRadio => inserted == blank;
+
+        /// <summary>Whether the blank cassette stands in its place on the turntable.</summary>
+        public bool BlankOnTurntable => blank.Place == Place.Ring;
+
+        /// <summary>The height of the table top above the floor (m).</summary>
+        public float TableHeight => top;
 
         /// <summary>The middle of the radio's slot, where a cassette sits once it's in.</summary>
         public Vector3 SlotPosition => slot.position;

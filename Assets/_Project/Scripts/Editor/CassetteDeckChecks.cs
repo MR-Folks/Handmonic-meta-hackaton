@@ -225,10 +225,9 @@ namespace MusicInYourHands.EditorTools
                 Run(0.2f);
             }
             // Picks up a cassette: the open hand comes from in front and above, then pinches its middle.
-            void PickUp(SongAsset song)
+            void PickUp(SongAsset song) => PickUpAt(menu.Deck.CassetteCenter(song));
+            void PickUpAt(Vector3 center)
             {
-                var deckNow = menu.Deck;
-                var center = deckNow.CassetteCenter(song);
                 var toward = Vector3.ProjectOnPlane(camera.transform.position - center, Vector3.up).normalized;
                 Move(center + toward * 0.12f + Vector3.up * 0.1f, 14, Open);
                 Move(center, 14, Open);
@@ -379,6 +378,19 @@ namespace MusicInYourHands.EditorTools
                 long allocated = System.GC.GetAllocatedBytesForCurrentThread() - before;
                 Expect(allocated == 0, $"no memory allocated per frame ({allocated} bytes over 120 frames)");
 
+                // The blank cassette in the radio opens the file picker on the headset; here it says so, comes
+                // back out, and the song that is still playing goes back in.
+                var playingNow = bus.CurrentSong;
+                PickUpAt(deck.BlankCenter);
+                CarryToRadio();
+                Pinch(false);
+                Move(pinchAt + Vector3.up * 0.12f - gaze * 0.05f, 10, Open);
+                Run(0.3f);
+                bool blankIn = deck.BlankInRadio;
+                Run(2.6f);
+                Expect(blankIn && deck.BlankOnTurntable && deck.InsertedSong == playingNow && bus.CurrentSong == playingNow,
+                    $"the blank cassette goes in, says the picker opens on the headset and comes home, and {Title(playingNow)} goes back in (in: {blankIn}, home: {deck.BlankOnTurntable}, radio: {Title(deck.InsertedSong)})");
+
                 // The close button closes it; Meta's menu gesture does too.
                 Press("Close Button");
                 Run(0.8f);
@@ -389,7 +401,18 @@ namespace MusicInYourHands.EditorTools
                 menu.Toggle(camera);
                 Run(0.8f);
                 Expect(reopened && !deck.IsOpen && !menu.IsOpen, "Meta's menu gesture closes the deck");
-                return Report(failures);
+
+                // Standing (eyes 1.6 m up), the table grows so the deck stays within easy reach.
+                camera.transform.position = new Vector3(0f, 1.6f, 0f);
+                menu.OpenDeck(camera);
+                Run(1.2f);
+                float standingTop = deck.TableHeight;
+                float standingReach = Vector3.ProjectOnPlane(deck.CassetteCenter(deck.FrontSong) - camera.transform.position, Vector3.up).magnitude;
+                Expect(standingTop > 0.9f && standingTop < 1f && standingReach > 0.35f && standingReach < 0.45f,
+                    $"standing, the table top rises to {standingTop:0.00} m with the front cassette {standingReach:0.00} m ahead");
+                menu.Toggle(camera);
+                Run(0.6f);
+                return Report(failures, $"Seated: front cassette {reach:0.00} m ahead, everything to touch within {widest:0.0}° of the gaze ({widestName}), table top {tableTop:0.00} m; standing: table top {standingTop:0.00} m.");
             }
             finally
             {
@@ -413,13 +436,14 @@ namespace MusicInYourHands.EditorTools
             return fine ? "" : $"{part} is at {at}, on the wrong side (want x {x}, z {z}: front on -Z, left on -X). ";
         }
 
-        static bool Report(List<string> failures)
+        static bool Report(List<string> failures, string measures = "")
         {
             if (failures.Count == 0)
             {
                 Debug.Log("[Check] The cassette deck works by hand: the song bubble opens it within reach and view, dragging the edge turns it, " +
                           "a pinched cassette shows the snap outline at the radio and plays when let go, the next one pops it home, Eject and Play work, " +
-                          "the song list and its Back button come and go, a sweep turns it, the close button and the menu gesture close it, and a frame allocates nothing.");
+                          "the song list and its Back button come and go, a sweep turns it, the blank cassette asks for the file picker, the close button " +
+                          "and the menu gesture close it, standing raises the table, and a frame allocates nothing. " + measures);
                 return true;
             }
             Debug.LogError("[Check] Cassette deck: " + string.Join("; ", failures) + ".");
