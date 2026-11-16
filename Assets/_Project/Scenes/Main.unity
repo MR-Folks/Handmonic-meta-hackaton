@@ -3069,6 +3069,11 @@ MonoBehaviour:
   muffledCutoff: 650
   fullDip: 0.1
   dropTime: 0.5
+  liftSpeed: 0.6
+  liftFollow: 8
+  eyeClearance: 0.25
+  floorClearance: 0.15
+  holdDelay: 0.2
 --- !u!4 &2000780159
 Transform:
   m_ObjectHideFlags: 0

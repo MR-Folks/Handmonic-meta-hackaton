@@ -43,6 +43,19 @@ namespace MusicInYourHands.EditorTools
             // The right hand dips into the pool; the left rests above it.
             Shot<SoundPool>("8-sound-pool", HandPose.PalmsDown, 38f, closeUp: rig => rig.Right.Palm.position + Vector3.down * 0.04f,
                 handOffset: side => side == "R" ? new Vector3(-0.03f, -0.27f, 0.12f) : new Vector3(0f, -0.12f, 0.1f));
+            // Both hands cupped under the water hold the pool: they rest there a moment, then rise 20 cm over a second
+            // and a half, and the pool comes up with them, mounded over the palms and dripping from the hands.
+            int liftFrames = 0;
+            float lifted = 0f;
+            Shot<SoundPool>("8l-sound-pool-lift", HandPose.PalmsUp, 30f,
+                holdPose: rig =>
+                {
+                    float rise = Mathf.Clamp(++liftFrames - 25, 0, 45) * (0.2f / 45f);
+                    RaiseHands(rig, rise - lifted);
+                    lifted = rise;
+                },
+                closeUp: rig => (rig.Left.Palm.position + rig.Right.Palm.position) * 0.5f + Vector3.up * 0.03f,
+                handOffset: side => new Vector3(side == "L" ? 0.06f : -0.06f, -0.26f, 0.13f));
             Shot<SoundWind>("9-sound-wind", HandPose.PalmsToFace, 22f, closeUp: rig => rig.Left.Palm.position,
                 handOffset: side => side == "L" ? new Vector3(-0.05f, 0f, 0.15f) : new Vector3(0.05f, -0.1f, 0f));
             Shot<BubbleNotes>("10-bubble-notes", HandPose.BacksToFace, 4f, closeUp: rig => rig.Right.Tips[1] + new Vector3(-0.08f, 0.12f, 0.12f), lead: 8f);
@@ -201,6 +214,20 @@ namespace MusicInYourHands.EditorTools
                     new Room.Surface(sofa, Vector3.up, Vector3.right, new Vector2(0.8f, 1.5f)),
                     new Room.Surface(shelf, Vector3.up, Vector3.right, new Vector2(0.6f, 0.35f))
                 });
+        }
+
+        /// <summary>Moves both posed hands up by <paramref name="rise"/> metres and feeds them to the rig again.</summary>
+        static void RaiseHands(HandRig rig, float rise)
+        {
+            if (rise == 0f) return;
+            foreach (bool left in new[] { true, false })
+            {
+                var hand = rig.Get(left);
+                if (hand.PalmJoint == null) continue;
+                hand.PalmJoint.root.position += Vector3.up * rise;
+                var tips = hand.TipJoints.Select(t => t.position).ToArray();
+                rig.Push(left, true, new Pose(hand.PalmJoint.position, hand.PalmJoint.rotation), hand.PalmNormal, tips);
+            }
         }
 
         /// <summary>For Shadow play: the hands raised a little and apart, the way you hold them up to make shadows.</summary>
