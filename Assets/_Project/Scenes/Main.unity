@@ -1805,6 +1805,9 @@ MonoBehaviour:
   sway: 0.26
   ripple: 0.35
   boldPerBeat: 3
+  sunLean: 0.35
+  sunFace: 0.6
+  sunSize: 0.14
   leanReach: 0.6
   overReach: 0.2
   maxStretch: 0.7
