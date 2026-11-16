@@ -281,9 +281,49 @@ namespace MusicInYourHands.EditorTools
                         widestName = name;
                     }
                 }
+                // The words over the turntable: inside the view too, and covering no label of the cassettes at the
+                // front (as seen from the eyes), since those are what you choose by.
+                var plate = deck.FrontPlate;
+                float plateWidest = 0f;
+                foreach (var side in new[] { -0.5f, 0.5f })
+                {
+                    float angle = Mathf.Abs(Vector3.SignedAngle(gaze, Vector3.ProjectOnPlane(plate.TransformPoint(side, 0f, 0f) - eye, Vector3.up), Vector3.up));
+                    plateWidest = Mathf.Max(plateWidest, angle);
+                    if (angle > widest)
+                    {
+                        widest = angle;
+                        widestName = "words over the turntable";
+                    }
+                }
+                Rect Seen(System.Func<int, Vector3> corner)
+                {
+                    var min = new Vector2(float.MaxValue, float.MaxValue);
+                    var max = new Vector2(float.MinValue, float.MinValue);
+                    for (int k = 0; k < 4; k++)
+                    {
+                        var v = (Vector2)camera.WorldToViewportPoint(corner(k));
+                        min = Vector2.Min(min, v);
+                        max = Vector2.Max(max, v);
+                    }
+                    return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+                }
+                var plateSeen = Seen(k => plate.TransformPoint((k & 1) == 0 ? -0.5f : 0.5f, (k & 2) == 0 ? -0.5f : 0.5f, 0f));
+                var covered = new List<string>();
+                for (int step = -2; step <= 2; step++)
+                {
+                    var neighbour = deck.SongBeside(step);
+                    if (neighbour == null) continue;
+                    // Only labels turned towards you can be read.
+                    var centre = deck.PointOnCassette(neighbour, Vector3.zero);
+                    var outward = (deck.PointOnCassette(neighbour, Vector3.back * 0.01f) - centre).normalized;
+                    if (Vector3.Dot(outward, (eye - centre).normalized) < 0.3f) continue;
+                    var labelSeen = Seen(k => deck.PointOnCassette(neighbour, new Vector3((k & 1) == 0 ? -0.044f : 0.044f, (k & 2) == 0 ? 0.0095f : 0.029f, -0.006f)));
+                    if (labelSeen.Overlaps(plateSeen)) covered.Add(neighbour.title);
+                }
+                Expect(covered.Count == 0, $"the words over the turntable cover no front label (covered: {string.Join(", ", covered)})");
                 float tableTop = deck.Root.Find("Rise/Table/Top Lift/TopSurface") is Transform top ? top.position.y : -1f;
                 Expect(reach > 0.35f && reach < 0.45f, $"front cassette within reach ({reach:0.000} m ahead)");
-                Expect(widest <= 27f, $"everything to touch within the narrow view (widest: {widestName} at {widest:0.0}°)");
+                Expect(widest <= 26f, $"everything to touch within the narrow view (widest: {widestName} at {widest:0.0}°)");
                 Expect(Mathf.Abs(tableTop - 0.68f) < 0.003f, $"table top at 0.68 m for a seated player (at {tableTop:0.000} m)");
 
                 // Turn the turntable: pinch its edge to the right of the front and drag it round to the left.
@@ -412,7 +452,7 @@ namespace MusicInYourHands.EditorTools
                     $"standing, the table top rises to {standingTop:0.00} m with the front cassette {standingReach:0.00} m ahead");
                 menu.Toggle(camera);
                 Run(0.6f);
-                return Report(failures, $"Seated: front cassette {reach:0.00} m ahead, everything to touch within {widest:0.0}° of the gaze ({widestName}), table top {tableTop:0.00} m; standing: table top {standingTop:0.00} m.");
+                return Report(failures, $"Seated: front cassette {reach:0.00} m ahead, everything to touch within {widest:0.0}° of the gaze ({widestName}), the words over the turntable within {plateWidest:0.0}° and clear of the front labels, table top {tableTop:0.00} m; standing: table top {standingTop:0.00} m.");
             }
             finally
             {

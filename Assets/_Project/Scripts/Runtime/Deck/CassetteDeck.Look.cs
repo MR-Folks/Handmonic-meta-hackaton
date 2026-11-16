@@ -45,8 +45,10 @@ namespace MusicInYourHands
         static readonly Color BlankShell = new Color(0.9f, 0.93f, 0.96f);
 
         const string BlankTitle = "+  Add a song";
-        const float TitleHeight = 0.015f, InfoHeight = 0.0102f, CreditHeight = 0.0092f, HintHeight = 0.009f, StatusHeight = 0.011f;
-        const string StreamedLine = "From Audius  ·  " + AudiusSongs.License;
+        // The front cassette's words lie on a plate over the middle of the turntable, about 70 cm from your eyes.
+        const float TitleHeight = 0.021f, InfoHeight = 0.0135f, CreditHeight = 0.012f, HintHeight = 0.012f, StatusHeight = 0.011f;
+        /// <summary>How wide the words over the turntable may be (m), so the plate stays clear of the cassettes round it.</summary>
+        const float PlateWidth = 0.18f;
         const string NoPicker = "The file picker opens on the headset";
 
         enum Status { Empty, Listening, Blank, NoPicker, Loading, Failed, Playing, Paused, Stopped }
@@ -56,7 +58,9 @@ namespace MusicInYourHands
         TypeLabel[] steadyLabels;
         Renderer[] speakers;
         Renderer edgeGlow, floorShadow, frontPlate, radioPlate;
-        float frontWidth, frontWidthBare, radioWidth, hintFade = 1f;
+        float frontWidth, frontWidthBare, radioWidth, hintFade = 1f, titleScale = 1f, infoScale = 1f, hintScale = 1f;
+        /// <summary>Set once a cassette has gone into the radio by hand: the how-to line has done its job.</summary>
+        static bool learned;
         Renderer[] tableShadows;
         readonly Renderer[] dots = new Renderer[2];
         Vector3 radioCaption;
@@ -439,19 +443,27 @@ namespace MusicInYourHands
                 shownFront = c;
                 shownInRadio = inRadio;
                 shownLyrics = lyrics;
-                title.Text = c == null ? "" : c.Blank ? "Add a song" : Fit(c.Song != null ? c.Song.title : "", TitleHeight, 0.34f);
-                info.Text = c == null ? "" : Fit(InfoLine(c, inRadio, lyrics), InfoHeight, 0.38f);
+                // A long title gets a little smaller before it is shortened.
+                string name = c == null ? "" : c.Blank ? "Add a song" : c.Song != null ? c.Song.title ?? "" : "";
+                titleScale = Mathf.Clamp(PlateWidth / Mathf.Max(TypeFace.Bold.Width(name) * TitleHeight, 1e-4f), 0.72f, 1f);
+                title.Text = Fit(name, TitleHeight * titleScale, PlateWidth);
+                title.Transform.localScale = Vector3.one * titleScale;
+                string about = c == null ? "" : InfoLine(c, inRadio, lyrics);
+                infoScale = Mathf.Clamp(PlateWidth / Mathf.Max(TypeFace.Bold.Width(about) * InfoHeight, 1e-4f), 0.8f, 1f);
+                info.Text = Fit(about, InfoHeight * infoScale, PlateWidth);
+                info.Transform.localScale = Vector3.one * infoScale;
                 // A song from Audius carries the credit its license asks for across the lines: the title, then who
                 // made and owns it, then the license.
                 shownCredit = c != null && c.Song != null && c.Song.IsFromAudius;
-                if (shownCredit) credit.Text = StreamedLine;
+                if (shownCredit) credit.Text = AudiusSongs.License;
                 MeasureFront();
             }
             if (credit.GameObject.activeSelf != shownCredit) credit.GameObject.SetActive(shownCredit);
 
-            // The general hint shows for the first seconds after opening; the hints for what a hand is doing, always.
+            // The how-to line shows until the first cassette goes into the radio; the hints for what a hand is doing,
+            // always.
             var hintNow = HintNow(c);
-            bool hinting = hintNow != Hint.Pick || openClock < 10f;
+            bool hinting = hintNow != Hint.Pick || !learned;
             hintFade = Mathf.MoveTowards(hintFade, hinting ? 1f : 0f, dt * 2f);
             if (hint.GameObject.activeSelf != hintFade > 0.01f) hint.GameObject.SetActive(hintFade > 0.01f);
             if (hintNow != shownHint)
@@ -459,35 +471,36 @@ namespace MusicInYourHands
                 shownHint = hintNow;
                 hint.Text = hintNow switch
                 {
-                    Hint.Carry => "Bring it to the radio's open door",
+                    Hint.Carry => "Bring it to the radio's door",
                     Hint.Drop => "Let go to put it in",
                     Hint.Edge => "Pinch the edge and drag to turn",
-                    Hint.Turning => "Let go and it settles on a cassette",
-                    Hint.Blank => "Put the blank cassette in the radio to add a song",
-                    _ => "Pinch a cassette and put it in the radio  ·  turn it by the edge"
+                    Hint.Turning => "Let go and it settles",
+                    Hint.Blank => "Put it in the radio to add a song",
+                    _ => "Pinch a cassette to pick it up"
                 };
+                hintScale = Mathf.Clamp(PlateWidth / Mathf.Max(TypeFace.Bold.Width(hint.Text) * HintHeight, 1e-4f), 0.8f, 1f);
+                hint.Text = Fit(hint.Text, HintHeight * hintScale, PlateWidth);
+                hint.Transform.localScale = Vector3.one * hintScale;
                 MeasureFront();
             }
 
-            // Stacked upwards from a little above the front cassette, turned to your eyes, on a plate.
-            var front3 = new Vector3(front.x, 0f, front.y);
-            var anchor = onTable.TransformPoint(turntableAt + front3 * (rimRadius + 0.015f) + Vector3.up * (rimHeight + cassetteSize.y * 1.08f + 0.04f));
-            var facingYou = Facing(anchor);
-            float y = 0f, low = shownCredit ? -CreditHeight * 0.75f : -InfoHeight * 0.75f;
-            if (hintFade > 0.01f)
-            {
-                Line(hint, anchor, facingYou, y, new Color(1f, 1f, 1f, 0.62f * hintFade));
-                y += 0.016f * hintFade;
-                low = Mathf.Lerp(low, -HintHeight * 0.75f, hintFade);
-            }
-            if (shownCredit)
-            {
-                Line(credit, anchor, facingYou, y, new Color(1f, 1f, 1f, 0.7f));
-                y += 0.015f;
-            }
-            Line(info, anchor, facingYou, y, lyrics ? Color.Lerp(Soft, Lyrics, 0.55f) : Soft);
-            Line(title, anchor, facingYou, y += 0.021f, c != null ? Color.Lerp(Color.white, c.Color, 0.25f) : Color.white);
-            Plate(frontPlate, anchor, facingYou, low, y + TitleHeight * 0.75f, Mathf.Lerp(frontWidthBare, frontWidth, hintFade));
+            // The words stand on the middle of the turntable, a little towards the radio, leaning back to face your
+            // eyes: seen from your seat they fill the gap between the front cassettes below them and the back of the
+            // ring above, so they never cover a label you are choosing by, and they stay inside the narrow view.
+            float low = shownCredit ? -CreditHeight * 0.75f : -InfoHeight * 0.75f, y = 0f;
+            float hintStep = 0.019f * hintFade;
+            if (hintFade > 0.01f) low = Mathf.Lerp(low, -HintHeight * 0.75f, hintFade);
+            float creditY = hintStep, infoY = creditY + (shownCredit ? 0.0185f : 0f), titleY = infoY + 0.026f * Mathf.Lerp(0.85f, 1f, titleScale);
+            float high = titleY + TitleHeight * titleScale * 0.75f;
+            var foot = onTable.TransformPoint(turntableAt + new Vector3(frontRight.x, 0f, frontRight.y) * PlateShift - new Vector3(front.x, 0f, front.y) * PlateBack
+                + Vector3.up * (platterTop + 0.007f));
+            var facingYou = Facing(foot);
+            var anchor = foot - facingYou * new Vector3(0f, low - 0.008f, 0f);
+            if (hintFade > 0.01f) Line(hint, anchor, facingYou, y, new Color(1f, 1f, 1f, 0.66f * hintFade));
+            if (shownCredit) Line(credit, anchor, facingYou, creditY, new Color(1f, 1f, 1f, 0.74f));
+            Line(info, anchor, facingYou, infoY, lyrics ? Color.Lerp(Soft, Lyrics, 0.55f) : Soft);
+            Line(title, anchor, facingYou, titleY, c != null ? Color.Lerp(Color.white, c.Color, 0.25f) : Color.white);
+            Plate(frontPlate, anchor, facingYou, low, high, Mathf.Lerp(frontWidthBare, frontWidth, hintFade));
 
             // The radio.
             var now = StatusNow(bus, out var song);
@@ -556,10 +569,10 @@ namespace MusicInYourHands
         void MeasureFront()
         {
             var face = TypeFace.Bold;
-            float w = Mathf.Max(face.Width(title.Text) * TitleHeight, face.Width(info.Text) * InfoHeight);
+            float w = Mathf.Max(face.Width(title.Text) * TitleHeight * titleScale, face.Width(info.Text) * InfoHeight * infoScale);
             if (shownCredit) w = Mathf.Max(w, face.Width(credit.Text) * CreditHeight);
             frontWidthBare = w;
-            frontWidth = Mathf.Max(w, face.Width(hint.Text) * HintHeight);
+            frontWidth = Mathf.Max(w, face.Width(hint.Text) * HintHeight * hintScale);
         }
 
         /// <summary>A rotation that turns words at <paramref name="at"/> (world) to face your eyes, upright.</summary>

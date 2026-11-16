@@ -35,6 +35,11 @@ namespace MusicInYourHands
         const float Lean = 9f;
         const int MaxCassettes = 24;
         const float RiseSeconds = 0.6f, SinkSeconds = 0.4f;
+        /// <summary>
+        /// Where the words over the turntable stand: this far from its middle towards the radio, to keep them in the
+        /// narrow view, and this far back, away from you (m).
+        /// </summary>
+        const float PlateShift = 0.11f, PlateBack = 0.03f;
 
         enum Place { Ring, Held, Returning, Inserting, Inserted, Ejecting }
 
@@ -85,7 +90,7 @@ namespace MusicInYourHands
         readonly ParticleSystem sparks;
 
         // Measured from the models.
-        readonly float modelTop, rimRadius, rimHeight, platterRadius;
+        readonly float modelTop, rimRadius, rimHeight, platterRadius, platterTop;
         readonly Vector3 cassetteSize, labelCenter, labelSize;
         readonly Vector3 turntableAt, radioAt;
         readonly Vector2 headAt, front, frontRight;
@@ -149,7 +154,9 @@ namespace MusicInYourHands
             platterRest = platter != null ? platter.localRotation : Quaternion.identity;
             var baseBounds = DeckParts.ModelBounds(turntable);
             float turntableRadius = Mathf.Max(baseBounds.extents.x, baseBounds.extents.z);
-            platterRadius = platter != null ? Mathf.Max(DeckParts.LocalBounds(turntable, platter).extents.x, 0.05f) : turntableRadius;
+            var platterBounds = platter != null ? DeckParts.LocalBounds(turntable, platter) : baseBounds;
+            platterRadius = Mathf.Max(platterBounds.extents.x, 0.05f);
+            platterTop = platterBounds.max.y;
             var rimMark = DeckParts.Find(turntable, "RimHeight");
             var rimLocal = rimMark != null ? turntable.InverseTransformPoint(rimMark.position) : new Vector3(0f, 0.03f, -0.23f);
             rimRadius = new Vector2(rimLocal.x, rimLocal.z).magnitude;
@@ -584,6 +591,7 @@ namespace MusicInYourHands
             c.PlayOnSeat = false;
             if (feedback)
             {
+                if (!c.Blank) learned = true;
                 voices.Play(DeckSounds.Clunk, slot.position, 0.8f);
                 c.Flash = 1f;
                 EmitSparks(c.Blank ? new Color(1f, 0.55f, 0.45f) : c.Color);
@@ -854,6 +862,9 @@ namespace MusicInYourHands
 
         /// <summary>The song <paramref name="steps"/> places round from the front (positive to the right).</summary>
         public SongAsset SongBeside(int steps) => ring.Count > 0 ? ring[turning.Wrap(turning.Front + steps)].Song : null;
+
+        /// <summary>The plate of words over the turntable (a quad 1 x 1 in its own space), for the editor checks.</summary>
+        public Transform FrontPlate => frontPlate.transform;
 
         /// <summary>The middle of the blank cassette, in the world.</summary>
         public Vector3 BlankCenter => blank.Root.position;
