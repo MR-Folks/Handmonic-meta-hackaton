@@ -510,6 +510,8 @@ namespace MusicInYourHands.EditorTools
 
             var glow = EnsureMaterial(GlowMaterialPath, "MusicInYourHands/Glow");
             var line = EnsureMaterial(LineMaterialPath, "MusicInYourHands/Line");
+            // The cassette deck builds itself at run time from Resources; its materials live there too.
+            CassetteDeckSetup.EnsureMaterials();
 
             // The palm-up wheel was replaced by the bubble menu.
             var oldWheel = GameObject.Find("WorldWheel");
