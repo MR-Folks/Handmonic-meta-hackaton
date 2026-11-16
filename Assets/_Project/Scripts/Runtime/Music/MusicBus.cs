@@ -302,6 +302,17 @@ namespace MusicInYourHands
             else Listen();
         }
 
+        /// <summary>
+        /// Stops the song and goes back to its start, as the cassette deck's Stop and Eject keys do; play or the
+        /// thumb tap starts it again from the beginning. Listening to the room isn't stopped.
+        /// </summary>
+        public void Stop()
+        {
+            if (IsListening || source == null || source.clip == null) return;
+            source.Pause();
+            source.timeSamples = 0;
+        }
+
         public void TogglePause()
         {
             if (IsListening)

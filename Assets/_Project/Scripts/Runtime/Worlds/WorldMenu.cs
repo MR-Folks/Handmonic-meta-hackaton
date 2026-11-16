@@ -8,7 +8,9 @@ namespace MusicInYourHands
     /// menu gesture. The sound worlds cluster on the left and the lyric worlds on the right, each bubble showing a
     /// small animated emblem; below them a row plays and pauses the song, steps to the previous and next song
     /// (including songs added on the headset and songs from Audius), switches to listening to the room, turns the lyrics
-    /// on and off and opens the song page (SongLibrary), which takes the honeycombs' place. Bubbles near where you look
+    /// on and off and opens the cassette deck (CassetteDeck), where you choose a song by putting its cassette in a
+    /// radio; the menu steps aside for it. The deck's song list button brings the menu back with the song page
+    /// (SongLibrary) in the honeycombs' place, and the page's Back button returns to the deck. Bubbles near where you look
     /// are a little larger, and if you look away the menu glides back in front of you, but never away from a fingertip
     /// reaching for it.
     /// The menu opens within arm's reach, so you can touch a bubble or button with your index fingertip, or point at it
@@ -125,6 +127,10 @@ namespace MusicInYourHands
         MaterialPropertyBlock block;
         AudioPool voices;
         SongLibrary library;
+        CassetteDeck deck;
+        Camera lastView;
+        MusicBus lastBus;
+        bool pickerFromDeck;
         readonly Vector2?[] aims = new Vector2?[2];
         readonly Vector2?[] presses = new Vector2?[2];
         float honeycomb = 1f;
@@ -134,7 +140,14 @@ namespace MusicInYourHands
         Rect touchArea;
         float surface;
 
-        public bool IsOpen => open;
+        /// <summary>
+        /// True while the menu or the cassette deck is open (the song page included): the hands are choosing, so the
+        /// worlds and the music gestures leave them alone.
+        /// </summary>
+        public bool IsOpen => open || (deck != null && deck.IsOpen);
+
+        /// <summary>The cassette deck, once the menu has been built (for the editor checks and screenshots).</summary>
+        public CassetteDeck Deck => deck;
 
         void OnEnable()
         {
@@ -154,9 +167,51 @@ namespace MusicInYourHands
             if (toggleRequested)
             {
                 toggleRequested = false;
-                if (open) Close(); else Open(Camera.main);
+                Toggle(Camera.main);
             }
             Step(HandRig.Instance, WorldManager.Instance, MusicBus.Instance, Camera.main, Time.deltaTime);
+        }
+
+        /// <summary>
+        /// What Meta's menu gesture does: closes the cassette deck if it is open, else opens or closes the menu. Closing
+        /// either leaves you in the world you were in.
+        /// </summary>
+        public void Toggle(Camera view)
+        {
+            if (deck != null && deck.IsOpen) deck.Close();
+            else if (open) Close();
+            else Open(view);
+        }
+
+        /// <summary>Opens the cassette deck straight away, the menu stepping aside (editor checks and screenshots).</summary>
+        public void OpenDeck(Camera view)
+        {
+            if (view == null) return;
+            lastView = view;
+            Close();
+            deck?.Open(view, lastBus != null ? lastBus : MusicBus.Instance);
+        }
+
+        /// <summary>The deck's song list button: the deck steps aside and the menu opens on the song page.</summary>
+        public void ShowSongList(Camera view)
+        {
+            if (view == null) return;
+            deck?.Close();
+            library.Show();
+            Open(view);
+        }
+
+        void OnLibraryBack()
+        {
+            Close();
+            if (lastView != null) deck?.Open(lastView, lastBus != null ? lastBus : MusicBus.Instance);
+        }
+
+        void OnDeckPicker()
+        {
+            pickerFromDeck = true;
+            deck?.Close();
+            Close();
         }
 
         /// <summary>Opens the menu in front of the viewer.</summary>
@@ -230,8 +285,20 @@ namespace MusicInYourHands
         {
             if (manager == null || view == null) return;
             Build(manager);
-            // The file picker finished: the menu comes back to show what happened.
-            if (library.Poll(bus)) Open(view);
+            lastView = view;
+            lastBus = bus;
+            // The file picker finished: the menu comes back to show what happened, on the song page. If it was
+            // opened from the deck's blank cassette and nothing was picked, the deck comes back instead.
+            if (library.Poll(bus, out var outcome))
+            {
+                if (pickerFromDeck && outcome == SongPicker.Outcome.Cancelled)
+                {
+                    library.Hide();
+                    deck.Open(view, bus);
+                }
+                else Open(view);
+                pickerFromDeck = false;
+            }
             honeycomb = Mathf.MoveTowards(honeycomb, library.IsOpen ? 0f : 1f, dt * 6f);
             if (open && openTime == 0f) Place(view);
             else if (open) Follow(view, dt);
@@ -306,6 +373,7 @@ namespace MusicInYourHands
             DrawCaption(manager, bus, hovered, view, dt);
             DrawPointers(view);
             if (root.gameObject.activeSelf != (anyVisible || open)) root.gameObject.SetActive(anyVisible || open);
+            deck.Step(rig, bus, view, dt);
         }
 
         void StepLibrary(MusicBus bus, float dt)
@@ -351,7 +419,7 @@ namespace MusicInYourHands
             : b.World == ListenToggle ? bus != null && bus.IsListening ? "Play the song" : "Listen to the room"
             : IsSongStep(b) ? SongStepName(bus, b.World == NextSong ? 1 : -1)
             : b.World == LyricsToggle ? LyricsOption.On ? "Turn lyrics off" : "Turn lyrics on"
-            : b.World == Library ? "Your songs and songs from Audius"
+            : b.World == Library ? "Choose a song on the cassette deck"
             : bus == null ? "Music" : bus.IsPlaying ? $"Pause {bus.Title}" : $"Play {bus.Title}";
 
         static string SongStepName(MusicBus bus, int step)
@@ -596,7 +664,12 @@ namespace MusicInYourHands
                 closeAt = openTime + 0.35f;
             }
             else if (b.World == LyricsToggle) LyricsOption.On = !LyricsOption.On;
-            else if (b.World == Library) library.Show();
+            else if (b.World == Library)
+            {
+                // The menu steps aside as the cassette deck rises.
+                closeAt = openTime + 0.3f;
+                if (lastView != null) deck.Open(lastView, bus);
+            }
             else if (bus == null) return;
             else if (b.World == ListenToggle) bus.ToggleListen();
             else if (IsSongStep(b)) bus.StepSong(b.World == NextSong ? 1 : -1);
@@ -709,6 +782,13 @@ namespace MusicInYourHands
             library = new SongLibrary(root, panel, new Vector2(0f, spacing * 0.2f));
             library.Pressed += OnLibraryPressed;
             library.PickerOpened += Close;
+            library.BackPressed += OnLibraryBack;
+            if (deck == null)
+            {
+                deck = new CassetteDeck(transform, glowMaterial);
+                deck.SongListRequested += () => ShowSongList(lastView);
+                deck.PickerOpened += OnDeckPicker;
+            }
 
             // Where a fingertip can touch: the bubbles, with room for their size, and the song page.
             Vector2 min = bubbles[0].Slot, max = min;
