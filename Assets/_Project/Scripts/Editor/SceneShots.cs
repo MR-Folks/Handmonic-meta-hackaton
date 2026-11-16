@@ -74,7 +74,9 @@ namespace MusicInYourHands.EditorTools
                 holdPose: _ => { if (++heldFrames % 24 == 0) drift.PreviewHold(); });
             Shot<RisingFloor>("18-rising-floor", HandPose.PalmsToFace, 20f, lead: 4f);
             Shot<WordSnow>("19-word-snow", HandPose.PalmsUp, 10f, lead: 9f);
-            Shot<CeilingStars>("20-ceiling-stars", HandPose.PalmsToFace, -40f, lead: 4f);
+            // Solar system: the planets round you, and looking up, the sung line as a constellation under the ceiling.
+            Shot<SolarSystem>("24-solar-system", HandPose.PalmsToFace, 8f);
+            Shot<SolarSystem>("24s-solar-system-stars", HandPose.PalmsToFace, -40f, lead: 4f);
             Shot<SandTable>("11-sand-table", HandPose.PalmsDown, 40f, closeUp: rig => rig.Right.Palm.position + Vector3.down * 0.08f,
                 handOffset: side => side == "R" ? new Vector3(0.02f, -0.24f, 0.12f) : new Vector3(-0.05f, -0.12f, 0.06f));
             MenuShot();
@@ -89,7 +91,7 @@ namespace MusicInYourHands.EditorTools
             Shot<BreathingRoom>("14r-breathing-room-room", HandPose.PalmsToFace, 6f, scanned: true);
             Shot<NeonSign>("16r-neon-sign-room", HandPose.BacksToFace, 2f, lead: 4f, extra: 1.7f, scanned: true);
             Shot<WordSnow>("19r-word-snow-room", HandPose.PalmsUp, 22f, lead: 14f, scanned: true);
-            Shot<CeilingStars>("20r-ceiling-stars-room", HandPose.PalmsToFace, -40f, lead: 4f, scanned: true);
+            Shot<SolarSystem>("24r-solar-system-stars-room", HandPose.PalmsToFace, -40f, lead: 4f, scanned: true);
             Shot<ShadowPlay>("23r-shadow-play-room", HandPose.BacksToFace, 6f, holdPose: rig => PreviewBody(rig, 1f / 30f),
                 handOffset: ShadowPlayHands, scanned: true);
             Shot<NoteRain>("5r-note-rain-room", HandPose.PalmsUp, 30f, scanned: true);

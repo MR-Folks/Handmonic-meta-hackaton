@@ -20,14 +20,16 @@ namespace MusicInYourHands
     /// The music: the sun's glow and corona pulse with the kick and the bass and flare on every beat, when a wave of
     /// light also runs out from the sun across the orbits and planets; each planet brightens with its own band (the big
     /// outer planets with the low ones, the small inner planets with the high ones); everything turns faster as the
-    /// song gets louder; and melody notes make planets twinkle. Each sung word is a comet with a glowing tail pointing
-    /// away from the sun: it swoops in from further out and settles at its place on an arc round you, in front of you
-    /// and just below your eyes, the words of a line laid out from left to right so the line reads like a sentence,
-    /// then it flies off round you as it fades.
+    /// song gets louder; and melody notes make planets twinkle.
     /// Your hands: bring your fingers close to a planet and a ring lights round it; pinch to pick it up and carry it,
     /// while a dashed ring shows the orbit it will take: round you, as far out as you hold it. Let go and it settles
     /// onto that orbit, at the speed that distance gives it. Hold an open palm out to the sun and it warms: it burns
     /// brighter, its corona reaches out, embers stream across to your hand and a soft tone rises.
+    /// The words: overhead, the lyrics become constellations under your ceiling. Each sung word lights up as a star with
+    /// its word beside it, and a line of light draws across to it from the word before, so the line of the song is
+    /// traced in stars. The stars twinkle with the music and pulse on the beat, and each new line forms a new
+    /// constellation while the last one fades. Point up at a star and its word floats down in front of you to read up
+    /// close. Songs without lyrics spell out their title instead.
     /// </summary>
     public class SolarSystem : World
     {
@@ -39,7 +41,7 @@ namespace MusicInYourHands
 
         public override int MenuIcon => 25;
 
-        public override string Hint => "Pinch a planet to move it; hold a palm out to the sun";
+        public override string Hint => "Pinch a planet to move it, hold a palm out to the sun, or point up at a star";
 
         public override HandTheme Theme => new HandTheme
         {
@@ -106,14 +108,13 @@ namespace MusicInYourHands
         [Tooltip("Seconds of an open palm held out to the sun to warm it fully.")]
         [SerializeField] float warmUp = 1.5f;
 
-        [Header("Comets")]
-        [Tooltip("Seconds a sung word's comet takes to fly past.")]
-        [SerializeField] float cometLife = 3.6f;
-        [Tooltip("How far from you (m) the sung words settle, and how far below your eyes.")]
-        [SerializeField] float wordRing = 1f;
-        [SerializeField] float wordDrop = 0.12f;
-        [Tooltip("How far round you (degrees) a comet sweeps in from, beside its place.")]
-        [SerializeField] float cometSweep = 12f;
+        [Header("Constellations")]
+        [Tooltip("How far across the ceiling a line's constellation spreads (m from where you stand), and how wide round you (degrees each way).")]
+        [SerializeField] Vector2 starReach = new Vector2(0.9f, 2f);
+        [SerializeField] float starSpread = 50f;
+        [Tooltip("The height of a star's word overhead, and of the word you point at when it floats down to read (m).")]
+        [SerializeField] float starLabelHeight = 0.07f;
+        [SerializeField] float starReadHeight = 0.13f;
 
         static readonly int KindId = Shader.PropertyToID("_Kind");
         static readonly int ColorAId = Shader.PropertyToID("_ColorA");
@@ -146,6 +147,7 @@ namespace MusicInYourHands
         static readonly int OmegaId = Shader.PropertyToID("_Omega");
         static readonly int ReferenceId = Shader.PropertyToID("_Reference");
         static readonly int SizeId = Shader.PropertyToID("_Size");
+        static readonly int RimId = Shader.PropertyToID("_Rim");
         static readonly int PlanetPosId = Shader.PropertyToID("_PlanetPos");
         static readonly int PlanetRadiusId = Shader.PropertyToID("_PlanetRadius");
         static readonly int RadiusId = Shader.PropertyToID("_Radius");
@@ -180,12 +182,8 @@ namespace MusicInYourHands
         const int Saturn = 5;
         const int Giants = 4;
         const int RingSegments = 192;
-        const int TailPoints = 18;
         const int DropPoints = 6;
-        /// <summary>Room between two words of a line laid out along the comets' arc, in letter heights.</summary>
-        const float WordGap = 0.8f;
         static readonly Vector2 BeltRadii = new Vector2(0.83f, 0.95f);
-        static readonly Color CometColor = new Color(0.82f, 0.94f, 1f);
         static readonly Color SunGold = new Color(1f, 0.78f, 0.42f);
         static readonly Color Ember = new Color(1f, 0.45f, 0.14f);
 
@@ -268,18 +266,8 @@ namespace MusicInYourHands
         Planet[] planets;
         Moon[] moons;
         readonly Grip[] grips = { new Grip(), new Grip() };
-        Renderer[] heads;
-        LineStrip[] tails;
-        /// <summary>
-        /// Per sung word (by its place in SungWords.Words): where its comet settles, round the point you stood at when
-        /// its line began (that point, the direction in radians round from +x towards +z, how far out and how high),
-        /// and which way round it drifts (+1 towards larger angles, your left; -1 your right).
-        /// </summary>
-        Vector3[] cometCentre;
-        float[] cometAngle, cometRadius, cometHeight, cometSide;
         Vector3[] path;
         Color[] pathColors;
-        float[] pathWidths;
         ParticleSystem sparks;
         AudioPool voices;
         AudioSource sunVoice;
@@ -292,24 +280,59 @@ namespace MusicInYourHands
 
         /// <summary>Where the system is centred (below your head, at orbit height), and where it is drawn while it glides there.</summary>
         Vector3 centre, shownCentre;
-        Vector3 sunAt, warmPalm, lineCentre;
+        Vector3 sunAt, warmPalm;
         Quaternion facing = Quaternion.identity;
         /// <summary>How far the room lets the orbits beyond Mars reach out (LeastFit-1), and the size that gives the bodies out there.</summary>
         float fit = 1f, sizeFit = 1f, beltScale = 1f;
         /// <summary>The sun's spot on its circle and where it is now (degrees round from your right), its circle's radius and its height.</summary>
         float sunBase, sunAngle, sunRadius, sunHeight;
-        float lineAngle, lineRadius, lineHeight;
         float orbitClock, pace = 1f, energy, sunLight = 1f;
         float flare, flareAge = 9f, warmth, emberDebt;
-        bool fresh = true, sunPlaced, lineSet, burst;
+        bool fresh = true, sunPlaced, burst;
+
+        const int StarsPerLine = 14;
+        const int StarSets = 2;
+
+        sealed class Star
+        {
+            public Renderer Light;
+            public MeshRenderer Label;
+            public Mesh Mesh;
+            public string Text;
+            public Vector3 Position;
+            public float Born = -1f;
+            public float Twinkle;
+        }
+
+        sealed class Constellation
+        {
+            public readonly Star[] Stars = new Star[StarsPerLine];
+            public LineStrip Lines;
+            public int Count;
+            public float Fading = -1f;
+            public float Turn;
+        }
+
+        /// <summary>Two constellations take turns: the line being sung, and the last one as it fades.</summary>
+        readonly Constellation[] skies = new Constellation[StarSets];
+        readonly Vector3[] starLinePath = new Vector3[StarsPerLine * 8];
+        readonly Color[] starLineColors = new Color[StarsPerLine * 8];
+        readonly Vector3[] pointerPath = new Vector3[2];
+        Material starLettering;
+        MeshRenderer reading;
+        Mesh readingMesh;
+        Star pointed;
+        LineStrip pointer;
+        int constellation = -1;
+        float readFade, readHold;
+        /// <summary>Where the constellations form over you: where you stood, the way you faced, and the ceiling's height.</summary>
+        Vector3 skyHead, skyForward;
+        float skyCeiling;
 
         protected override float FadeInSeconds => 2f;
 
-        protected override int SungWordCount => 8;
-
-        protected override float SungWordHeight => 0.056f;
-
-        protected override float SungWordsAlpha => FadeIn;
+        /// <summary>The words are the stars' own, so songs without lyrics still spell out their title overhead.</summary>
+        protected override bool WordsWithoutLyrics => true;
 
         static Planet[] MakePlanets() => new[]
         {
@@ -427,23 +450,8 @@ namespace MusicInYourHands
             belt.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             belt.receiveShadows = false;
 
-            heads = new Renderer[SungWordCount];
-            tails = new LineStrip[SungWordCount];
-            cometCentre = new Vector3[SungWordCount];
-            cometAngle = new float[SungWordCount];
-            cometRadius = new float[SungWordCount];
-            cometHeight = new float[SungWordCount];
-            cometSide = new float[SungWordCount];
-            for (int i = 0; i < heads.Length; i++)
-            {
-                heads[i] = Effects.MakeQuad($"Comet {i}", transform, glowMaterial);
-                heads[i].gameObject.SetActive(false);
-                tails[i] = new LineStrip($"Comet Tail {i}", transform, lineMaterial, TailPoints);
-                tails[i].SetVisible(false);
-            }
-            path = new Vector3[TailPoints];
-            pathColors = new Color[TailPoints];
-            pathWidths = new float[TailPoints];
+            path = new Vector3[DropPoints];
+            pathColors = new Color[DropPoints];
 
             for (int s = 0; s < 2; s++)
             {
@@ -474,15 +482,18 @@ namespace MusicInYourHands
             sunVoice.dopplerLevel = 0f;
             sunVoice.volume = 0f;
 
+            BuildSky();
             ResetSystem();
         }
 
-        protected override void OnEnter() => ResetSystem();
+        protected override void OnEnter()
+        {
+            ResetSystem();
+            ResetSky();
+        }
 
         protected override void OnExit()
         {
-            foreach (var h in heads) Show(h, false);
-            foreach (var t in tails) t.SetVisible(false);
             foreach (var g in grips)
             {
                 Show(g.Reach, false);
@@ -493,6 +504,7 @@ namespace MusicInYourHands
             sparks.Clear();
             if (sunVoice != null) sunVoice.Stop();
             HandSkin.FocusStrength = 0f;
+            HideSky();
         }
 
         /// <summary>Everything as it starts: the planets on their own orbits, the sun calm, placed afresh round you.</summary>
@@ -500,7 +512,7 @@ namespace MusicInYourHands
         {
             orbitClock = energy = warmth = flare = 0f;
             flareAge = 9f;
-            burst = sunPlaced = lineSet = false;
+            burst = sunPlaced = false;
             fresh = true;
             foreach (var p in planets)
             {
@@ -545,6 +557,11 @@ namespace MusicInYourHands
             }
             ChooseSunSpot(forward);
             fresh = false;
+
+            // The constellations form over where you stand: under the scanned ceiling, or a little above your head.
+            skyHead = eye;
+            skyForward = forward;
+            skyCeiling = Room.Ceiling(Mathf.Max(eye.y + 0.85f, floorY + 2.4f));
         }
 
         /// <summary>
@@ -631,57 +648,17 @@ namespace MusicInYourHands
             Burst(p.World, Color.Lerp(p.Air, Color.white, 0.5f), 7, 0.05f + far * 0.02f, 0.008f + far * 0.005f);
         }
 
-        /// <summary>
-        /// Each sung word becomes a comet. The words of a line slow down at their own places along an arc round you, in
-        /// front of where you looked as the line began and just below your eyes, laid out like the line itself: each
-        /// word as far along the arc as its middle is along the line, so the line reads from left to right and long
-        /// words get the room they need. Comets on the left half drift to the left and those on the right half to the
-        /// right, so neighbours drift apart. A new line gives the last one's words a second at most to fade.
-        /// </summary>
+        /// <summary>Each sung word adds a star overhead; a new line starts a new constellation while the last one fades.</summary>
         protected override void OnWord(string word, bool newLine)
         {
-            var words = SungWords.Words;
-            if (newLine)
-                for (int i = 0; i < words.Count; i++)
-                    if (words[i].Active) words[i].Life = Mathf.Min(words[i].Life, words[i].Age + 1f);
-            if (newLine || !lineSet) StartLine();
-            var w = SungWords.Add(word, CometColor, cometLife);
-
-            var texts = Sung.LineTexts;
-            float total = 0f, middle = 0f;
-            for (int k = 0; k < texts.Length; k++)
+            if (newLine || constellation < 0)
             {
-                if (k > 0) total += WordGap;
-                float width = TypeFace.Bold.Width(texts[k]);
-                if (k == Sung.Index) middle = total + width * 0.5f;
-                total += width;
+                if (constellation >= 0) skies[constellation].Fading = Clock;
+                constellation = (constellation + 1) % StarSets;
+                ClearConstellation(skies[constellation]);
+                skies[constellation].Turn = Random.Range(-starSpread * 0.4f, starSpread * 0.4f);
             }
-            if (Sung.Index >= texts.Length) middle = total * 0.5f;
-            // Metres from the middle of the line (to the right), as an angle round the arc: at most 60 degrees each way.
-            float along = (middle - total * 0.5f) * SungWordHeight;
-            float angle = Mathf.Clamp(along / lineRadius, -1.05f, 1.05f);
-
-            int slot = 0;
-            while (slot < words.Count - 1 && words[slot] != w) slot++;
-            cometCentre[slot] = lineCentre;
-            cometAngle[slot] = lineAngle - angle;
-            cometRadius[slot] = lineRadius;
-            cometHeight[slot] = lineHeight;
-            cometSide[slot] = angle < 0f ? 1f : -1f;
-        }
-
-        /// <summary>A new line of words: its arc in front of where you look now, just below your eyes, inside the room.</summary>
-        void StartLine()
-        {
-            var eye = View.transform.position;
-            var forward = Effects.FlatForward(View);
-            lineCentre = eye;
-            lineAngle = Mathf.Atan2(forward.z, forward.x);
-            float room = Open;
-            for (int k = -1; k <= 1; k++) room = Mathf.Min(room, ReachAlong(Quaternion.AngleAxis(k * 30f, Vector3.up) * forward));
-            lineRadius = Mathf.Clamp(room - 0.3f, 0.6f, wordRing);
-            lineHeight = eye.y - wordDrop;
-            lineSet = true;
+            AddStar(skies[constellation], word);
         }
 
         /// <summary>A pinch close to a planet picks it up; a pinch in empty space shows a small light between the fingers.</summary>
@@ -723,7 +700,9 @@ namespace MusicInYourHands
             }
             DrawSun(music, view);
             DrawPlanets(music, view);
-            DrawComets(music, view);
+            PointAtStars(rig, view, dt);
+            foreach (var sky in skies) DrawConstellation(sky, music, view);
+            DrawReading(music, view, dt);
             DrawHands(view, dt);
             Hum(music);
             HandSkin.FocusPosition = sunAt;
@@ -1268,106 +1247,6 @@ namespace MusicInYourHands
         }
 
         /// <summary>
-        /// Where the comet of sung word <paramref name="slot"/> is, <paramref name="u"/> of the way through its life: it
-        /// swoops in from further out and higher, a little from the middle of its line, to its place on the arc, where
-        /// it slows to a gentle drift outwards along the arc (the word is easy to read there), then flies off round you
-        /// and up as it fades, so it never crosses its neighbours.
-        /// </summary>
-        Vector3 Comet(int slot, float u)
-        {
-            const float arrive = 0.28f, leave = 0.78f;
-            float turn, reachOut, rise;
-            if (u < arrive)
-            {
-                float k = 1f - u / arrive;
-                k *= k;
-                turn = -cometSweep * k;
-                reachOut = 1f + 0.5f * k;
-                rise = 0.3f * k;
-            }
-            else if (u < leave)
-            {
-                float k = (u - arrive) / (leave - arrive);
-                turn = 3f * k;
-                reachOut = 1f + 0.02f * k;
-                rise = 0f;
-            }
-            else
-            {
-                float k = (u - leave) / (1f - leave);
-                turn = 3f + 5f * k + 14f * k * k;
-                reachOut = 1.02f + 0.45f * k * k;
-                rise = 0.28f * k * k;
-            }
-            float a = cometAngle[slot] + cometSide[slot] * turn * Mathf.Deg2Rad;
-            float r = cometRadius[slot] * reachOut;
-            var c = cometCentre[slot];
-            return new Vector3(c.x + Mathf.Cos(a) * r, cometHeight[slot] + rise, c.z + Mathf.Sin(a) * r);
-        }
-
-        /// <summary>
-        /// The sung words as comets: a bright head with the word riding just beside it, and a tail that points away
-        /// from the sun, longer near the sun, bending a little along the way it came. A comet fades into a scanned wall,
-        /// and out of the way if you walk right up to it.
-        /// </summary>
-        void DrawComets(MusicFrame music, Camera view)
-        {
-            var words = SungWords != null ? SungWords.Words : null;
-            var eye = view.transform.position;
-            var up = view.transform.up;
-            for (int i = 0; i < heads.Length; i++)
-            {
-                var w = words != null && i < words.Count ? words[i] : null;
-                bool show = w != null && w.Active;
-                Show(heads[i], show);
-                tails[i].SetVisible(show);
-                if (!show) continue;
-                // The comet keeps to its own timetable; the word's life only fades it (sooner when a new line starts).
-                float u = Mathf.Clamp01(w.Age / cometLife);
-                var head = Comet(i, u);
-                float keep = InRoom(head, 0f) * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.3f, 0.5f, Vector3.Distance(head, eye)));
-                float fade = Mathf.Clamp01(w.Age / 0.3f) * Mathf.Clamp01((w.Life - w.Age) / 0.6f) * FadeIn * keep;
-                // Away from the sun, turned a little across your view so the tail never hides end-on.
-                var away = head - sunAt;
-                float fromSun = away.magnitude;
-                away = fromSun > 1e-4f ? away / fromSun : Vector3.down;
-                var sight = (head - eye).normalized;
-                away -= sight * (Vector3.Dot(away, sight) * 0.6f);
-                away = away.sqrMagnitude > 1e-6f ? away.normalized : Vector3.down;
-                float length = 0.16f + 0.22f * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(1.6f, 0.4f, fromSun));
-                for (int k = 0; k < TailPoints; k++)
-                {
-                    float t = k / (float)(TailPoints - 1);
-                    var behind = Comet(i, Mathf.Max(0f, u - t * 0.08f));
-                    path[k] = Vector3.Lerp(behind, head + away * (t * length), 0.6f);
-                    var c = Color.Lerp(Color.white, new Color(0.35f, 0.62f, 1f), Mathf.Sqrt(t));
-                    c.a = Mathf.Pow(1f - t, 1.1f) * fade;
-                    pathColors[k] = c;
-                    pathWidths[k] = Mathf.Lerp(1f, 0.2f, t);
-                }
-                tails[i].Set(path, pathColors, pathWidths, TailPoints, 0.035f, Color.white, eye, false);
-
-                heads[i].transform.position = head;
-                Effects.Face(heads[i].transform, view);
-                heads[i].transform.localScale = Vector3.one * (0.06f * (1f + music.Kick * 0.25f));
-                block.Clear();
-                block.SetColor(ColorId, CometColor);
-                block.SetFloat(IntensityId, 1.5f * fade);
-                heads[i].SetPropertyBlock(block);
-
-                // The word rides just below its head while the tail points up as you look (above it while the tail
-                // points down), so the tail never crosses it and the line keeps its spacing.
-                w.Size = 1f;
-                float letters = SungWordHeight;
-                float below = Vector3.Dot(away, up) >= 0f ? -1f : 1f;
-                w.Position = head + up * (below * letters * 0.95f - letters * 0.36f);
-                w.Rotation = WordLayer.Facing(w.Position, eye);
-                w.Halo = 0.22f + music.Kick * 0.15f;
-                w.Alpha = keep;
-            }
-        }
-
-        /// <summary>
         /// Feedback for the hands: a ring round the planet within reach (brighter as the fingers close), the dashed
         /// orbit round you that a carried planet will take, with a line from it to where it will join that orbit, and a
         /// small light between fingers pinching empty space.
@@ -1586,6 +1465,197 @@ namespace MusicInYourHands
             // The shader moves the asteroids round you, so the bounds cover the whole belt (and the dip under your face).
             mesh.bounds = new Bounds(Vector3.zero, new Vector3(radii.y * 2.2f, 1f, radii.y * 2.2f));
             return mesh;
+        }
+
+        // ---- The words overhead ----
+
+        /// <summary>The stars and words of two constellations, the word you read and your pointing line.</summary>
+        void BuildSky()
+        {
+            starLettering = new Material(letteringMaterial) { name = "Star Lettering", mainTexture = TypeFace.Bold.Atlas };
+            // A firm dark edge keeps the pale words readable against a bright ceiling.
+            starLettering.SetFloat(RimId, 0.8f);
+            for (int s = 0; s < StarSets; s++)
+            {
+                var sky = new Constellation { Lines = new LineStrip($"Constellation {s}", transform, lineMaterial, starLinePath.Length) };
+                sky.Lines.SetVisible(false);
+                for (int i = 0; i < StarsPerLine; i++)
+                {
+                    var star = new Star { Light = Effects.MakeQuad($"Star {s}.{i}", transform, glowMaterial) };
+                    star.Label = Glyphs.MakeLetter($"Star Word {s}.{i}", transform, starLettering, out star.Mesh);
+                    star.Light.gameObject.SetActive(false);
+                    star.Label.gameObject.SetActive(false);
+                    sky.Stars[i] = star;
+                }
+                skies[s] = sky;
+            }
+            reading = Glyphs.MakeLetter("Reading", transform, starLettering, out readingMesh);
+            reading.gameObject.SetActive(false);
+            pointer = new LineStrip("Pointing", transform, lineMaterial, 2);
+            pointer.SetVisible(false);
+        }
+
+        void ResetSky()
+        {
+            constellation = -1;
+            pointed = null;
+            readFade = readHold = 0f;
+            foreach (var sky in skies) ClearConstellation(sky);
+        }
+
+        void HideSky()
+        {
+            foreach (var sky in skies) ClearConstellation(sky);
+            reading.gameObject.SetActive(false);
+            pointer.SetVisible(false);
+        }
+
+        static void ClearConstellation(Constellation sky)
+        {
+            sky.Count = 0;
+            sky.Fading = -1f;
+            sky.Lines.SetVisible(false);
+            foreach (var star in sky.Stars)
+            {
+                star.Born = -1f;
+                star.Light.gameObject.SetActive(false);
+                star.Label.gameObject.SetActive(false);
+            }
+        }
+
+        /// <summary>A new star for the sung word, on a wandering path across the ceiling.</summary>
+        void AddStar(Constellation sky, string text)
+        {
+            if (sky.Count >= StarsPerLine) return;
+            int i = sky.Count++;
+            var star = sky.Stars[i];
+            float u = StarsPerLine > 1 ? i / 7f : 0f;
+            float angle = Mathf.Lerp(-starSpread, starSpread, Mathf.Repeat(u, 1f)) + sky.Turn + Random.Range(-8f, 8f);
+            float distance = Mathf.Lerp(starReach.x, starReach.y, 0.5f + 0.5f * Mathf.Sin(i * 1.7f + sky.Turn)) + Random.Range(-0.15f, 0.15f);
+            var dir = Quaternion.AngleAxis(angle, Vector3.up) * skyForward;
+            star.Position = new Vector3(skyHead.x, skyCeiling, skyHead.z) + dir * distance;
+            star.Text = text;
+            star.Born = Clock;
+            star.Twinkle = Random.value * 6.28f;
+            Glyphs.BuildWord(star.Mesh, TypeFace.Bold, text, 1f, 1, 0f, Color.white, Color.white);
+            star.Light.gameObject.SetActive(true);
+            star.Label.gameObject.SetActive(true);
+        }
+
+        /// <summary>
+        /// Points with the index finger: a ray from the shoulder through the fingertip, the star nearest to it picked.
+        /// </summary>
+        void PointAtStars(HandRig rig, Camera view, float dt)
+        {
+            Star best = null;
+            float bestAngle = 6f;
+            Vector3 tipOfBest = Vector3.zero;
+            if (rig != null)
+            {
+                var side = Vector3.Cross(Vector3.up, Effects.FlatForward(view)).normalized;
+                for (int s = 0; s < 2; s++)
+                {
+                    var hand = rig.Get(s == 0);
+                    // A finger pointing at the open menu isn't pointing at the sky.
+                    if (!hand.IsTracked || hand.InSystemGesture || MenuOpen) continue;
+                    var tip = hand.TipJoints[1] != null ? hand.TipJoints[1].position : hand.Tips[1];
+                    var shoulder = view.transform.position + Vector3.down * 0.17f + side * (s == 0 ? -0.17f : 0.17f);
+                    var dir = (tip - shoulder).normalized;
+                    if (dir.y < 0.2f) continue;
+                    foreach (var sky in skies)
+                    {
+                        if (sky.Fading >= 0f) continue;
+                        for (int i = 0; i < sky.Count; i++)
+                        {
+                            float a = Vector3.Angle(dir, sky.Stars[i].Position - tip);
+                            if (a < bestAngle) { bestAngle = a; best = sky.Stars[i]; tipOfBest = tip; }
+                        }
+                    }
+                }
+            }
+            if (best != null)
+            {
+                Acted("star pick");
+                if (best != pointed) Glyphs.BuildWord(readingMesh, TypeFace.Bold, best.Text, 1f, 1, 0f, Color.white, Color.white);
+                pointed = best;
+                readHold = 1.2f;
+                pointerPath[0] = tipOfBest;
+                pointerPath[1] = best.Position;
+                pointer.SetVisible(true);
+                pointer.Set(pointerPath, 2, 0.003f, new Color(0.85f, 0.8f, 1f, 0.35f), view.transform.position);
+            }
+            else
+            {
+                pointer.SetVisible(false);
+                readHold -= dt;
+                if (readHold <= 0f) pointed = null;
+            }
+        }
+
+        void DrawConstellation(Constellation sky, MusicFrame music, Camera view)
+        {
+            float skyFade = sky.Fading >= 0f ? 1f - Mathf.Clamp01((Clock - sky.Fading) / 3f) : 1f;
+            if (sky.Fading >= 0f && skyFade <= 0f) { ClearConstellation(sky); return; }
+            var eye = view.transform.position;
+            float hat = music.Band(5);
+            int n = 0;
+            for (int i = 0; i < sky.Count; i++)
+            {
+                var star = sky.Stars[i];
+                float age = Clock - star.Born;
+                float appear = Mathf.Clamp01(age / 0.4f);
+                float twinkle = 0.7f + 0.3f * Mathf.Sin(Clock * (3f + i % 3) + star.Twinkle) + hat * 0.3f;
+                bool picked = star == pointed;
+                star.Light.transform.position = star.Position;
+                star.Light.transform.localScale = Vector3.one * (0.07f + music.Kick * 0.03f + (picked ? 0.05f : 0f)) * appear;
+                Effects.Face(star.Light.transform, view);
+                block.Clear();
+                block.SetColor(ColorId, picked ? new Color(1f, 0.9f, 0.6f) : new Color(0.85f, 0.82f, 1f));
+                block.SetFloat(IntensityId, (1.1f * twinkle + (picked ? 0.8f : 0f)) * skyFade * FadeIn);
+                star.Light.SetPropertyBlock(block);
+
+                // The word beside its star, turned to you.
+                var labelAt = star.Position + Vector3.down * 0.06f;
+                var look = labelAt - eye;
+                star.Label.transform.SetPositionAndRotation(labelAt, Quaternion.LookRotation(look, Vector3.up));
+                star.Label.transform.localScale = Vector3.one * starLabelHeight;
+                block.Clear();
+                block.SetColor(ColorId, new Color(0.88f, 0.86f, 1f));
+                block.SetFloat(AlphaId, appear * 0.85f * skyFade * FadeIn);
+                star.Label.SetPropertyBlock(block);
+
+                // The line from the previous star draws itself across as the word arrives.
+                if (i == 0) continue;
+                var from = sky.Stars[i - 1].Position;
+                float grow = Mathf.Clamp01(age / 0.5f);
+                for (int k = 0; k <= 6 && n < starLinePath.Length; k++)
+                {
+                    starLinePath[n] = Vector3.Lerp(from, star.Position, grow * k / 6f);
+                    starLineColors[n] = new Color(0.75f, 0.72f, 1f, (k == 0 || k == 6 ? 0.1f : 0.45f));
+                    n++;
+                }
+            }
+            bool showLines = n >= 2;
+            sky.Lines.SetVisible(showLines);
+            if (showLines) sky.Lines.Set(starLinePath, starLineColors, n, 0.003f, new Color(1f, 1f, 1f, skyFade * FadeIn), view.transform.position, false);
+        }
+
+        /// <summary>The word of the star you point at, floating in front of you to read.</summary>
+        void DrawReading(MusicFrame music, Camera view, float dt)
+        {
+            readFade = Mathf.MoveTowards(readFade, pointed != null ? 1f : 0f, dt * 3f);
+            bool show = readFade > 0.01f;
+            if (reading.gameObject.activeSelf != show) reading.gameObject.SetActive(show);
+            if (!show) return;
+            var eye = view.transform.position;
+            var at = eye + Effects.FlatForward(view) * 0.7f + Vector3.up * 0.05f;
+            if (pointed != null) at = Vector3.Lerp(pointed.Position, at, Mathf.SmoothStep(0f, 1f, readFade));
+            reading.transform.SetPositionAndRotation(at, Quaternion.LookRotation(at - eye, Vector3.up));
+            reading.transform.localScale = Vector3.one * starReadHeight * (1f + music.Kick * 0.05f);
+            block.Clear();
+            block.SetColor(ColorId, new Color(1f, 0.92f, 0.75f));
+            block.SetFloat(AlphaId, readFade * FadeIn);
+            reading.SetPropertyBlock(block);
         }
     }
 }

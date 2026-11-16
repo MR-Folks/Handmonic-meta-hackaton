@@ -564,58 +564,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &214973736
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 214973738}
-  - component: {fileID: 214973737}
-  m_Layer: 0
-  m_Name: CeilingStars
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &214973737
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 214973736}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2f86e0187ecdc44a0a800627adbb24bc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.CeilingStars
-  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
-  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
-  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
-  skyMaterial: {fileID: 2100000, guid: a377da8a64af84ae68901afb43ab9d32, type: 2}
-  reach: {x: 0.9, y: 2}
-  spread: 50
-  labelHeight: 0.07
-  readHeight: 0.13
---- !u!4 &214973738
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 214973736}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1462377328}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &298916676
 GameObject:
   m_ObjectHideFlags: 0
@@ -754,10 +702,10 @@ MonoBehaviour:
   grabReach: 0.05
   warmAim: 28
   warmUp: 1.5
-  cometLife: 3.6
-  wordRing: 1
-  wordDrop: 0.12
-  cometSweep: 12
+  starReach: {x: 0.9, y: 2}
+  starSpread: 50
+  starLabelHeight: 0.07
+  starReadHeight: 0.13
 --- !u!4 &403129350
 Transform:
   m_ObjectHideFlags: 0
@@ -2076,7 +2024,6 @@ MonoBehaviour:
   - {fileID: 1970306282}
   - {fileID: 683420573}
   - {fileID: 377810160}
-  - {fileID: 214973737}
   startWorld: 0
 --- !u!4 &1462377328
 Transform:
@@ -2115,7 +2062,6 @@ Transform:
   - {fileID: 1970306283}
   - {fileID: 683420574}
   - {fileID: 377810161}
-  - {fileID: 214973738}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1492539440
