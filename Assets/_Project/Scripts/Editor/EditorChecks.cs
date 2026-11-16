@@ -31,6 +31,7 @@ namespace MusicInYourHands.EditorTools
         static bool RunAll()
         {
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            CassetteDeckSetup.EnsureMaterials();
             bool ok = true;
             ok &= CheckWorldCatalog();
             ok &= CheckWorldHooks();
@@ -42,6 +43,7 @@ namespace MusicInYourHands.EditorTools
             ok &= CheckOrbPreview();
             ok &= CheckMenuPreview();
             ok &= CheckMenuTouch();
+            ok &= CheckCassetteDeck();
             ok &= CheckMenuHands();
             ok &= CheckMusicGestures();
             ok &= CheckShadowArms();
