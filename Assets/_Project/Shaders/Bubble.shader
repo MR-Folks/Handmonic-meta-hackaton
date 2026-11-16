@@ -314,7 +314,7 @@ Shader "MusicInYourHands/Bubble"
                 }
                 else if (icon < 22.5)
                 {
-                    // Ceiling stars: a small constellation, joined by lines, twinkling.
+                    // Free since Ceiling stars joined Solar system: a small constellation, joined by lines, twinkling.
                     float2 s0 = float2(-0.5, -0.1), s1 = float2(-0.18, 0.25), s2 = float2(0.12, 0.05), s3 = float2(0.45, 0.32), s4 = float2(0.3, -0.35);
                     e = Line(Segment(p, s0, s1), 0.015) * 0.5 + Line(Segment(p, s1, s2), 0.015) * 0.5
                       + Line(Segment(p, s2, s3), 0.015) * 0.5 + Line(Segment(p, s2, s4), 0.015) * 0.5;
