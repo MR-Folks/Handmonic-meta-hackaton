@@ -354,59 +354,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1462377328}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &128519272
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 128519274}
-  - component: {fileID: 128519273}
-  m_Layer: 0
-  m_Name: FireflyChoir
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &128519273
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 128519272}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6c20fb67fd1bd457da74dcb13ebd148e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.FireflyChoir
-  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
-  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
-  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
-  count: 88
-  flySize: 0.016
-  cloudReach: {x: 0.08, y: 0.16}
-  tailWidth: 1.8
-  startle: 0.4
-  waveSpeed: 1.1
---- !u!4 &128519274
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 128519272}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1462377328}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &176874510
 GameObject:
   m_ObjectHideFlags: 0
@@ -2005,7 +1952,6 @@ MonoBehaviour:
   - {fileID: 790749978}
   - {fileID: 179923059}
   - {fileID: 122405007}
-  - {fileID: 128519273}
   - {fileID: 2000780158}
   - {fileID: 1153605162}
   - {fileID: 1715105674}
@@ -2043,7 +1989,6 @@ Transform:
   - {fileID: 790749979}
   - {fileID: 179923060}
   - {fileID: 122405008}
-  - {fileID: 128519274}
   - {fileID: 2000780159}
   - {fileID: 1153605163}
   - {fileID: 1715105675}
@@ -2614,11 +2559,25 @@ MonoBehaviour:
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   bubbleMaterial: {fileID: 2100000, guid: fa89d5024587b4c8e83405b9bccf5a04, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
+  bubbleNotesFishMaterial: {fileID: 2100000, guid: 9280c5a2ab8b30a4c825bce5d5ff2bb7, type: 2}
+  bubbleNotesStreamMaterial: {fileID: 2100000, guid: a9536104b0e765b42b72d8cbe355d15f, type: 2}
   distance: 0.5
   width: 0.7
   heightRange: {x: -0.5, y: 0.35}
   riseSpeed: {x: 0.09, y: 0.14}
   maxBubbles: 36
+  fishCount: 48
+  fishLength: {x: 0.08, y: 0.12}
+  swimReach: {x: 0.75, y: 1.6}
+  swimHeight: {x: -0.65, y: 0.2}
+  cruise: 0.15
+  headClearance: 0.4
+  circleReach: {x: 0.11, y: 0.19}
+  gatherShare: 0.34
+  startle: 0.12
+  waveSpeed: 1.1
+  streamWidth: 0.03
+  streamCoil: {x: 0.065, y: 0.035}
 --- !u!4 &1715105675
 Transform:
   m_ObjectHideFlags: 0

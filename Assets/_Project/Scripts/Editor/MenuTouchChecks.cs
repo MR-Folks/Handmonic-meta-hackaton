@@ -22,7 +22,7 @@ namespace MusicInYourHands.EditorTools
             {
                 MakePreviewWorld<HeartbeatOrb>(managerGo.transform),
                 MakePreviewWorld<NoteRain>(managerGo.transform),
-                MakePreviewWorld<FireflyChoir>(managerGo.transform),
+                MakePreviewWorld<BubbleNotes>(managerGo.transform),
                 MakePreviewWorld<SoundPool>(managerGo.transform)
             };
             var manager = managerGo.AddComponent<WorldManager>();

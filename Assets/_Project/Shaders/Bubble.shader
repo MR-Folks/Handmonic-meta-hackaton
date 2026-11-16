@@ -183,13 +183,23 @@ Shader "MusicInYourHands/Bubble"
                 }
                 else if (icon < 10.5)
                 {
-                    // Bubble notes: three small bubbles rising.
+                    // Bubble notes: three small bubbles rising, and a little fish swimming across below them.
                     [unroll] for (int k = 0; k < 3; k++)
                     {
-                        float r = 0.14 + k * 0.05;
-                        float2 c = float2(-0.36 + k * 0.36, 0.7 - frac(t * 0.25 + k * 0.33) * 1.4);
-                        e += Line(abs(length(p - c) - r), 0.035) * 0.9;
+                        float r = 0.12 + k * 0.04;
+                        float y = -0.55 + frac(t * 0.25 + k * 0.33) * 1.25;
+                        float2 c = float2(-0.36 + k * 0.36, y);
+                        e += Line(abs(length(p - c) - r), 0.035) * 0.9 * smoothstep(0.7, 0.5, y);
                     }
+                    float fx = -0.7 + frac(t * 0.14) * 1.4;
+                    float2 q = p - float2(fx, -0.48 + 0.03 * sin(t * 1.6));
+                    // Its tail beats from side to side.
+                    q.y += 0.035 * sin(t * 8) * saturate(-q.x * 5);
+                    float body = smoothstep(1.0, 0.7, length(q / float2(0.21, 0.1)));
+                    float behind = -q.x - 0.16;
+                    float tail = step(0, behind) * step(behind, 0.14) * step(abs(q.y), behind * 0.85);
+                    float eye = smoothstep(0.026, 0.014, length(q - float2(0.105, 0.02)));
+                    e += saturate(body + tail - eye) * smoothstep(0.7, 0.5, abs(fx));
                 }
                 else if (icon < 11.5)
                 {

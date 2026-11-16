@@ -39,7 +39,6 @@ namespace MusicInYourHands.EditorTools
             Shot<WaveformRibbon>("3-waveform-ribbon", HandPose.BacksToFace, 8f, rig => { rig.Left.Pinch = 1f; rig.Right.Pinch = 1f; });
             Shot<AirStrings>("4-air-strings", HandPose.BacksToFace, 12f);
             Shot<NoteRain>("5-note-rain", HandPose.PalmsUp, 34f, closeUp: rig => rig.Right.Palm.position + new Vector3(-0.1f, 0.1f, 0.05f));
-            Shot<FireflyChoir>("6-firefly-choir", HandPose.PalmsToFace, 8f, closeUp: rig => rig.Right.Palm.position);
             // The right hand dips into the pool; the left rests above it.
             Shot<SoundPool>("8-sound-pool", HandPose.PalmsDown, 38f, closeUp: rig => rig.Right.Palm.position + Vector3.down * 0.04f,
                 handOffset: side => side == "R" ? new Vector3(-0.03f, -0.27f, 0.12f) : new Vector3(0f, -0.12f, 0.1f));

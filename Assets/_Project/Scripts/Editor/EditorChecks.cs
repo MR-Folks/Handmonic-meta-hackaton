@@ -48,7 +48,6 @@ namespace MusicInYourHands.EditorTools
             ok &= CheckRibbonPreview();
             ok &= CheckStringsPreview();
             ok &= CheckRainPreview();
-            ok &= CheckFirefliesPreview();
             ok &= CheckSongs();
             ok &= CheckAudiusSongs();
             ok &= CheckLettering();
@@ -484,10 +483,6 @@ namespace MusicInYourHands.EditorTools
                 camera.transform.rotation = Quaternion.Euler(42f, 0f, 0f);
                 camera.fieldOfView = 70f;
             }, 2.6f, withSong: true);
-
-        static bool CheckFirefliesPreview() => CheckWorldPreview<FireflyChoir>("Firefly choir preview", "Logs/preview-fireflies.png",
-            new[] { ("glowMaterial", ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow"), ("lineMaterial", ProjectSetup.LineMaterialPath, "MusicInYourHands/Line") },
-            (hands, rig, world, camera) => { }, 3f);
 
 #if META_XR_CORE
         sealed class PreviewHand
