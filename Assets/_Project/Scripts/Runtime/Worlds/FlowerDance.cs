@@ -11,8 +11,10 @@ namespace MusicInYourHands
     /// head that turns to face you. They sway from side to side on the beat, stems bending and heads bobbing with a
     /// little squash and stretch while their leaves lift like arms, and the beat ripples out across the garden from
     /// the flowers in front of you. On every beat a few flowers get bold: they pop bigger, open their petals wide and
-    /// glow in rich colours, then relax. Each sung word floats up out of a bold flower in a puff of pollen. Hold a
-    /// hand near the flowers and they lean towards it and open a little; hold your palm over one and it stretches up
+    /// glow in rich colours, then relax. Each sung word floats up out of a bold flower in a puff of pollen.
+    /// Your hands are the sun: a warm glow shines from each palm, and the whole garden turns to it. Wherever you move
+    /// your hand, the flowers lean that way and turn their faces round towards it, still swaying from side to side on
+    /// the beat; they lean further and open a little as it comes near. Hold your palm over a flower and it stretches up
     /// to meet it, glowing, with a soft note and pollen rising to your palm.
     /// The whole garden is one mesh drawn in one go: the shader bends and poses every flower from a few values per
     /// flower that this class sets each frame.
@@ -27,15 +29,16 @@ namespace MusicInYourHands
 
         public override int MenuIcon => 26;
 
-        public override string Hint => "Hold your palm over a flower and it reaches up to you";
+        public override string Hint => "Your hand is the sun: move it and the flowers lean after it";
 
+        // Sun-warm hands: golden edges and a glow of heat.
         public override HandTheme Theme => new HandTheme
         {
-            Fill = new Color(0.12f, 0.2f, 0.1f, 0.5f),
-            Edge = new Color(0.62f, 0.92f, 0.45f),
-            Glow = new Color(1f, 0.55f, 0.72f),
-            Pattern = HandTheme.Effect.Specks,
-            PatternColor = new Color(1f, 0.86f, 0.42f)
+            Fill = new Color(0.3f, 0.18f, 0.05f, 0.45f),
+            Edge = new Color(1f, 0.86f, 0.45f),
+            Glow = new Color(1f, 0.7f, 0.3f),
+            Pattern = HandTheme.Effect.Heat,
+            PatternColor = new Color(1f, 0.8f, 0.35f)
         };
 
         [Header("Materials")]
@@ -63,9 +66,21 @@ namespace MusicInYourHands
         [SerializeField] float ripple = 0.35f;
         [Tooltip("How many flowers get bold on each beat.")]
         [SerializeField] int boldPerBeat = 3;
+        [Tooltip("Seconds a flower's tip takes to glide after its dance pose: more is softer, less follows the beat more tightly.")]
+        [SerializeField] float tipGlide = 0.08f;
 
         [Header("Hands")]
-        [Tooltip("How near (m) a hand must come to a flower's head for the flower to lean towards it.")]
+        [Tooltip("How far the garden leans after your hand (the sun) at most, as a share of each flower's height.")]
+        [SerializeField] float sunLean = 0.4f;
+        [Tooltip("How far (m) your hand goes from the middle in front of your chest for the garden to lean its furthest that way.")]
+        [SerializeField] float sunRange = 0.35f;
+        [Tooltip("Seconds a flower's lean takes to glide after the sun as your hand moves.")]
+        [SerializeField] float leanGlide = 0.3f;
+        [Tooltip("How far round towards your hand the flowers turn their faces (0: they keep facing you; 1: they face your hand).")]
+        [SerializeField, Range(0f, 1f)] float sunFace = 0.45f;
+        [Tooltip("The size (m) of the sun's glow on your palm.")]
+        [SerializeField] float sunSize = 0.14f;
+        [Tooltip("How near (m) a hand must come to a flower's head for the flower to lean further, its tip towards your palm.")]
         [SerializeField] float leanReach = 0.6f;
         [Tooltip("How far to the side (m) of a flower's head a palm held over it still draws it up.")]
         [SerializeField] float overReach = 0.2f;
@@ -163,6 +178,9 @@ namespace MusicInYourHands
             public float BoldAge = 99f; // seconds since it last got bold
             public float Spoke = -99f;  // the Clock time a word last came out of it
             public Vector2 Lean;        // towards the hands (share of its height, its own x and z)
+            public Vector2 LeanSpeed;   // how fast Lean is gliding, for its spring
+            public Vector2 Tip;         // where its tip is this frame, gliding after the dance's pose
+            public Vector2 TipSpeed;    // how fast Tip is gliding, for its spring
             public float Stretch;       // up towards a palm (extra share of its height)
             public float Open;          // petals opened by the hands
             public float Warm;          // glow from the hands
@@ -192,7 +210,22 @@ namespace MusicInYourHands
         ParticleSystem pollen;
         AudioPool voices;
         Vector3 eye;
-        float beat, beatError, energy;
+        float beat, beatError, energy, tempo;
+        /// <summary>The way the garden faced you when it was planted, for reading where your hand (the sun) is.</summary>
+        Vector3 gardenForward = Vector3.forward;
+        /// <summary>
+        /// Where the sun pulls the whole garden (room space, up to 1 long): to your left or right, and away from you,
+        /// as far as your hand is from the middle in front of your chest. It glides, so the garden sways after it.
+        /// </summary>
+        Vector3 sunPull, sunPullSpeed;
+        /// <summary>How fully the sun shines (0 with no hand out).</summary>
+        float sunShine;
+        /// <summary>The sun on each palm: its glow, where it is (following the palm a little behind) and how fully it shows (0-1).</summary>
+        Renderer[] suns;
+        readonly Vector3[] sunAt = new Vector3[2];
+        readonly float[] sunShown = new float[2];
+
+        static readonly Color SunColor = new Color(1f, 0.82f, 0.38f);
 
         protected override float FadeInSeconds => 1f;
 
@@ -241,6 +274,12 @@ namespace MusicInYourHands
                 halos[h] = Effects.MakeQuad($"Flower Glow {h}", transform, glowMaterial);
                 halos[h].gameObject.SetActive(false);
             }
+            suns = new Renderer[2];
+            for (int s = 0; s < 2; s++)
+            {
+                suns[s] = Effects.MakeQuad(s == 0 ? "Sun L" : "Sun R", transform, glowMaterial);
+                suns[s].gameObject.SetActive(false);
+            }
             pollen = Effects.MakeSparkSystem("Pollen", transform, glowMaterial);
             var main = pollen.main;
             main.maxParticles = 400;
@@ -254,6 +293,10 @@ namespace MusicInYourHands
         {
             beat = 0f;
             beatError = 0f;
+            tempo = 0f;
+            sunShown[0] = sunShown[1] = 0f;
+            sunPull = sunPullSpeed = Vector3.zero;
+            sunShine = 0f;
             foreach (var f in flowers)
             {
                 f.BoldAge = 99f;
@@ -266,6 +309,8 @@ namespace MusicInYourHands
             if (garden != null) garden.gameObject.SetActive(false);
             if (halos != null)
                 foreach (var h in halos) h.gameObject.SetActive(false);
+            if (suns != null)
+                foreach (var s in suns) s.gameObject.SetActive(false);
             if (pollen != null) pollen.Clear();
         }
 
@@ -279,6 +324,7 @@ namespace MusicInYourHands
             var head = view.transform.position;
             var forward = Effects.FlatForward(view);
             float floorY = Effects.FloorY(view);
+            gardenForward = forward;
             foreach (var f in flowers) f.Planted = false;
             int used = Room.Scanned ? PlantOnFurniture(head, forward, floorY) : 0;
             PlantRows(head, forward, floorY, used);
@@ -352,6 +398,7 @@ namespace MusicInYourHands
             float loud = Mathf.Clamp01((music.Band(1) + music.Band(2) + music.Band(3)) / 2.2f);
             energy = Mathf.Lerp(energy, loud, 1f - Mathf.Exp(-dt * 3f));
             eye = view.transform.position;
+            FollowSun(rig, view, dt);
             for (int i = 0; i < flowers.Length; i++) Dance(i, rig, dt);
             block.SetVectorArray(RootId, roots);
             block.SetVectorArray(PoseId, poses);
@@ -367,26 +414,33 @@ namespace MusicInYourHands
         /// <summary>
         /// The dance's own beat clock: it counts beats, landing on whole numbers with the song's beats, and runs on at
         /// the song's tempo between them (or at a steady tempo when there is no beat), so the flowers never stop or jump.
+        /// The tempo it runs at glides to the song's, and a beat that comes a little early or late is eased into over
+        /// about half a second rather than caught up at once, so the dance never lurches.
         /// </summary>
         void KeepTime(MusicFrame music, float dt)
         {
             bool live = music.BeatInterval > 0.25f && music.BeatInterval < 2f && music.BeatAge < music.BeatInterval * 4f;
             float interval = live ? music.BeatInterval : steadyBeat;
-            beat += dt / interval;
+            tempo = tempo <= 0f ? interval : Mathf.Lerp(tempo, interval, 1f - Mathf.Exp(-dt * 1.5f));
+            beat += dt / tempo;
             if (live && music.Beat)
             {
-                // The beat came BeatAge seconds ago, when the clock should have shown a whole number.
-                float then = beat - music.BeatAge / interval;
-                beatError = Mathf.Round(then) - then;
+                // The beat came BeatAge seconds ago, when the clock should have shown a whole number. A tiny miss is
+                // left alone: detected beats wobble by that much, and chasing it would make the flowers twitch.
+                float then = beat - music.BeatAge / tempo;
+                float miss = Mathf.Round(then) - then;
+                beatError = Mathf.Abs(miss) < 0.04f ? 0f : miss;
             }
-            float pull = beatError * Mathf.Min(1f, dt * 10f);
+            float pull = beatError * Mathf.Min(1f, dt * 2.5f);
             beat += pull;
             beatError -= pull;
         }
 
         /// <summary>
-        /// One flower's dance this frame: it sways across on the beat, squashes and nods as each beat lands and lifts
-        /// its leaves; pops when it is bold; and leans and stretches towards the hands. Fills its row of the shader's arrays.
+        /// One flower's dance this frame: it sways smoothly from side to side, reaching a side on each beat; dips, nods
+        /// and lifts its leaves as each beat lands; swells when it is bold; leans and turns after the sun (your hand);
+        /// and stretches up to a palm over it. Every move rises and eases out smoothly, and the tip glides after its pose
+        /// on a spring, so nothing snaps. Fills its row of the shader's arrays.
         /// </summary>
         void Dance(int i, HandRig rig, float dt)
         {
@@ -401,34 +455,40 @@ namespace MusicInYourHands
             float size = f.Size * Grow(Clock - f.Sprout);
             f.Grown = size;
 
-            // It turns slowly to keep its face to you.
-            float want = YawTowards(f.Root, eye);
+            // It turns slowly to keep its face to you, and round towards the sun, the further the further out your hand is.
+            var lookAt = eye + sunPull * (2f * sunFace);
+            float want = YawTowards(f.Root, lookAt);
             f.Yaw += Mathf.DeltaAngle(f.Yaw * Mathf.Rad2Deg, want * Mathf.Rad2Deg) * Mathf.Deg2Rad * (1f - Mathf.Exp(-dt * 1.5f));
 
             // The beat reaches it a little after the flowers in front of you, so the dance ripples outwards.
             float b = beat - f.Delay;
             float tb = b - Mathf.Floor(b);
             float sb = style.HalfTime ? b * 0.5f : b;
-            float ks = Mathf.Floor(sb);
-            float side = (((long)ks & 1L) == 0L ? 1f : -1f) * f.Side;
-            float swing = side * Swing(sb - ks, out float upright);
-            float hit = Mathf.Exp(-tb * 6f);
-            float squash = (-0.1f * Mathf.Exp(-tb * 5f) * Mathf.Cos(tb * 10f) + 0.035f * upright) * style.Bob;
-            float flap = style.Lift * (0.25f + 0.75f * Mathf.Exp(-tb * 3.5f));
+            // One smooth swing from side to side, at a side on every beat (every other beat for the tall ones), and
+            // tallest as it passes the middle.
+            float swing = f.Side * Mathf.Cos(Mathf.PI * sb);
+            float upright = Mathf.Sin(Mathf.PI * sb);
+            upright *= upright;
+            // As a beat lands it dips, nods and lifts its leaves, rising into each and easing out again.
+            float hit = Pulse(tb, 0.15f);
+            float squash = (-0.08f * hit + 0.035f * upright) * style.Bob;
+            float flap = style.Lift * (0.3f + 0.7f * Pulse(tb, 0.18f));
 
-            // Bold: it pops bigger with a wobble, opens wide and glows, then relaxes over about a second.
+            // Bold: it swells bigger, opens wide and glows, then relaxes over about a second.
             f.BoldAge += dt;
             float a = f.BoldAge;
-            float rise = Mathf.Clamp01(a / 0.07f);
-            float pop = rise * (Mathf.Exp(-a * 2.3f) + Mathf.Sin(a * 21f) * Mathf.Exp(-a * 6f) * 0.12f);
-            float open = Mathf.Clamp01(a / 0.12f) * Mathf.Exp(-a * 1.7f);
-            float bold = rise * Mathf.Exp(-a * 1.5f);
+            float pop = Pulse(a, 0.2f);
+            float open = Pulse(a, 0.25f);
+            float bold = Mathf.SmoothStep(0f, 1f, a / 0.15f) * Mathf.Exp(-Mathf.Max(0f, a - 0.15f) * 1.5f);
 
             // It dances bigger as the music gets louder; a flower reaching up to a palm holds still under it.
             float over = Reach(f, rig, size, dt);
             float calm = 1f - 0.75f * over;
             float amount = sway * style.Sway * (0.45f + 0.75f * energy) * calm;
-            var tip = new Vector2(swing * amount, 0.04f * hit * calm) + f.Lean;
+            var pose = new Vector2(swing * amount, 0.04f * hit * calm) + f.Lean;
+            // The tip glides after its pose, so a beat that comes early or a sudden hand never makes it snap.
+            f.Tip = Vector2.SmoothDamp(f.Tip, pose, ref f.TipSpeed, tipGlide, Mathf.Infinity, dt);
+            var tip = f.Tip;
             roots[i] = new Vector4(f.Root.x, f.Root.y, f.Root.z, f.Yaw);
             poses[i] = new Vector4(tip.x, tip.y, (1f + squash * 0.5f * calm + 0.06f * pop) * (1f + f.Stretch), 1f + 0.45f * pop + 0.05f * energy);
             looks[i] = new Vector4(Mathf.Clamp01(Mathf.Max(open, f.Open)), Mathf.Clamp01(Mathf.Max(bold, f.Warm)), squash * 1.6f * calm, style.Nod * hit * calm);
@@ -438,17 +498,14 @@ namespace MusicInYourHands
         }
 
         /// <summary>
-        /// One beat of the sway, from the side it landed on (1) across to the other (-1): it holds there a moment with a
-        /// little bounce, then swings over to arrive with the next beat. <paramref name="upright"/> is 1 as it passes
-        /// the middle, where it stands tallest.
+        /// A smooth pulse <paramref name="t"/> (seconds or beats) after it starts: it rises from 0 to 1 at
+        /// <paramref name="peak"/> without a jolt, then eases back out.
         /// </summary>
-        static float Swing(float t, out float upright)
+        static float Pulse(float t, float peak)
         {
-            float e = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((t - 0.1f) / 0.8f));
-            upright = Mathf.Sin(Mathf.PI * e);
-            upright *= upright;
-            float bounce = Mathf.Sin(t * Mathf.PI * 2.8f) * Mathf.Exp(-t * 7f) * 0.3f;
-            return Mathf.Cos(Mathf.PI * e) + bounce;
+            if (t <= 0f) return 0f;
+            float x = t / peak;
+            return x * Mathf.Exp(1f - x);
         }
 
         /// <summary>How far a flower has grown, t seconds after it starts: it springs up with a little overshoot.</summary>
@@ -461,8 +518,9 @@ namespace MusicInYourHands
         }
 
         /// <summary>
-        /// Hands near the flower draw it towards them: it leans in and opens a little. A palm held flat over it pulls it
-        /// up to meet the palm, wide open and glowing, with a soft note as it arrives and pollen rising to the palm.
+        /// The sun (your hands) draws every flower towards it: wherever the hand is, the flower leans that way and opens
+        /// a little, and leans further, its tip towards the palm, as the hand comes near. A palm held flat over it pulls
+        /// it up to meet the palm, wide open and glowing, with a soft note as it arrives and pollen rising to the palm.
         /// Returns how strongly a palm is over it (0-1).
         /// </summary>
         float Reach(Flower f, HandRig rig, float size, float dt)
@@ -472,6 +530,13 @@ namespace MusicInYourHands
             float stretch = 0f, open = 0f, warm = 0f, over = 0f;
             float height = Mathf.Max(f.Height * size, 0.05f);
             var head = f.Root + Vector3.up * (height + f.Neck * size);
+            if (size > 0.15f && sunShine > 0f)
+            {
+                // The whole garden leans the way the sun pulls it: towards wherever your hand is.
+                var pull = ToLocal(sunPull, f.Yaw);
+                lean += new Vector2(pull.x, pull.z) * sunLean;
+                open = 0.25f * sunShine;
+            }
             if (rig != null && size > 0.15f)
             {
                 for (int s = 0; s < 2; s++)
@@ -479,10 +544,12 @@ namespace MusicInYourHands
                     var hand = rig.Get(s == 0);
                     if (!hand.IsTracked || hand.InSystemGesture) continue;
                     var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
-                    var local = ToLocal(palm - f.Root, f.Yaw);
+                    // Leaning follows the sun on the palm, which trails the hand a little, so tracking tremor doesn't shake the flowers.
+                    var shining = sunShown[s] > 0f ? sunAt[s] : palm;
+                    var local = ToLocal(shining - f.Root, f.Yaw);
                     // The lean that would bring its tip under the palm.
                     var toward = Vector2.ClampMagnitude(new Vector2(local.x, local.z) / height, 0.5f);
-                    float near = Smooth01((leanReach - Vector3.Distance(palm, head)) / Mathf.Max(leanReach - 0.1f, 0.01f));
+                    float near = Smooth01((leanReach - Vector3.Distance(shining, head)) / Mathf.Max(leanReach - 0.1f, 0.01f));
                     lean += toward * (near * 0.75f);
                     open = Mathf.Max(open, near * 0.5f);
                     warm = Mathf.Max(warm, near * 0.3f);
@@ -503,7 +570,7 @@ namespace MusicInYourHands
                 if (over > 0f) Acted("palm over flower");
             }
             float follow = 1f - Mathf.Exp(-dt * 4f);
-            f.Lean = Vector2.Lerp(f.Lean, Vector2.Lerp(Vector2.ClampMagnitude(lean, 0.5f), under, over), follow);
+            f.Lean = Vector2.SmoothDamp(f.Lean, Vector2.Lerp(Vector2.ClampMagnitude(lean, 0.6f), under, over), ref f.LeanSpeed, leanGlide, Mathf.Infinity, dt);
             f.Stretch = Mathf.Lerp(f.Stretch, stretch * over, 1f - Mathf.Exp(-dt * 2.5f));
             f.Open = Mathf.Lerp(f.Open, Mathf.Max(open, over), follow);
             f.Warm = Mathf.Lerp(f.Warm, Mathf.Max(warm, over * 0.55f), follow);
@@ -521,6 +588,67 @@ namespace MusicInYourHands
             // A thin stream of pollen rises from its face to the palm.
             if (f.Over > 0.35f && Random.value < dt * 16f * f.Over) Drift(f);
             return f.Over;
+        }
+
+        /// <summary>
+        /// Your hands are the sun: a warm glow on each tracked palm that swells on every beat and burns brighter as the
+        /// music gets louder. The sun trails the palm slightly, so the flowers move smoothly instead of trembling with the
+        /// tracking. Where it is against the middle in front of your chest (to your left or right, nearer or further)
+        /// sets how the whole garden leans and turns.
+        /// </summary>
+        void FollowSun(HandRig rig, Camera view, float dt)
+        {
+            float follow = 1f - Mathf.Exp(-dt * 6f);
+            float pulse = Pulse(beat - Mathf.Floor(beat), 0.15f);
+            for (int s = 0; s < 2; s++)
+            {
+                var hand = rig != null ? rig.Get(s == 0) : null;
+                bool lit = hand != null && hand.IsTracked && !hand.InSystemGesture;
+                if (lit)
+                {
+                    var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
+                    var at = palm + hand.PalmNormal * 0.025f;
+                    sunAt[s] = sunShown[s] <= 0f ? at : Vector3.Lerp(sunAt[s], at, follow);
+                }
+                sunShown[s] = Mathf.MoveTowards(sunShown[s], lit ? 1f : 0f, dt * 3f);
+
+                var glow = suns[s];
+                bool show = sunShown[s] > 0.01f;
+                if (glow.gameObject.activeSelf != show) glow.gameObject.SetActive(show);
+                if (!show) continue;
+                glow.transform.position = sunAt[s];
+                Effects.Face(glow.transform, view);
+                glow.transform.localScale = Vector3.one * (sunSize * (1f + 0.35f * pulse + 0.2f * energy));
+                haloBlock.Clear();
+                haloBlock.SetColor(ColorId, SunColor);
+                haloBlock.SetFloat(IntensityId, (0.8f + 0.6f * energy + 0.7f * pulse) * sunShown[s] * FadeIn);
+                haloBlock.SetFloat(CoreId, 0.55f);
+                glow.SetPropertyBlock(haloBlock);
+            }
+
+            // The pull on the garden: with both hands out the sun is between them.
+            var forward = gardenForward;
+            var right = Vector3.Cross(Vector3.up, forward);
+            var chest = eye + forward * 0.3f + Vector3.down * 0.3f;
+            var sum = Vector3.zero;
+            float weight = 0f;
+            sunShine = 0f;
+            for (int s = 0; s < 2; s++)
+            {
+                if (sunShown[s] <= 0f) continue;
+                sum += sunAt[s] * sunShown[s];
+                weight += sunShown[s];
+                sunShine = Mathf.Max(sunShine, sunShown[s]);
+            }
+            var target = Vector3.zero;
+            if (weight > 0f)
+            {
+                var offset = sum / weight - chest;
+                float across = Mathf.Clamp(Vector3.Dot(offset, right) / sunRange, -1f, 1f);
+                float away = Mathf.Clamp(Vector3.Dot(offset, forward) / sunRange, -1f, 1f);
+                target = Vector3.ClampMagnitude(right * across + forward * (away * 0.6f), 1f) * sunShine;
+            }
+            sunPull = Vector3.SmoothDamp(sunPull, target, ref sunPullSpeed, 0.25f, Mathf.Infinity, dt);
         }
 
         void Embolden(Flower f)
@@ -783,7 +911,7 @@ namespace MusicInYourHands
             f.Sprout = Clock + 0.1f + 0.55f * round + 0.14f * row + Next(random) * 0.12f;
             f.Grown = 0f;
             f.BoldAge = 99f;
-            f.Lean = Vector2.zero;
+            f.Lean = f.LeanSpeed = f.Tip = f.TipSpeed = Vector2.zero;
             f.Stretch = f.Open = f.Warm = f.Over = 0f;
             f.Touched = false;
         }

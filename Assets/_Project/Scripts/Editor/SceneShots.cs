@@ -65,6 +65,9 @@ namespace MusicInYourHands.EditorTools
             Shot<ShadowPlay>("23-shadow-play", HandPose.BacksToFace, 6f, holdPose: rig => PreviewBody(rig, 1f / 30f),
                 closeUp: rig => new Vector3(0.12f, 1.95f, 2.6f), handOffset: ShadowPlayHands);
             Shot<ShadowPlay>("23h-shadow-play-hands-only", HandPose.BacksToFace, 6f, handOffset: ShadowPlayHands);
+            // Flower dance: your hands are the sun, and the garden leans after them (here held out to your left).
+            Shot<FlowerDance>("25-flower-dance", HandPose.PalmsToFace, 8f);
+            Shot<FlowerDance>("25l-flower-dance-sun-left", HandPose.PalmsToFace, 8f, handOffset: _ => new Vector3(-0.45f, 0.05f, 0.1f));
             Shot<NeonSign>("16-neon-sign", HandPose.BacksToFace, 2f, lead: 4f, extra: 1.7f);
             Shot<WordDrift>("17-word-drift", HandPose.PalmsToFace, 2f, lead: 6f);
             WordDrift drift = null;
