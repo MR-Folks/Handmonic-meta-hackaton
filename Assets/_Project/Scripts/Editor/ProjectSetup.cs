@@ -555,6 +555,11 @@ namespace MusicInYourHands.EditorTools
                 mruk.SceneSettings.LoadSceneOnStartup = false;
                 scan.AddComponent<RoomScanFeed>();
             }
+#if META_XR_AUDIO
+            // The room's reflections and reverb for the spatial sounds, sized from the scan.
+            if (Object.FindAnyObjectByType<RoomAcoustics>(FindObjectsInactive.Include) == null)
+                new GameObject("RoomAcoustics", typeof(RoomAcoustics));
+#endif
 #endif
         }
 
