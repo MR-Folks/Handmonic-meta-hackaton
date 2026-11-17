@@ -17,12 +17,14 @@ namespace MusicInYourHands
     /// hand glistens below the waterline. Pinch above the pool and a clear stream pours from your fingers, curving as
     /// your hand moves, thinning as it falls and breaking into beads where it meets the water; let go and its tail
     /// falls as drops.
-    /// Cup both hands under the water, palms up, as if scooping some up to drink, and you hold the whole pool: raise
-    /// your hands and it rises with them, lower them and it sinks. The water mounds up over each palm and glows softly
-    /// there, the beads ride the mounds, water drips from the edges of your hands and sloshes quietly as it moves, and
-    /// the room's water light rises with it. It never comes higher than a little below your eyes, nor lower than just
-    /// above the floor (or its table). Take your hands away (out to the side, apart, or palms turned down) and it
-    /// stays at its new height, also when the world sets itself up again after you move.
+    /// Cup both hands under the water, palms up, and bring them up through the surface, as if to drink: a handful of
+    /// the pool comes up between them, a small body of clear water in the bowl of your palms that follows them,
+    /// rippling gently with the music, while the surface below just ripples where it left. How long you keep it depends
+    /// on how closed your hands are: held together it only drips slowly from the seam, about a drop a second, and lasts
+    /// a quarter of a minute; open the seam and it drips faster, then runs out in a thin stream; open them wide, or tip
+    /// or turn your palms, and it pours out at once. It shrinks as it leaks, and the drops fall back into the pool with
+    /// small ripples. Lower your hands into the pool and what is left goes back in. One cupped hand brings up a little
+    /// that soon runs out between the fingers.
     /// </summary>
     public class SoundPool : World
     {
@@ -54,6 +56,9 @@ namespace MusicInYourHands
         [SerializeField] Material streamMaterial;
         [Tooltip("The water light spreading over the room (Materials/RoomRipples).")]
         [SerializeField] Material roomRipplesMaterial;
+        [Tooltip("The handful of water scooped up in your hands (Materials/SoundPoolHandful).")]
+        [WorldMaterial("SoundPoolHandful")]
+        [SerializeField] Material handfulMaterial;
 
         [Header("Room")]
         [Tooltip("Half the width and depth of the stand-in room (m), and its height.")]
@@ -79,17 +84,17 @@ namespace MusicInYourHands
         [Tooltip("Seconds a melody droplet takes to fall into the pool.")]
         [SerializeField] float dropTime = 0.5f;
 
-        [Header("Lifting")]
-        [Tooltip("The fastest (m/s) the pool rises or sinks while you hold it.")]
-        [SerializeField] float liftSpeed = 0.6f;
-        [Tooltip("How quickly the held pool catches up with your palms (per second); lower feels heavier.")]
-        [SerializeField] float liftFollow = 8f;
-        [Tooltip("The highest the pool goes: this far (m) below your eyes.")]
-        [SerializeField] float eyeClearance = 0.25f;
-        [Tooltip("The lowest the pool goes: this far (m) above the floor. On a table it goes no lower than it rests there.")]
-        [SerializeField] float floorClearance = 0.15f;
-        [Tooltip("How long (s) both cupped hands stay under the water before they hold the pool.")]
-        [SerializeField] float holdDelay = 0.2f;
+        [Header("Scooping")]
+        [Tooltip("The gap (m) along the seam between your hands at or under which they hold their water, dripping slowly.")]
+        [SerializeField] float sealGap = 0.02f;
+        [Tooltip("The gap (m) past which the water pours out between your hands at once.")]
+        [SerializeField] float spillGap = 0.1f;
+        [Tooltip("How long (s) a full handful lasts in hands held closed.")]
+        [SerializeField] float sealedSeconds = 17.5f;
+        [Tooltip("How far (degrees) your palms may tip away from up before water runs over their edges.")]
+        [SerializeField] float dripTilt = 35f;
+        [Tooltip("How far (degrees) your palms tip before the water pours out at once.")]
+        [SerializeField] float spillTilt = 75f;
 
         static readonly int KickId = Shader.PropertyToID("_Kick");
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
@@ -101,8 +106,7 @@ namespace MusicInYourHands
         static readonly int SpecPowerId = Shader.PropertyToID("_SpecPower");
         static readonly int LipBeatId = Shader.PropertyToID("_LipBeat");
         static readonly int CrestGainId = Shader.PropertyToID("_CrestGain");
-        static readonly int PalmLId = Shader.PropertyToID("_PalmL");
-        static readonly int PalmRId = Shader.PropertyToID("_PalmR");
+        static readonly int RippleId = Shader.PropertyToID("_Ripple");
         static readonly int SharpnessId = Shader.PropertyToID("_Sharpness");
         static readonly int FillId = Shader.PropertyToID("_Fill");
         static readonly int DriftId = Shader.PropertyToID("_Drift");
@@ -111,12 +115,10 @@ namespace MusicInYourHands
         {
             new Color(0.5f, 0.78f, 1f), new Color(0.45f, 0.88f, 0.9f), new Color(0.62f, 0.9f, 1f), new Color(0.42f, 0.7f, 0.98f)
         };
-        // The beads' palette: a narrow band of water colours, blue to teal, and the paler aqua they take on over a palm.
+        // The beads' palette: a narrow band of water colours, blue to teal.
         static readonly Color BeadBlue = new Color(0.2f, 0.5f, 0.84f);
         static readonly Color BeadTeal = new Color(0.17f, 0.62f, 0.7f);
-        static readonly Color BeadLight = new Color(0.42f, 0.8f, 0.92f);
         static readonly Color RippleColor = new Color(0.45f, 0.85f, 1f);
-        static readonly Color DripColor = new Color(0.65f, 0.92f, 1f, 0.95f);
 
         /// <summary>A drop of poured water. Attached drops are still part of the stream; let go, they fall as drops.</summary>
         struct Drip
@@ -132,7 +134,7 @@ namespace MusicInYourHands
         MeshRenderer surfaceRenderer;
         Vector3[] vertices, normals;
         float[] height, previous, next, sponge;
-        ParticleSystem splashes, loose, handDrips;
+        ParticleSystem splashes, loose;
         Renderer caustics;
         ParticleSystem.Particle[] looseOut;
         Quaternion[] beadTurn;
@@ -148,13 +150,15 @@ namespace MusicInYourHands
         Vector3[] streamPath;
         float[] streamWidths;
         RoomWaves room;
-        readonly List<Drip> drips = new List<Drip>();
-        readonly float[] streamDebt = new float[2];
-        readonly bool[] pouring = new bool[2];
-        readonly Vector3[] pourFrom = new Vector3[2];
-        readonly Vector3[] lastPourFrom = new Vector3[2];
-        // The hand's speed with tracking jitter smoothed out, so neighbouring drops leave it alike.
-        readonly Vector3[] pourVelocity = new Vector3[2];
+        readonly List<Drip> drips = new List<Drip>(MaxDrips);
+        // The streams: one poured from each hand's pinch, and one running out of a handful (ScoopStream).
+        const int Streams = 3, ScoopStream = 2;
+        readonly float[] streamDebt = new float[Streams];
+        readonly bool[] pouring = new bool[Streams];
+        readonly Vector3[] pourFrom = new Vector3[Streams];
+        readonly Vector3[] lastPourFrom = new Vector3[Streams];
+        // The source's speed with tracking jitter smoothed out, so neighbouring drops leave it alike.
+        readonly Vector3[] pourVelocity = new Vector3[Streams];
         Vector3[] streamSmooth;
         Vector3 litPoint;
         float stir;
@@ -195,34 +199,35 @@ namespace MusicInYourHands
         // How far (m) a ripple travels in the water per simulation step.
         float waveStep;
 
-        // ---- Holding the pool ----
-        const float TableRest = 0.035f, MoundHeight = 0.02f, MoundRadius = 0.075f;
-        bool holding;
-        // How long both hands have been cupped under the water (s) before holding, and how long since they stopped
-        // (s) while holding, so a moment of lost tracking doesn't drop the pool.
-        float holdTimer, letGo;
-        // The surface's height over the palms when it was picked up, and the gap between the palms then.
-        float holdOffset, holdGap;
-        // How much the pool is held (0-1, eased): the mounds over the palms and their light.
-        float holdWeight;
-        // How fast the pool is rising (+) or sinking (m/s), smoothed.
-        float liftVelocity;
-        // Where each palm is under the pool (metres across it), smoothed, and how tall the water mounds over it.
-        readonly Vector2[] moundAt = new Vector2[2];
-        readonly float[] moundHeight = new float[2];
-        readonly Vector3[] palmAt = new Vector3[2];
-        readonly float[] dripDebt = new float[2];
-        readonly int[] dripTurn = new int[2];
-        // Where the pool sits: the table top or floor under it, whether it is a table, its usual height there, and
-        // how wide its light patch is there.
-        float groundY, restY, causticSpread = 1.4f;
-        bool onTable;
-        // A height chosen by lifting the pool, kept as a height over the table or floor it was chosen over.
-        bool chosen, chosenOnTable;
-        float chosenAbove;
+        // ---- A handful of water ----
+        // How much a handful leaks while pouring out at once (share of a full one per second), and how high (m) over
+        // the palms' joints its rim sits, so it rests on the skin of the palms rather than inside them.
+        const float SpillRate = 3.5f, HandfulRise = 0.018f;
+        // Whether cupped hands are under the water, ready to scoop as they come up: both together, or each alone.
+        bool pairUnder;
+        readonly bool[] handUnder = new bool[2];
+        // The hands holding water (1 left, 2 right, 3 both), and how much (1 is a full double handful; 0 none).
+        int scoopHands;
+        float scoopVolume;
+        // The seam gap (m) and palm tilt (degrees), smoothed against tracking jitter; how long the hands have been
+        // lost, and wide open or tipped; whether the water is pouring out at once.
+        float seamGap, palmTilt, lostFor, spillFor;
+        bool spilling, leakOverRim;
+        // Drops owed to the leak, and how wide its stream is (m).
+        float dripDebt, scoopStreamWidth;
+        // The bowl the hands make: the palms' middle, the way across from left to right palm, the palms' distance,
+        // how fast they move, where water gets through the seam, over the lowest rim, and where it leaks now.
+        Vector3 bowlBase, bowlAcross = Vector3.right, bowlVelocity, seamPoint, rimPoint, leakPoint;
+        float bowlSpan;
+        // The handful as drawn: where it is and how it is turned (eased after the hands).
+        MeshRenderer handful;
+        Vector3 handfulAt;
+        Quaternion handfulTurn = Quaternion.identity;
+        // The table top or floor under the pool, and the floor, where falling drops vanish.
+        float groundY, floorY;
+        float dripSoundAt = -9f;
         AudioPool voices;
-        AudioSource slosh;
-        AudioClip scoopClip, dropsClip;
+        AudioClip scoopClip, spillClip, dripClip;
 
         protected override float FadeInSeconds => 1f / 2f;
 
@@ -290,18 +295,6 @@ namespace MusicInYourHands
             var main = splashes.main;
             main.gravityModifier = 0.5f;
 
-            // Drops falling from the edges of the hands that hold the pool up.
-            handDrips = Effects.MakeSparkSystem("Hand drips", transform, glowMaterial);
-            var dripMain = handDrips.main;
-            dripMain.gravityModifier = 1f;
-            dripMain.maxParticles = 160;
-            var dripNoise = handDrips.noise;
-            dripNoise.enabled = false;
-            var dripRenderer = handDrips.GetComponent<ParticleSystemRenderer>();
-            dripRenderer.renderMode = ParticleSystemRenderMode.Stretch;
-            dripRenderer.velocityScale = 0.02f;
-            dripRenderer.lengthScale = 1.2f;
-
             caustics = Effects.MakeQuad("Water Light", transform, causticsMaterial);
             caustics.gameObject.SetActive(false);
 
@@ -337,10 +330,10 @@ namespace MusicInYourHands
             loose = MakeManualSystem("Drops", MaxDrips, true);
             if (streamMaterial != null)
             {
-                streams = new LineStrip[2];
-                for (int s = 0; s < 2; s++)
+                streams = new LineStrip[Streams];
+                for (int s = 0; s < Streams; s++)
                 {
-                    streams[s] = new LineStrip(s == 0 ? "Pour L" : "Pour R", transform, streamMaterial, StreamPoints);
+                    streams[s] = new LineStrip(s == 0 ? "Pour L" : s == 1 ? "Pour R" : "Handful stream", transform, streamMaterial, StreamPoints);
                     streams[s].SetVisible(false);
                 }
             }
@@ -361,19 +354,22 @@ namespace MusicInYourHands
                 room = new RoomWaves(transform, roomLook, roomHalfSize, roomHeight);
             }
 
-            voices = new AudioPool(transform, 3);
+            if (handfulMaterial != null)
+            {
+                var go = new GameObject("Handful");
+                go.transform.SetParent(transform, false);
+                go.AddComponent<MeshFilter>().sharedMesh = HandfulMesh();
+                handful = go.AddComponent<MeshRenderer>();
+                handful.sharedMaterial = handfulMaterial;
+                handful.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                handful.receiveShadows = false;
+                go.SetActive(false);
+            }
+
+            voices = new AudioPool(transform, 6);
             scoopClip = ScoopSound();
-            dropsClip = DropsSound();
-            var sloshGo = new GameObject("Slosh");
-            sloshGo.transform.SetParent(transform, false);
-            slosh = sloshGo.AddComponent<AudioSource>();
-            slosh.clip = SloshSound();
-            slosh.loop = true;
-            slosh.playOnAwake = false;
-            slosh.spatialBlend = 1f;
-            slosh.minDistance = 0.4f;
-            slosh.dopplerLevel = 0f;
-            slosh.volume = 0f;
+            spillClip = SpillSound();
+            dripClip = DripSound();
         }
 
         void OnDestroy()
@@ -461,9 +457,8 @@ namespace MusicInYourHands
             pulse = 0f;
             lightLevel = 0f;
             for (int r = 0; r < Rings; r++) ringRadius[r] = 99f;
-            holding = false;
-            holdTimer = letGo = holdWeight = liftVelocity = 0f;
-            moundHeight[0] = moundHeight[1] = 0f;
+            pairUnder = handUnder[0] = handUnder[1] = false;
+            Empty();
         }
 
         protected override void OnExit()
@@ -471,60 +466,42 @@ namespace MusicInYourHands
 #if UNITY_EDITOR
             previewBeads = false;
 #endif
-            Release(true);
-            holdWeight = 0f;
-            moundHeight[0] = moundHeight[1] = 0f;
+            Empty();
+            if (handful != null) handful.gameObject.SetActive(false);
             if (surface != null) surface.gameObject.SetActive(false);
             if (caustics != null) caustics.gameObject.SetActive(false);
             drips.Clear();
-            pouring[0] = pouring[1] = false;
+            System.Array.Clear(pouring, 0, Streams);
             if (loose != null) loose.Clear();
-            if (handDrips != null) handDrips.Clear();
             if (streams != null) foreach (var s in streams) s.SetVisible(false);
             room?.Hide();
             cutoff = 22000f;
             if (lowPass != null) lowPass.enabled = false;
             if (splashes != null) splashes.Clear();
-            if (slosh != null)
-            {
-                slosh.volume = 0f;
-                slosh.Stop();
-            }
         }
 
-        /// <summary>
-        /// The pool sits in front of you at table height, or on your real table once the room is scanned. A height you
-        /// chose by lifting it stays, as a height over the table or floor, as long as it still makes sense where you are
-        /// now: over the same kind of ground, and inside the comfortable range for your eyes' height.
-        /// </summary>
+        /// <summary>The pool sits in front of you at table height, or on your real table once the room is scanned.</summary>
         protected override void OnPlace(Camera view)
         {
-            Release(true);
             var forward = Effects.FlatForward(view);
-            float floor = Effects.FloorY(view);
+            floorY = Effects.FloorY(view);
             var center = view.transform.position + forward * distance + Vector3.down * belowEyes;
-            center.y = Mathf.Max(center.y, floor + 0.45f);
+            center.y = Mathf.Max(center.y, floorY + 0.45f);
             // With a room scan, the pool fills a shallow tray on the real table in front of you.
-            onTable = Room.TableAhead(view.transform.position, forward, 1.1f, size.y * 0.5f, out _, out var spot);
-            if (onTable) center = spot + Vector3.up * TableRest;
-            groundY = onTable ? spot.y : floor;
-            restY = center.y;
-            if (chosen && chosenOnTable == onTable)
-            {
-                float y = groundY + chosenAbove;
-                if (y >= Lowest - 0.005f && y <= Highest(view) + 0.005f) center.y = y;
-            }
+            bool onTable = Room.TableAhead(view.transform.position, forward, 1.1f, size.y * 0.5f, out _, out var spot);
+            if (onTable) center = spot + Vector3.up * 0.035f;
+            groundY = onTable ? spot.y : floorY;
             surface.SetPositionAndRotation(center, Quaternion.LookRotation(forward, Vector3.up));
             surface.gameObject.SetActive(true);
             // The water's light falls on the table under it, or on the floor right below it.
-            float lit = onTable ? spot.y + 0.003f : floor + 0.004f;
+            float lit = onTable ? spot.y + 0.003f : floorY + 0.004f;
             litPoint = new Vector3(center.x, lit, center.z);
             caustics.transform.SetPositionAndRotation(litPoint, Quaternion.LookRotation(Vector3.down, forward));
-            causticSpread = onTable ? 1.1f : 1.4f;
-            caustics.transform.localScale = new Vector3(size.x * causticSpread, size.y * causticSpread, 1f);
+            float spread = onTable ? 1.1f : 1.4f;
+            caustics.transform.localScale = new Vector3(size.x * spread, size.y * spread, 1f);
             // On the floor, the room's own floor carries this light on outwards, so the patch would only double it.
             caustics.gameObject.SetActive(onTable || room == null);
-            room?.Place(view.transform.position, forward, floor);
+            room?.Place(view.transform.position, forward, floorY);
         }
 
         /// <summary>
@@ -532,12 +509,6 @@ namespace MusicInYourHands
         /// in a pool resting on a table bottoms out on the tray instead of sinking into the table.
         /// </summary>
         float TrayBottom => groundY + 0.004f - surface.position.y;
-
-        /// <summary>The lowest the pool goes: a little above the floor, or resting on its table.</summary>
-        float Lowest => groundY + (onTable ? TableRest : floorClearance);
-
-        /// <summary>The highest the pool goes: well below the eyes, so it never comes near your face.</summary>
-        float Highest(Camera view) => Mathf.Max(view.transform.position.y - eyeClearance, Lowest);
 
         /// <summary>
         /// Each kick drops a ring in the middle of the pool. A beat also starts the beads' pulse and a ring of light
@@ -573,7 +544,6 @@ namespace MusicInYourHands
         {
             songTime = music.SongTime;
             Beat(music, dt);
-            Lift(rig, view, dt);
             HandSkin.FocusPosition = surface.position;
             HandSkin.FocusStrength = FadeIn;
 
@@ -582,11 +552,13 @@ namespace MusicInYourHands
             LandDroplets();
 
             float dip = TouchWithHands(rig, dt);
+            Scoop(rig, dt);
             Pour(rig, dt);
             Simulate(dt);
             UpdateMesh(dt);
             Muffle(music.Bus, dip, dt);
             DrawBeads();
+            DrawHandful(dt);
             Sing(view, dt);
             Shine(dt);
         }
@@ -611,21 +583,16 @@ namespace MusicInYourHands
 
         /// <summary>
         /// The water light on the floor below, on the table under the pool and across the room: easing with the bass
-        /// and with how stirred the water is, never jumping. It rises with the pool when you lift it, and the patch on
-        /// the table spreads out and dims the higher the pool is held over it. Also the water's own shading.
+        /// and with how stirred the water is, never jumping. Also the water's own shading.
         /// </summary>
         void Shine(float dt)
         {
             stir *= Mathf.Exp(-dt * 1.5f);
-            float want = 0.2f + bassSlow * 0.1f + Mathf.Min(stir, 1f) * 0.22f + holdWeight * 0.05f;
+            float want = 0.2f + bassSlow * 0.1f + Mathf.Min(stir, 1f) * 0.22f;
             lightLevel = Mathf.Lerp(lightLevel, want, 1f - Mathf.Exp(-2.5f * dt));
             float light = lightLevel * FadeIn;
-            float raised = Mathf.Max(0f, surface.position.y - restY);
-            float spread = causticSpread + raised * 1.5f;
-            caustics.transform.localScale = new Vector3(size.x * spread, size.y * spread, 1f);
-            float thin = causticSpread / spread;
             block.Clear();
-            block.SetFloat(StrengthId, light * thin * thin * 1.4f);
+            block.SetFloat(StrengthId, light * 1.4f);
             block.SetFloat(ClockId, Now);
             block.SetFloat(SharpnessId, 6f);
             block.SetFloat(FillId, 0.12f);
@@ -633,7 +600,7 @@ namespace MusicInYourHands
             caustics.SetPropertyBlock(block);
             if (room != null)
             {
-                room.SetLight(litPoint + Vector3.up * raised, light);
+                room.SetLight(litPoint, light);
                 room.Step(Music, dt);
             }
 
@@ -645,194 +612,371 @@ namespace MusicInYourHands
             block.SetFloat(LipBeatId, 0.35f);
             // Softer crests, so the swell rolls through gentle shades instead of patches of bright and deep.
             block.SetFloat(CrestGainId, 60f);
-            for (int s = 0; s < 2; s++)
-            {
-                var at = surface.TransformPoint(new Vector3(moundAt[s].x, 0f, moundAt[s].y));
-                block.SetVector(s == 0 ? PalmLId : PalmRId, new Vector4(at.x, at.y, at.z, moundHeight[s] / MoundHeight * 0.6f));
-            }
             surfaceRenderer.SetPropertyBlock(block);
         }
 
         /// <summary>
-        /// Holding the pool. Both hands cupped under the water (palms roughly up, not pinching, inside the pool) for a
-        /// moment pick it up: from then on it follows the height of your palms, keeping the gap it had over them, eased
-        /// and never faster than liftSpeed, between Lowest and Highest. Taking the hands away lets it go where it is:
-        /// out past its sides, apart, palms turned down, a pinch, out of the water or far below it. A pool lifted above
-        /// its usual height also sinks away gently if your eyes come down near it (you sat down, say).
+        /// Scooping. Cupped hands (palms up, not pinching or making a fist) under the water and brought up through the
+        /// surface carry a handful of it up (FindScoop): both together when the seam between them is narrower than
+        /// spillGap, or one alone. While held, the handful follows the hands (Bowl) and leaks (Leak) as fast as the hands
+        /// are open and tipped, until it is empty, pours out at once (Spill), or goes back into the pool (Merge). Hands
+        /// lost for a moment keep their water; the open menu, or hands lost for longer, let it fall.
         /// </summary>
-        void Lift(HandRig rig, Camera view, float dt)
+        void Scoop(HandRig rig, float dt)
         {
             bool menu = MenuOpen;
-            bool both = false;
-            if (rig != null && !menu)
+            if (scoopVolume <= 0f)
             {
-                bool left = Cupped(rig.Left, 0);
-                bool right = Cupped(rig.Right, 1);
-                both = left && right;
+                FindScoop(rig, menu);
+                return;
             }
-            float gap = both ? Vector3.Distance(palmAt[0], palmAt[1]) : 0f;
-            if (holding)
+            bool useLeft = (scoopHands & 1) != 0, useRight = (scoopHands & 2) != 0;
+            bool tracked = rig != null && (!useLeft || rig.Left.IsTracked) && (!useRight || rig.Right.IsTracked);
+            lostFor = tracked ? 0f : lostFor + dt;
+            float rate = 1f / sealedSeconds;
+            if (tracked)
             {
-                bool keep = both && gap < holdGap + 0.18f;
-                letGo = keep ? 0f : letGo + dt;
-                if (menu || letGo > 0.15f) Release(false);
+                Bowl(rig, useLeft, useRight, out float gap, out float tilt, out bool squeezed);
+                // Smoothed, so tracking jitter doesn't make the leak flicker.
+                float follow = 1f - Mathf.Exp(-12f * dt);
+                seamGap = Mathf.Lerp(seamGap, gap, follow);
+                palmTilt = Mathf.Lerp(palmTilt, tilt, follow);
+                // Lowered back into the pool, what is left goes back in.
+                var local = surface.InverseTransformPoint(bowlBase);
+                if (!menu && local.y < -0.005f && Mathf.Abs(local.x) < size.x * 0.5f && Mathf.Abs(local.z) < size.y * 0.5f)
+                {
+                    Merge(new Vector2(local.x / size.x + 0.5f, local.z / size.y + 0.5f));
+                    return;
+                }
+                if (!spilling && !menu)
+                {
+                    // Closed, a drop a second; opening the seam or tipping the palms lets it out faster and faster.
+                    float open = Mathf.InverseLerp(sealGap, spillGap, seamGap);
+                    float tip = Mathf.InverseLerp(dripTilt, spillTilt, palmTilt);
+                    rate += open * open * 1.6f + tip * tip * 2.5f;
+                    leakOverRim = tip * tip * 2.5f > open * open * 1.6f;
+                    // Wide open or tipped right over (held a moment, against jitter), or squeezed: it all pours out.
+                    spillFor = seamGap > spillGap || palmTilt > spillTilt ? spillFor + dt : 0f;
+                    if (squeezed || spillFor > 0.1f) Spill(true);
+                }
+                leakPoint = leakOverRim ? rimPoint : seamPoint;
+            }
+            // The menu takes the hands, and hands lost for more than a moment hold nothing: the water falls.
+            if (!spilling && (menu || lostFor > 0.5f)) Spill(false);
+            Leak(spilling ? SpillRate : rate, dt);
+        }
+
+        /// <summary>
+        /// Watches for cupped hands coming up through the surface. Two cupped hands under the water with a seam narrower
+        /// than spillGap make one bowl, which scoops as the middle between them comes up through it; a cupped hand on its
+        /// own scoops as it comes up. A hand counts as under from 5 mm below the surface and as out from 5 mm above it,
+        /// so it can't scoop again and again while it hovers at the surface.
+        /// </summary>
+        void FindScoop(HandRig rig, bool menu)
+        {
+            float depthL = 0f, depthR = 0f;
+            bool left = rig != null && !menu && Cupped(rig.Left, out depthL);
+            bool right = rig != null && !menu && Cupped(rig.Right, out depthR);
+            if (left && right && SeamGap(rig.Left, rig.Right, out _) < spillGap)
+            {
+                handUnder[0] = handUnder[1] = false;
+                float depth = (depthL + depthR) * 0.5f;
+                if (depth < -0.005f)
+                {
+                    bool ready = pairUnder;
+                    pairUnder = false;
+                    if (ready) TakeScoop(rig, 3);
+                }
+                else if (depth > 0.005f) pairUnder = depth < 0.25f;
+                return;
+            }
+            pairUnder = false;
+            for (int side = 0; side < 2; side++)
+            {
+                bool cupped = side == 0 ? left : right;
+                float depth = side == 0 ? depthL : depthR;
+                if (!cupped)
+                {
+                    handUnder[side] = false;
+                    continue;
+                }
+                if (depth < -0.005f)
+                {
+                    bool ready = handUnder[side];
+                    handUnder[side] = false;
+                    if (ready)
+                    {
+                        TakeScoop(rig, side == 0 ? 1 : 2);
+                        return;
+                    }
+                }
+                else if (depth > 0.005f) handUnder[side] = depth < 0.25f;
+            }
+        }
+
+        /// <summary>
+        /// Whether a hand is cupped (palm within 60 degrees of up, not pinching, not a fist) over or in the pool, and how
+        /// deep its palm is (negative above the surface).
+        /// </summary>
+        bool Cupped(HandRig.Hand hand, out float depth)
+        {
+            depth = 0f;
+            if (!hand.IsTracked || hand.InSystemGesture || hand.Pinch > 0.5f || hand.Fist > 0.85f) return false;
+            if (Vector3.Dot(hand.PalmNormal, Vector3.up) < 0.5f) return false;
+            var local = surface.InverseTransformPoint(Palm(hand));
+            depth = -local.y;
+            return Mathf.Abs(local.x) < size.x * 0.5f && Mathf.Abs(local.z) < size.y * 0.5f;
+        }
+
+        /// <summary>
+        /// The hands come up with a handful: the closer together, the more they bring (a full one with the seam closed, a
+        /// third with it nearly as wide as spillGap, and a third in one hand). The surface dips and rings where the water
+        /// left, with a soft scooping sound.
+        /// </summary>
+        void TakeScoop(HandRig rig, int hands)
+        {
+            scoopHands = hands;
+            Bowl(rig, (hands & 1) != 0, (hands & 2) != 0, out float gap, out float tilt, out _);
+            seamGap = gap;
+            palmTilt = tilt;
+            scoopVolume = hands == 3 ? Mathf.Lerp(1f, 0.35f, Mathf.InverseLerp(sealGap, spillGap, gap)) : 0.35f;
+            spilling = leakOverRim = false;
+            lostFor = spillFor = 0f;
+            dripDebt = 0.5f;
+            leakPoint = seamPoint;
+            handfulAt = bowlBase + Vector3.up * HandfulRise;
+            handfulTurn = Quaternion.LookRotation(Vector3.Cross(bowlAcross, Vector3.up), Vector3.up);
+            var local = surface.InverseTransformPoint(bowlBase);
+            var spot = new Vector2(local.x / size.x + 0.5f, local.z / size.y + 0.5f);
+            Disturb(spot, hands == 3 ? 0.05f : 0.035f, -0.002f - 0.004f * scoopVolume);
+            Splash(SurfacePoint(spot), Effects.Blue, 6, 0.25f);
+            Acted("scoop water");
+            voices?.Play(scoopClip, bowlBase, 0.25f);
+        }
+
+        /// <summary>
+        /// The bowl the holding hands make this frame: where it is (bowlBase, bowlAcross, bowlSpan, bowlVelocity); how open
+        /// it is, as the widest gap along the seam between two hands (one hand alone counts as partly open, its fingers
+        /// letting water through); how far the palms tip; where water gets out first (seamPoint under the seam, rimPoint
+        /// over the lowest rim); and whether a hand squeezes it out (a fist or a pinch).
+        /// </summary>
+        void Bowl(HandRig rig, bool useLeft, bool useRight, out float gap, out float tilt, out bool squeezed)
+        {
+            if (useLeft && useRight)
+            {
+                HandRig.Hand left = rig.Left, right = rig.Right;
+                Vector3 pl = Palm(left), pr = Palm(right);
+                var across = Vector3.ProjectOnPlane(pr - pl, Vector3.up);
+                bowlSpan = across.magnitude;
+                if (bowlSpan > 1e-3f) bowlAcross = across / bowlSpan;
+                bowlBase = (pl + pr) * 0.5f;
+                bowlVelocity = (left.Velocity + right.Velocity) * 0.5f;
+                gap = SeamGap(left, right, out seamPoint);
+                float tl = Tilt(left, bowlAcross), tr = Tilt(right, -bowlAcross);
+                tilt = Mathf.Max(tl, tr);
+                rimPoint = tl >= tr ? RimBelow(left, bowlAcross) : RimBelow(right, -bowlAcross);
+                squeezed = left.Fist > 0.85f || right.Fist > 0.85f || left.Pinch > 0.8f || right.Pinch > 0.8f;
             }
             else
             {
-                bool ready = both && gap < 0.6f;
-                holdTimer = ready ? holdTimer + dt : 0f;
-                if (ready && holdTimer >= holdDelay) PickUp(gap);
+                var hand = useLeft ? rig.Left : rig.Right;
+                bowlBase = Palm(hand);
+                // Across the palm from left to right: thumb to little finger on the left hand, the other way on the right.
+                var across = Vector3.ProjectOnPlane(useLeft ? Tip(hand, 4) - Tip(hand, 1) : Tip(hand, 1) - Tip(hand, 4), Vector3.up);
+                if (across.sqrMagnitude > 1e-6f) bowlAcross = across.normalized;
+                bowlSpan = 0.05f;
+                bowlVelocity = hand.Velocity;
+                gap = Mathf.Lerp(sealGap, spillGap, 0.4f);
+                seamPoint = (Tip(hand, 3) + Tip(hand, 4)) * 0.5f;
+                tilt = Tilt(hand, Vector3.zero);
+                rimPoint = RimBelow(hand, Vector3.zero);
+                squeezed = hand.Fist > 0.85f || hand.Pinch > 0.8f;
             }
-
-            float y = surface.position.y, target = y;
-            if (holding && letGo == 0f)
-            {
-                Acted("hold the pool");
-                target = Mathf.Clamp((palmAt[0].y + palmAt[1].y) * 0.5f + holdOffset, Lowest, Highest(view));
-            }
-            else if (y > restY + 0.01f && y > Highest(view))
-                target = Highest(view);
-            float eased = Mathf.Lerp(y, target, 1f - Mathf.Exp(-liftFollow * dt));
-            float step = Mathf.Clamp(eased - y, -liftSpeed * dt, liftSpeed * dt);
-            if (step != 0f)
-            {
-                var p = surface.position;
-                p.y += step;
-                surface.position = p;
-            }
-            liftVelocity = Mathf.Lerp(liftVelocity, dt > 0f ? step / dt : 0f, 1f - Mathf.Exp(-10f * dt));
-
-            // The mounds over the palms rise and settle softly, swelling a little as the pool is lifted.
-            holdWeight = Mathf.MoveTowards(holdWeight, holding ? 1f : 0f, dt * 2f);
-            float press = 1f + Mathf.Clamp(liftVelocity * 0.8f, -0.25f, 0.35f);
-            for (int s = 0; s < 2; s++)
-            {
-                if (holding)
-                {
-                    var local = surface.InverseTransformPoint(palmAt[s]);
-                    moundAt[s] = Vector2.Lerp(moundAt[s], new Vector2(local.x, local.z), 1f - Mathf.Exp(-12f * dt));
-                }
-                moundHeight[s] = MoundHeight * holdWeight * press;
-            }
-            if (holding && letGo == 0f && rig != null)
-                for (int s = 0; s < 2; s++) DripFrom(rig.Get(s == 0), s, 8f + Mathf.Abs(liftVelocity) * 30f, dt);
-
-            if (slosh != null && Application.isPlaying)
-            {
-                float want = holding ? 0.04f + Mathf.Min(Mathf.Abs(liftVelocity) / liftSpeed, 1f) * 0.2f : 0f;
-                slosh.volume = Mathf.MoveTowards(slosh.volume, want, dt * 0.8f);
-                slosh.transform.position = surface.position;
-                if (slosh.volume > 0.001f && !slosh.isPlaying) slosh.Play();
-                else if (slosh.volume <= 0.001f && slosh.isPlaying) slosh.Stop();
-            }
+            seamPoint += Vector3.down * 0.012f;
         }
 
         /// <summary>
-        /// Whether a hand is cupped under the water, ready to hold the pool (or, while it does, still holding it), with
-        /// its palm in <see cref="palmAt"/>. Once holding, a hand may tip, drift out past the edge or come up near the
-        /// surface a little before it counts as gone.
+        /// The widest gap along the seam between two cupped hands: between the edges of the palms below the little fingers,
+        /// and between the little fingertips. Also the middle of that gap, where water gets through first.
         /// </summary>
-        bool Cupped(HandRig.Hand hand, int side)
+        static float SeamGap(HandRig.Hand left, HandRig.Hand right, out Vector3 at)
         {
-            if (!hand.IsTracked || hand.InSystemGesture) return false;
-            palmAt[side] = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
-            if (Vector3.Dot(hand.PalmNormal, Vector3.up) < (holding ? 0.1f : 0.45f)) return false;
-            // A pinch pours instead, and a fist holds no water.
-            if (hand.Pinch > (holding ? 0.75f : 0.5f) || hand.Fist > 0.85f) return false;
-            var local = surface.InverseTransformPoint(palmAt[side]);
-            float margin = holding ? 0.04f : -0.01f;
-            if (Mathf.Abs(local.x) > size.x * 0.5f + margin || Mathf.Abs(local.z) > size.y * 0.5f + margin) return false;
-            float depth = -local.y;
-            return holding ? depth > -0.1f && depth < 0.32f : depth > 0.01f && depth < 0.25f;
+            Vector3 el = PalmEdge(left), er = PalmEdge(right), tl = Tip(left, 4), tr = Tip(right, 4);
+            float edges = Vector3.Distance(el, er), tips = Vector3.Distance(tl, tr);
+            at = edges >= tips ? (el + er) * 0.5f : (tl + tr) * 0.5f;
+            return Mathf.Max(edges, tips);
         }
 
-        /// <summary>Both hands take the pool: the water swells up around the palms with a soft scooping sound.</summary>
-        void PickUp(float gap)
+        /// <summary>The edge of a palm below its little finger, about four centimetres out from its middle.</summary>
+        static Vector3 PalmEdge(HandRig.Hand hand)
         {
-            holding = true;
-            letGo = 0f;
-            holdGap = gap;
-            holdOffset = surface.position.y - (palmAt[0].y + palmAt[1].y) * 0.5f;
-            for (int s = 0; s < 2; s++)
-            {
-                var local = surface.InverseTransformPoint(palmAt[s]);
-                moundAt[s] = new Vector2(local.x, local.z);
-                Disturb(new Vector2(local.x / size.x + 0.5f, local.z / size.y + 0.5f), 0.05f, 0.004f);
-            }
-            Acted("lift the pool");
-            voices?.Play(scoopClip, surface.position, 0.3f);
+            var side = Vector3.ProjectOnPlane(Tip(hand, 4) - Tip(hand, 1), hand.PalmNormal);
+            return Palm(hand) + (side.sqrMagnitude > 1e-6f ? side.normalized * 0.04f : Vector3.zero);
         }
 
         /// <summary>
-        /// The hands let the pool go and it stays where it is: that height is remembered, over the table or floor under
-        /// it, for when the world sets itself up again. Unless <paramref name="quiet"/>, the last water runs off the hands.
+        /// How far (degrees) a palm tips away from up, not counting a lean of up to 30 degrees towards the other hand:
+        /// palms leaning together make the bowl.
         /// </summary>
-        void Release(bool quiet)
+        static float Tilt(HandRig.Hand hand, Vector3 inward) => Vector3.Angle(Leaned(hand, inward), Vector3.up);
+
+        /// <summary>The point over the lowest rim of a tipped palm, where water runs off it first.</summary>
+        static Vector3 RimBelow(HandRig.Hand hand, Vector3 inward)
         {
-            if (!holding) return;
-            holding = false;
-            holdTimer = letGo = 0f;
-            float y = surface.position.y;
-            chosen = Mathf.Abs(y - restY) > 0.01f;
-            chosenAbove = y - groundY;
-            chosenOnTable = onTable;
-            if (quiet) return;
-            var rig = Rig;
-            if (rig != null)
-                for (int s = 0; s < 2; s++)
-                    if (rig.Get(s == 0).IsTracked) DripFrom(rig.Get(s == 0), s, 0f, 0f, 6);
-            voices?.Play(dropsClip, surface.position, 0.2f);
+            var downhill = Vector3.ProjectOnPlane(Leaned(hand, inward), Vector3.up);
+            return Palm(hand) + (downhill.sqrMagnitude > 1e-6f ? downhill.normalized * 0.045f : Vector3.zero) + Vector3.down * 0.01f;
         }
 
-        /// <summary>
-        /// Drops run off the edges of a hand holding the pool and fall to the floor or table under it: a few a second,
-        /// more while it moves, plus <paramref name="extra"/> at once.
-        /// </summary>
-        void DripFrom(HandRig.Hand hand, int side, float rate, float dt, int extra = 0)
+        /// <summary>A palm's normal without any lean of up to 30 degrees towards <paramref name="inward"/>.</summary>
+        static Vector3 Leaned(HandRig.Hand hand, Vector3 inward)
         {
-            if (handDrips == null || !hand.IsTracked) return;
-            dripDebt[side] += rate * dt * holdWeight + extra;
-            var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
-            while (dripDebt[side] >= 1f)
-            {
-                dripDebt[side] -= 1f;
-                Vector3 at;
-                switch (dripTurn[side]++ % 4)
-                {
-                    case 0: at = Tip(hand, 4); break;
-                    case 1: at = Tip(hand, 0); break;
-                    // The heel of the palm, and its outer edge below the little finger.
-                    case 2: at = palm + (palm - Tip(hand, 2)).normalized * 0.04f; break;
-                    default: at = palm + (Tip(hand, 4) - Tip(hand, 0)).normalized * 0.04f; break;
-                }
-                at += Random.insideUnitSphere * 0.006f + Vector3.down * 0.01f;
-                float fall = Mathf.Max(at.y - groundY, 0.05f);
-                handDrips.Emit(new ParticleSystem.EmitParams
-                {
-                    position = at,
-                    velocity = new Vector3(Random.Range(-0.03f, 0.03f), -0.06f + liftVelocity * 0.5f, Random.Range(-0.03f, 0.03f)),
-                    startColor = DripColor,
-                    startSize = Random.Range(0.004f, 0.0065f),
-                    startLifetime = Mathf.Clamp(Mathf.Sqrt(2f * fall / 9.81f), 0.2f, 0.9f)
-                }, 1);
-            }
+            var n = hand.PalmNormal;
+            return n - inward * Mathf.Clamp(Vector3.Dot(n, inward), 0f, 0.5f);
         }
+
+        static Vector3 Palm(HandRig.Hand hand) => hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
 
         static Vector3 Tip(HandRig.Hand hand, int finger) => hand.TipJoints[finger] != null ? hand.TipJoints[finger].position : hand.Tips[finger];
 
-        /// <summary>How tall the water mounds over the holding palms at a point on the pool (metres across it).</summary>
-        float Mound(float x, float z)
+        /// <summary>
+        /// Water leaving the handful at <paramref name="rate"/> (share of a full handful per second) from leakPoint: drops,
+        /// one a second from hands held closed and up to nine a second as they open, and from about six a second also a
+        /// thin stream, thicker the faster it runs. The handful shrinks by as much; once it is empty it is gone.
+        /// </summary>
+        void Leak(float rate, float dt)
         {
-            float h = 0f;
-            const float r2 = MoundRadius * MoundRadius;
-            for (int s = 0; s < 2; s++)
+            scoopVolume -= rate * dt;
+            dripDebt += Mathf.Min(rate * sealedSeconds, 9f) * dt;
+            while (dripDebt >= 1f)
             {
-                if (moundHeight[s] <= 0f) continue;
-                float dx = x - moundAt[s].x, dz = z - moundAt[s].y;
-                float d2 = dx * dx + dz * dz;
-                if (d2 < r2 * 9f) h += moundHeight[s] * Mathf.Exp(-d2 / r2);
+                dripDebt -= 1f;
+                if (drips.Count < MaxDrips) drips.Add(ScoopDrop(leakPoint + Random.insideUnitSphere * 0.004f, bowlVelocity * 0.3f + Vector3.down * 0.05f));
             }
-            return h;
+            scoopStreamWidth = Mathf.Lerp(0.003f, 0.012f, Mathf.InverseLerp(0.35f, 1.6f, rate));
+            if (rate > 0.35f && scoopVolume > 0f) Stream(ScoopStream, leakPoint, bowlVelocity, dt);
+            else StopStream(ScoopStream);
+            if (scoopVolume <= 0.01f) Empty();
+        }
+
+        Drip ScoopDrop(Vector3 at, Vector3 velocity) => new Drip
+        {
+            Position = at,
+            Velocity = velocity,
+            Color = Color.Lerp(Effects.Blue, Color.white, Random.Range(0.3f, 0.6f)),
+            Side = ScoopStream,
+            Attached = false
+        };
+
+        /// <summary>
+        /// The water pours out at once, from under the seam or over the lowest rim: a burst of drops, then the rest runs out
+        /// as a stream in a moment (SpillRate). <paramref name="byHands"/> when the hands did it (opened wide, tipped over or
+        /// squeezed), not the menu or lost tracking.
+        /// </summary>
+        void Spill(bool byHands)
+        {
+            spilling = true;
+            if (byHands) Acted("pour out the water");
+            for (int i = 0; i < 8 && drips.Count < MaxDrips; i++)
+                drips.Add(ScoopDrop(leakPoint + Random.insideUnitSphere * 0.02f, bowlVelocity * 0.3f + Random.insideUnitSphere * 0.08f));
+            voices?.Play(spillClip, leakPoint, 0.22f);
+        }
+
+        /// <summary>The hands went back into the pool: what is left of the handful joins it with a small splash.</summary>
+        void Merge(Vector2 spot)
+        {
+            Disturb(spot, 0.04f, -0.002f - 0.004f * scoopVolume);
+            Splash(SurfacePoint(spot), Effects.Blue, 4 + (int)(8f * scoopVolume), 0.3f);
+            Acted("pour the water back");
+            voices?.Play(scoopClip, bowlBase, 0.15f, 1.3f);
+            Empty();
+        }
+
+        /// <summary>The hands hold no water any more.</summary>
+        void Empty()
+        {
+            scoopVolume = 0f;
+            scoopHands = 0;
+            spilling = false;
+            StopStream(ScoopStream);
+        }
+
+        /// <summary>
+        /// The handful: a small lens of water in the bowl of the hands, level on top whatever they do, following them
+        /// (eased a little against tracking jitter), shrinking as it leaks, and rippling gently with the beat and as the
+        /// hands move. Held in two hands it stretches across them.
+        /// </summary>
+        void DrawHandful(float dt)
+        {
+            if (handful == null) return;
+            bool show = scoopVolume > 0f;
+            if (handful.gameObject.activeSelf != show) handful.gameObject.SetActive(show);
+            if (!show) return;
+            float fill = Mathf.Sqrt(Mathf.Clamp01(scoopVolume));
+            bool both = scoopHands == 3;
+            float across = Mathf.Lerp(0.035f, both ? Mathf.Clamp(bowlSpan + 0.03f, 0.08f, 0.15f) : 0.06f, fill);
+            float along = Mathf.Lerp(0.03f, both ? 0.09f : 0.065f, fill);
+            float deep = Mathf.Lerp(0.004f, 0.016f, fill);
+            float follow = 1f - Mathf.Exp(-25f * dt);
+            handfulAt = Vector3.Lerp(handfulAt, bowlBase + Vector3.up * HandfulRise, follow);
+            handfulTurn = Quaternion.Slerp(handfulTurn, Quaternion.LookRotation(Vector3.Cross(bowlAcross, Vector3.up), Vector3.up), follow);
+            handful.transform.SetPositionAndRotation(handfulAt, handfulTurn);
+            handful.transform.localScale = new Vector3(across, deep, along);
+            block.Clear();
+            block.SetFloat(RippleId, 0.25f + pulse * 0.5f + Mathf.Min(bowlVelocity.magnitude, 0.5f) * 0.8f);
+            block.SetFloat(ClockId, Now);
+            block.SetFloat(AlphaId, FadeIn * Mathf.Clamp01(scoopVolume / 0.05f));
+            handful.SetPropertyBlock(block);
+        }
+
+        /// <summary>
+        /// The handful's mesh: two discs of diameter 1 in rings round the middle, one for the water's surface (uv.y 1) and
+        /// one for the bowl under it (uv.y 0). The SoundPoolHandful shader shapes them.
+        /// </summary>
+        static Mesh HandfulMesh()
+        {
+            const int Rings = 6, Segments = 28, PerDisc = 1 + Rings * Segments;
+            var vertices = new Vector3[PerDisc * 2];
+            var uvs = new Vector2[PerDisc * 2];
+            var triangles = new int[2 * (Segments * 3 + (Rings - 1) * Segments * 6)];
+            int t = 0;
+            for (int disc = 0; disc < 2; disc++)
+            {
+                int o = disc * PerDisc;
+                float top = disc == 0 ? 1f : 0f;
+                vertices[o] = Vector3.zero;
+                uvs[o] = new Vector2(0f, top);
+                for (int r = 0; r < Rings; r++)
+                {
+                    for (int s = 0; s < Segments; s++)
+                    {
+                        float q = (r + 1) / (float)Rings, a = s * Mathf.PI * 2f / Segments;
+                        int i = o + 1 + r * Segments + s;
+                        vertices[i] = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * (q * 0.5f);
+                        uvs[i] = new Vector2(q, top);
+                    }
+                }
+                for (int s = 0; s < Segments; s++)
+                {
+                    triangles[t++] = o; triangles[t++] = o + 1 + (s + 1) % Segments; triangles[t++] = o + 1 + s;
+                }
+                for (int r = 0; r < Rings - 1; r++)
+                {
+                    for (int s = 0; s < Segments; s++)
+                    {
+                        int a0 = o + 1 + r * Segments + s, a1 = o + 1 + r * Segments + (s + 1) % Segments;
+                        int b0 = a0 + Segments, b1 = a1 + Segments;
+                        triangles[t++] = a0; triangles[t++] = a1; triangles[t++] = b0;
+                        triangles[t++] = a1; triangles[t++] = b1; triangles[t++] = b0;
+                    }
+                }
+            }
+            var mesh = new Mesh { name = "Handful" };
+            mesh.vertices = vertices;
+            mesh.uv = uvs;
+            mesh.triangles = triangles;
+            // The shader raises the surface to 1 and lowers the bowl to -0.6.
+            mesh.bounds = new Bounds(new Vector3(0f, 0.25f, 0f), new Vector3(1.1f, 2f, 1.1f));
+            return mesh;
         }
 
         /// <summary>Each melody note falls in as a droplet, timed to hit the surface as it is sung.</summary>
@@ -899,8 +1043,7 @@ namespace MusicInYourHands
 
         /// <summary>
         /// Fingertips and palms under the surface push the liquid aside; moving them makes waves, and breaking the
-        /// surface splashes. Hands holding the pool up part no water: it mounds over them instead (see Lift). Returns
-        /// how deep (0-1) the deepest hand is, for muffling the music.
+        /// surface splashes. Returns how deep (0-1) the deepest hand is, for muffling the music.
         /// </summary>
         float TouchWithHands(HandRig rig, float dt)
         {
@@ -932,7 +1075,7 @@ namespace MusicInYourHands
                         float radius = k < 5 ? 0.012f : 0.035f;
                         float speed = dt > 0f ? (point - lastPoint[side, k]).magnitude / dt : 0f;
                         // A dent where the hand is, deeper the faster it moves, which trails a wake behind it.
-                        if (!holding) Disturb(spot, radius, -Mathf.Min(0.004f, depth * 0.05f + speed * 0.004f) * dt * 30f);
+                        Disturb(spot, radius, -Mathf.Min(0.004f, depth * 0.05f + speed * 0.004f) * dt * 30f);
                         if (!wasUnder[side, k])
                         {
                             Disturb(spot, radius * 1.5f, -0.006f);
@@ -954,10 +1097,11 @@ namespace MusicInYourHands
         }
 
         /// <summary>
-        /// Pinching pours water from between thumb and index. Each frame it lets go of a few drops that fall under
-        /// gravity; while you keep pinching they stay joined as one stream, drawn as a smooth curve through them from
+        /// Pinching pours water from between thumb and index (Stream). Each frame it lets go of a few drops that fall
+        /// under gravity; while you keep pinching they stay joined as one stream, drawn as a smooth curve through them from
         /// your fingers down, so it bends as your hand moves. It ripples the water where it lands (or vanishes on the
-        /// floor beside it). Let go and the stream's tail falls on as separate drops.
+        /// floor or table beside it). Let go and the stream's tail falls on as separate drops. A handful's drops and
+        /// stream (Leak) fall the same way, with a quiet drip as they land in the pool.
         /// </summary>
         void Pour(HandRig rig, float dt)
         {
@@ -968,47 +1112,13 @@ namespace MusicInYourHands
                 bool now = hand != null && hand.IsTracked && hand.Pinch > 0.8f && !hand.InSystemGesture && PinchFree(side == 0);
                 if (!now)
                 {
-                    if (pouring[side])
-                        for (int i = 0; i < drips.Count; i++)
-                            if (drips[i].Side == side && drips[i].Attached) { var d = drips[i]; d.Attached = false; drips[i] = d; }
-                    pouring[side] = false;
-                    streamDebt[side] = 0f;
+                    StopStream(side);
                     continue;
                 }
-                var thumb = hand.TipJoints[0] != null ? hand.TipJoints[0].position : hand.Tips[0];
-                var index = hand.TipJoints[1] != null ? hand.TipJoints[1].position : hand.Tips[1];
-                pourFrom[side] = (thumb + index) * 0.5f;
-                if (!pouring[side])
-                {
-                    lastPourFrom[side] = pourFrom[side];
-                    pourVelocity[side] = hand.Velocity;
-                }
-                pouring[side] = true;
                 Acted("pour water");
-                pourVelocity[side] = Vector3.Lerp(pourVelocity[side], hand.Velocity, 1f - Mathf.Exp(-6f * dt));
-                streamDebt[side] += 80f * dt;
-                int count = (int)streamDebt[side];
-                // Spread this frame's drops along the way the fingers moved since the last one, and start each a
-                // little further on in its fall, so they leave one after another instead of in a clump.
-                for (int k = 0; k < count && drips.Count < MaxDrips; k++)
-                {
-                    float back = (count - k) / (float)count;
-                    var velocity = pourVelocity[side] * 0.3f + Vector3.down * 0.15f;
-                    float early = back * dt;
-                    drips.Add(new Drip
-                    {
-                        Position = Vector3.Lerp(pourFrom[side], lastPourFrom[side], back) + velocity * early + Physics.gravity * (0.5f * early * early),
-                        Velocity = velocity + Physics.gravity * early,
-                        Color = Color.Lerp(Effects.Blue, Color.white, Random.Range(0.3f, 0.6f)),
-                        Side = side,
-                        Attached = true
-                    });
-                }
-                streamDebt[side] -= count;
-                lastPourFrom[side] = pourFrom[side];
+                Stream(side, (Tip(hand, 0) + Tip(hand, 1)) * 0.5f, hand.Velocity, dt);
             }
 
-            float floor = surface.position.y - 2f;
             int n = 0;
             for (int i = drips.Count - 1; i >= 0; i--)
             {
@@ -1023,10 +1133,15 @@ namespace MusicInYourHands
                     // The stream digs a dent where it lands and keeps throwing water up out of it; a loose drop splashes less.
                     Disturb(spot, d.Attached ? 0.014f : 0.01f, d.Attached ? -0.003f : -0.0025f);
                     if (Random.value < (d.Attached ? 0.4f : 0.35f)) Splash(d.Position, d.Color, d.Attached ? 5 : 3, d.Attached ? 0.75f : 0.4f);
+                    if (d.Side == ScoopStream && Application.isPlaying && Clock - dripSoundAt > 0.12f)
+                    {
+                        dripSoundAt = Clock;
+                        voices?.Play(dripClip, d.Position, d.Attached ? 0.04f : 0.07f, Random.Range(0.85f, 1.3f));
+                    }
                     drips.RemoveAt(i);
                     continue;
                 }
-                if (d.Position.y < floor || local.y < -0.6f) { drips.RemoveAt(i); continue; }
+                if (d.Position.y < Room.GroundBelow(d.Position, floorY)) { drips.RemoveAt(i); continue; }
                 drips[i] = d;
                 // Drops still in the stream are drawn as part of it; loose ones as drops of their own.
                 if (!d.Attached && n < MaxDrips)
@@ -1037,12 +1152,57 @@ namespace MusicInYourHands
                     };
             }
             loose.SetParticles(looseOut, n);
-            for (int side = 0; side < 2; side++) DrawStream(side);
+            for (int side = 0; side < Streams; side++) DrawStream(side);
         }
 
         /// <summary>
-        /// The stream from one hand: a curve from the fingers down through its drops, newest first. It narrows as the
-        /// water speeds up, as a real stream does.
+        /// One frame of a stream of water leaving <paramref name="from"/> (moving at <paramref name="velocity"/>): it lets
+        /// go of a few drops that stay joined as one stream, spread along the way the source moved since the last frame
+        /// and each started a little further on in its fall, so they leave one after another instead of in a clump.
+        /// </summary>
+        void Stream(int side, Vector3 from, Vector3 velocity, float dt)
+        {
+            pourFrom[side] = from;
+            if (!pouring[side])
+            {
+                lastPourFrom[side] = from;
+                pourVelocity[side] = velocity;
+            }
+            pouring[side] = true;
+            pourVelocity[side] = Vector3.Lerp(pourVelocity[side], velocity, 1f - Mathf.Exp(-6f * dt));
+            streamDebt[side] += 80f * dt;
+            int count = (int)streamDebt[side];
+            for (int k = 0; k < count && drips.Count < MaxDrips; k++)
+            {
+                float back = (count - k) / (float)count;
+                var v = pourVelocity[side] * 0.3f + Vector3.down * 0.15f;
+                float early = back * dt;
+                drips.Add(new Drip
+                {
+                    Position = Vector3.Lerp(from, lastPourFrom[side], back) + v * early + Physics.gravity * (0.5f * early * early),
+                    Velocity = v + Physics.gravity * early,
+                    Color = Color.Lerp(Effects.Blue, Color.white, Random.Range(0.3f, 0.6f)),
+                    Side = side,
+                    Attached = true
+                });
+            }
+            streamDebt[side] -= count;
+            lastPourFrom[side] = from;
+        }
+
+        /// <summary>Ends a stream: its tail falls on as separate drops.</summary>
+        void StopStream(int side)
+        {
+            if (pouring[side])
+                for (int i = 0; i < drips.Count; i++)
+                    if (drips[i].Side == side && drips[i].Attached) { var d = drips[i]; d.Attached = false; drips[i] = d; }
+            pouring[side] = false;
+            streamDebt[side] = 0f;
+        }
+
+        /// <summary>
+        /// A stream (from a pinch, or out of a handful): a curve from where it leaves down through its drops, newest
+        /// first. It narrows as the water speeds up, as a real stream does.
         /// </summary>
         void DrawStream(int side)
         {
@@ -1076,7 +1236,8 @@ namespace MusicInYourHands
             block.SetFloat(LengthId, length);
             block.SetFloat(ClockId, Now);
             line.Renderer.SetPropertyBlock(block);
-            line.Set(streamPath, null, streamWidths, count, 0.011f, new Color(1f, 1f, 1f, FadeIn), View.transform.position);
+            float width = side == ScoopStream ? scoopStreamWidth : 0.011f;
+            line.Set(streamPath, null, streamWidths, count, width, new Color(1f, 1f, 1f, FadeIn), View.transform.position);
         }
 
         /// <summary>The sung words drift slowly across the water, rising and falling with its waves.</summary>
@@ -1156,8 +1317,8 @@ namespace MusicInYourHands
         /// The beads dotting the surface: low-poly balls in lines across the water, about two centimetres apart, riding
         /// the ocean swell (see Swell): each rises and falls with it and is carried a little back and forth as the crests
         /// pass, so the lines bunch on the crests and spread in the troughs. They bob on the ripples from hands and drops
-        /// too, and ride the mounds over palms holding the pool. Their colour stays in a narrow band of water blues and
-        /// teals that drifts slowly across the pool, paler over the palms. Their light is calm between beats (only a
+        /// too. Their colour stays in a narrow band of water blues and teals that drifts slowly across the pool. Their
+        /// light is calm between beats (only a
         /// touch brighter up on a crest) and swells together on the beat (<see cref="pulse"/>), and where a ring of
         /// light runs past (RingGlow); they swell a little with it. Towards the edges they shrink away, so the pool has no
         /// hard border. They turn slowly so their facets catch the light. All of them are one instanced draw.
@@ -1179,19 +1340,17 @@ namespace MusicInYourHands
                     float swell = Swell(rest, t, swellHeight, out var shift) * edge;
                     shift *= edge * 0.7f;
                     float px = rest.x + shift.x, pz = rest.y + shift.y;
-                    // The water's own ripples, from hands and drops, and the mounds over palms holding the pool.
+                    // The water's own ripples, from hands and drops.
                     float ripple = height[Nearest(spot)];
-                    float mound = Mound(px, pz) * edge;
                     float crest = Mathf.Clamp01(0.5f + swell / Mathf.Max(swellHeight, 1e-4f) * 0.5f);
                     float ring = RingGlow(Mathf.Sqrt(px * px + pz * pz));
-                    float held = mound / MoundHeight;
-                    var local = new Vector3(px, Mathf.Max(swell + ripple + mound, bottom) + 0.002f, pz);
-                    float diameter = BeadSize * (0.92f + crest * 0.06f + pulse * 0.14f + ring * 0.2f + held * 0.1f) * edge * FadeIn;
+                    var local = new Vector3(px, Mathf.Max(swell + ripple, bottom) + 0.002f, pz);
+                    float diameter = BeadSize * (0.92f + crest * 0.06f + pulse * 0.14f + ring * 0.2f) * edge * FadeIn;
                     beadMatrices[i] = Matrix4x4.TRS(surface.TransformPoint(local), spin * beadTurn[i], Vector3.one * diameter);
                     // A slow tide of colour, blue to teal, drifting across the pool over many seconds.
                     float tide = 0.5f + 0.5f * Mathf.Sin(rest.x * 6f + rest.y * 4f + t * 0.3f + Mathf.Sin(rest.y * 7f - t * 0.2f));
-                    var c = Color.Lerp(Color.Lerp(BeadBlue, BeadTeal, tide), BeadLight, Mathf.Min(held, 1f) * 0.5f);
-                    float glow = 0.14f + crest * 0.05f + pulse * 0.3f + ring * 0.32f + held * 0.3f;
+                    var c = Color.Lerp(BeadBlue, BeadTeal, tide);
+                    float glow = 0.14f + crest * 0.05f + pulse * 0.3f + ring * 0.32f;
                     beadTints[i] = new Vector4(c.r, c.g, c.b, glow);
                 }
             }
@@ -1283,14 +1442,12 @@ namespace MusicInYourHands
 
         /// <summary>
         /// Copies the heights into the mesh, plus the ocean swell rolling across it all the time (see Swell), taller
-        /// with the bass, and the mounds over palms holding the pool, and rebuilds the normals. The swell eases with the
-        /// slow bass rather than jumping on every kick.
+        /// with the bass, and rebuilds the normals. The swell eases with the slow bass rather than jumping on every kick.
         /// </summary>
         void UpdateMesh(float dt)
         {
             float t = Now;
             swellHeight = Mathf.Lerp(swellHeight, 0.007f + bassSlow * 0.009f + pulse * 0.002f, 1f - Mathf.Exp(-3f * dt));
-            bool mounds = moundHeight[0] > 0f || moundHeight[1] > 0f;
             float bottom = TrayBottom;
             for (int z = 0; z < rows; z++)
             {
@@ -1301,7 +1458,6 @@ namespace MusicInYourHands
                     float edge = Mathf.Clamp01(Mathf.Min(Mathf.Min(u, 1f - u), Mathf.Min(v, 1f - v)) * 8f);
                     // The sheet takes the swell's height; only the beads on it are carried sideways.
                     float swell = Swell(new Vector2(vertices[i].x, vertices[i].z), t, swellHeight, out _);
-                    if (mounds) swell += Mound(vertices[i].x, vertices[i].z);
                     vertices[i].y = Mathf.Max(height[i] + swell * edge, bottom);
                 }
             }
@@ -1360,7 +1516,7 @@ namespace MusicInYourHands
 
         static int Rate => AudioSettings.outputSampleRate > 0 ? AudioSettings.outputSampleRate : 48000;
 
-        /// <summary>Hands taking the pool: a soft, low bubble gliding up, inside a dark swish of moving water.</summary>
+        /// <summary>Water scooped up in the hands: a soft, low bubble gliding up, inside a dark swish of moving water.</summary>
         static AudioClip ScoopSound()
         {
             int rate = Rate, n = (int)(rate * 0.55f);
@@ -1381,8 +1537,8 @@ namespace MusicInYourHands
             return MakeClip("pool scoop", data, rate, 0.5f);
         }
 
-        /// <summary>The pool let go: the last two drops falling off the hands into it.</summary>
-        static AudioClip DropsSound()
+        /// <summary>A handful poured out at once: two soft drops, the second smaller.</summary>
+        static AudioClip SpillSound()
         {
             int rate = Rate, n = (int)(rate * 0.4f);
             var data = new float[n];
@@ -1401,47 +1557,24 @@ namespace MusicInYourHands
                 phase += 2f * Mathf.PI / rate;
                 data[i] = s;
             }
-            return MakeClip("pool drops", data, rate, 0.45f);
+            return MakeClip("pool spill", data, rate, 0.45f);
         }
 
         /// <summary>
-        /// Water sloshing in the hands, looped while you hold the pool: dark, gently rolling noise with a few small
-        /// bubbles in it. It joins up with itself, so it loops without a click.
+        /// A single small drop landing in the pool, for a handful's drips: a short, high bubble.
         /// </summary>
-        static AudioClip SloshSound()
+        static AudioClip DripSound()
         {
-            int rate = Rate, n = rate * 2, fade = rate / 10;
-            var noise = new float[n + fade];
-            var random = new System.Random(5);
-            float low = 0f, lower = 0f;
-            for (int i = 0; i < noise.Length; i++)
-            {
-                low += ((float)(random.NextDouble() * 2 - 1) - low) * 0.06f;
-                lower += (low - lower) * 0.08f;
-                noise[i] = lower;
-            }
+            int rate = Rate, n = (int)(rate * 0.15f);
             var data = new float[n];
+            float phase = 0f;
             for (int i = 0; i < n; i++)
             {
                 float t = i / (float)rate;
-                // The end runs on into the start (equal-power crossfade), so the loop has no seam.
-                float s = i < fade
-                    ? noise[i] * Mathf.Sqrt(i / (float)fade) + noise[n + i] * Mathf.Sqrt(1f - i / (float)fade)
-                    : noise[i];
-                // Rolling: whole cycles over the loop, so it joins up.
-                float roll = 0.55f + 0.45f * (0.5f + 0.5f * Mathf.Sin(2f * Mathf.PI * 1.5f * t)) * (0.5f + 0.5f * Mathf.Sin(2f * Mathf.PI * 2.5f * t + 1f));
-                s *= roll * 9f;
-                // A few small bubbles.
-                for (int b = 0; b < 4; b++)
-                {
-                    float age = t - (0.2f + b * 0.43f);
-                    if (age < 0f || age > 0.06f) continue;
-                    float f = 480f + b * 130f + 500f * age / 0.06f;
-                    s += Mathf.Sin(2f * Mathf.PI * f * age) * Mathf.Exp(-age * 60f) * 0.25f;
-                }
-                data[i] = s;
+                phase += 2f * Mathf.PI * (900f + 900f * (1f - Mathf.Exp(-t * 60f))) / rate;
+                data[i] = Mathf.Sin(phase) * Mathf.Min(1f, t / 0.002f) * Mathf.Exp(-t * 45f);
             }
-            return MakeClip("pool slosh", data, rate, 0.5f);
+            return MakeClip("pool drip", data, rate, 0.4f);
         }
 
         /// <summary>An audio clip of <paramref name="data"/>, scaled so its loudest sample is <paramref name="peak"/>.</summary>

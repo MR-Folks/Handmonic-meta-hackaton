@@ -43,19 +43,10 @@ namespace MusicInYourHands.EditorTools
             // The right hand dips into the pool; the left rests above it.
             Shot<SoundPool>("8-sound-pool", HandPose.PalmsDown, 38f, closeUp: rig => rig.Right.Palm.position + Vector3.down * 0.04f,
                 handOffset: side => side == "R" ? new Vector3(-0.03f, -0.27f, 0.12f) : new Vector3(0f, -0.12f, 0.1f));
-            // Both hands cupped under the water hold the pool: they rest there a moment, then rise 20 cm over a second
-            // and a half, and the pool comes up with them, mounded over the palms and dripping from the hands.
-            int liftFrames = 0;
-            float lifted = 0f;
-            Shot<SoundPool>("8l-sound-pool-lift", HandPose.PalmsUp, 30f,
-                holdPose: rig =>
-                {
-                    float rise = Mathf.Clamp(++liftFrames - 25, 0, 45) * (0.2f / 45f);
-                    RaiseHands(rig, rise - lifted);
-                    lifted = rise;
-                },
-                closeUp: rig => (rig.Left.Palm.position + rig.Right.Palm.position) * 0.5f + Vector3.up * 0.03f,
-                handOffset: side => new Vector3(side == "L" ? 0.06f : -0.06f, -0.26f, 0.13f));
+            // A handful of water scooped up between both cupped hands, held together; then parted a little, so it leaks.
+            Shot<SoundPool>("8s-sound-pool-scoop", HandPose.PalmsUp, 34f, holdPose: ScoopHands(0f), closeUp: BetweenPalms, handOffset: ScoopStart);
+            Shot<SoundPool>("8sl-sound-pool-scoop-leak", HandPose.PalmsUp, 34f, holdPose: ScoopHands(0.025f), closeUp: BetweenPalms,
+                handOffset: ScoopStart);
             Shot<SoundWind>("9-sound-wind", HandPose.PalmsToFace, 22f, closeUp: rig => rig.Left.Palm.position,
                 handOffset: side => side == "L" ? new Vector3(-0.05f, 0f, 0.15f) : new Vector3(0.05f, -0.1f, 0f));
             Shot<BubbleNotes>("10-bubble-notes", HandPose.BacksToFace, 4f, closeUp: rig => rig.Right.Tips[1] + new Vector3(-0.08f, 0.12f, 0.12f), lead: 8f);
@@ -216,17 +207,41 @@ namespace MusicInYourHands.EditorTools
                 });
         }
 
-        /// <summary>Moves both posed hands up by <paramref name="rise"/> metres and feeds them to the rig again.</summary>
-        static void RaiseHands(HandRig rig, float rise)
+        /// <summary>For Sound pool's scoop: both hands side by side under the water, little fingers together, palms up.</summary>
+        static Vector3 ScoopStart(string side) => new Vector3(side == "L" ? 0.095f : -0.095f, -0.26f, 0.13f);
+
+        static Vector3 BetweenPalms(HandRig rig) => (rig.Left.Palm.position + rig.Right.Palm.position) * 0.5f + Vector3.up * 0.02f;
+
+        /// <summary>
+        /// For Sound pool's scoop: the hands wait under the water a moment, rise 16 cm through the surface in a little under
+        /// a second, then each moves <paramref name="apart"/> metres outwards in half a second.
+        /// </summary>
+        static System.Action<HandRig> ScoopHands(float apart)
         {
-            if (rise == 0f) return;
-            foreach (bool left in new[] { true, false })
+            int frame = 0;
+            float risen = 0f, parted = 0f;
+            return rig =>
             {
-                var hand = rig.Get(left);
-                if (hand.PalmJoint == null) continue;
-                hand.PalmJoint.root.position += Vector3.up * rise;
+                frame++;
+                float rise = Mathf.Clamp(frame - 25, 0, 25) * (0.16f / 25f);
+                float part = Mathf.Clamp(frame - 60, 0, 15) * (apart / 15f);
+                MoveHands(rig, new Vector3(parted - part, rise - risen, 0f), new Vector3(part - parted, rise - risen, 0f));
+                risen = rise;
+                parted = part;
+            };
+        }
+
+        /// <summary>Moves the posed left and right hands by these offsets and feeds them to the rig again.</summary>
+        static void MoveHands(HandRig rig, Vector3 left, Vector3 right)
+        {
+            foreach (bool isLeft in new[] { true, false })
+            {
+                var move = isLeft ? left : right;
+                var hand = rig.Get(isLeft);
+                if (move == Vector3.zero || hand.PalmJoint == null) continue;
+                hand.PalmJoint.root.position += move;
                 var tips = hand.TipJoints.Select(t => t.position).ToArray();
-                rig.Push(left, true, new Pose(hand.PalmJoint.position, hand.PalmJoint.rotation), hand.PalmNormal, tips);
+                rig.Push(isLeft, true, new Pose(hand.PalmJoint.position, hand.PalmJoint.rotation), hand.PalmNormal, tips);
             }
         }
 
