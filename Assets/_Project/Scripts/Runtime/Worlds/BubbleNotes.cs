@@ -440,10 +440,14 @@ namespace MusicInYourHands
         /// </summary>
         protected override void OnWord(string word, bool newLine)
         {
-            int newest = -1;
-            for (int i = 0; i < bubbles.Count; i++)
-                if (bubbles[i].Active && (newest < 0 || bubbles[i].Age < bubbles[newest].Age)) newest = i;
-            if (newest < 0) return;
+            int newest = NewestBubble();
+            // A word that no melody note brought a bubble for gets one of its own, so no sung word is lost.
+            if (newest < 0)
+            {
+                Spawn(64 + (word.GetHashCode() & 0x7fffffff) % 12, Mathf.Sin(Clock * 78.233f));
+                newest = NewestBubble();
+                if (newest < 0) return;
+            }
             var b = bubbles[newest];
             var w = SungWords.Add(word, Color.Lerp(PitchColors[Mathf.Abs(b.Midi) % PitchColors.Length], Color.white, 0.55f), 6f);
             w.Slot = newest;
@@ -515,6 +519,15 @@ namespace MusicInYourHands
                 }
                 lastBands[b] = level;
             }
+        }
+
+        /// <summary>The bubble that appeared most recently, or -1 when none is up.</summary>
+        int NewestBubble()
+        {
+            int newest = -1;
+            for (int i = 0; i < bubbles.Count; i++)
+                if (bubbles[i].Active && (newest < 0 || bubbles[i].Age < bubbles[newest].Age)) newest = i;
+            return newest;
         }
 
         void Spawn(int midi, float depthJitter)

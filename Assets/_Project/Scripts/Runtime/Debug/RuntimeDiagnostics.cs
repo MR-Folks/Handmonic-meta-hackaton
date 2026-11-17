@@ -34,8 +34,15 @@ namespace MusicInYourHands
             string left = rig != null && rig.Left.IsTracked ? Fmt(rig.Left.Palm.position) : "-";
             string right = rig != null && rig.Right.IsTracked ? Fmt(rig.Right.Palm.position) : "-";
 
+            // Whether lyrics are on, how many lines the song has, its notes (and whether they were made from the
+            // lyrics), and the line and word being sung.
+            string lyrics = bus == null ? "-"
+                : $"{(LyricsOption.On ? "on" : "off")} lines={(bus.Lyrics != null ? bus.Lyrics.Lines.Count : 0)} " +
+                  $"notes={(bus.Notes != null ? bus.Notes.Notes.Count : 0)}{(bus.Notes != null && bus.Notes.IsFromLyrics ? " from lyrics" : "")} " +
+                  $"at={bus.Lyric.Line}:{bus.Lyric.Word}";
+
             int listeners = FindObjectsByType<AudioListener>(FindObjectsSortMode.None).Length;
-            Debug.Log($"[Diag] cam={camInfo} | listeners={listeners} listenerVol={AudioListener.volume:F2} paused={AudioListener.pause} | audio={audio} | palmL={left} palmR={right} | source={(bus != null ? bus.Source.ToString() : "-")} mic={(bus != null ? bus.InputLevel : 0f):F4} | bass={(bus != null ? bus.Bass : 0f):F2} mids={(bus != null ? bus.Mids : 0f):F2} highs={(bus != null ? bus.Highs : 0f):F2} beats={(bus != null ? bus.BeatCount : 0)}");
+            Debug.Log($"[Diag] cam={camInfo} | listeners={listeners} listenerVol={AudioListener.volume:F2} paused={AudioListener.pause} | audio={audio} | palmL={left} palmR={right} | source={(bus != null ? bus.Source.ToString() : "-")} mic={(bus != null ? bus.InputLevel : 0f):F4} | bass={(bus != null ? bus.Bass : 0f):F2} mids={(bus != null ? bus.Mids : 0f):F2} highs={(bus != null ? bus.Highs : 0f):F2} beats={(bus != null ? bus.BeatCount : 0)} | lyrics={lyrics}");
         }
     }
 }
