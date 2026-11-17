@@ -55,6 +55,7 @@ namespace MusicInYourHands.EditorTools
             ok &= CheckLettering();
             ok &= CheckLyricsOption();
             ok &= CheckPickerResults();
+            ok &= CheckSpatialAudio();
             Debug.Log(ok ? "[Check] All checks passed." : "[Check] Some checks FAILED.");
             return ok;
         }
