@@ -97,6 +97,7 @@ namespace MusicInYourHands.EditorTools
             ConfigureXR();
             ConfigureMetaProject();
             ConfigureTextures();
+            SpatialAudioSetup.Configure();
             EnsureMainScene(EnsureDemoSongs(), rebuild: false);
             AssetDatabase.SaveAssets();
             Debug.Log("[Setup] Music In Your Hands project setup finished.");

@@ -12,7 +12,8 @@
         "Unity.XR.Management",
         "Unity.XR.Management.Editor",
         "Unity.XR.OpenXR",
-        "Unity.XR.OpenXR.Editor"
+        "Unity.XR.OpenXR.Editor",
+        "Meta.XR.Audio"
     ],
     "includePlatforms": [
         "Editor"
@@ -27,6 +28,11 @@
             "name": "com.unity.xr.openxr",
             "expression": "1.0.0",
             "define": "UNITY_OPENXR"
+        },
+        {
+            "name": "com.meta.xr.sdk.audio",
+            "expression": "1.0.0",
+            "define": "META_XR_AUDIO"
         }
     ],
     "autoReferenced": false
