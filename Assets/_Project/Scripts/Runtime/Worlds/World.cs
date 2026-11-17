@@ -54,6 +54,16 @@ namespace MusicInYourHands
         /// <summary>How the hands look in this world. Applied when the world becomes active.</summary>
         public virtual HandTheme Theme => HandTheme.Veins;
 
+        /// <summary>
+        /// True for a world whose things sit in your room and should hide behind real things, as anything real would:
+        /// behind the sofa or a table, behind someone walking past, and behind your own real hands as they pass in front.
+        /// While such a world is on, the headset senses the room's depth (Meta's Depth API, see <see cref="RoomDepth"/>)
+        /// and the world's own shaders hide whatever is behind something real; things it draws with the shared
+        /// materials (glow, ring, line, lettering, bubble) hide only when made with <see cref="InRoom"/>, and so do its
+        /// sung words. Off by default: worlds drawn on the walls or on the hands would look wrong cut away.
+        /// </summary>
+        public virtual bool HiddenByRealRoom => false;
+
         // ---- Hooks, in the order they run ----
 
         /// <summary>Creates the world's objects, once.</summary>
@@ -341,6 +351,8 @@ namespace MusicInYourHands
                 var lettering = letteringMaterial != null ? letteringMaterial : FallbackLettering();
                 if (lettering != null) SungWords = new WordLayer("Lyric", transform, lettering, SungWordCount, SungWordHeight, Sung);
                 else Debug.LogError($"[World] {GetType().Name} has no lettering material for its sung words.");
+                // The sung words of a world hidden by the real room float in the room too.
+                if (SungWords != null && HiddenByRealRoom) SungWords.HiddenByRoom = true;
             }
             OnBuild();
         }
@@ -399,6 +411,7 @@ namespace MusicInYourHands
             waitOpen[0] = waitOpen[1] = false;
             beatPending = false;
             if (MusicBus.Instance != null) MusicBus.Instance.Beat += OnBusBeat;
+            RoomDepth.Wanted = HiddenByRealRoom;
             OnEnter();
         }
 
@@ -406,6 +419,8 @@ namespace MusicInYourHands
         {
             if (MusicBus.Instance != null) MusicBus.Instance.Beat -= OnBusBeat;
             beatPending = false;
+            // The next world, if it wants the room's depth too, asks again as it starts.
+            RoomDepth.Wanted = false;
             if (!IsBuilt) return;
             SungWords?.Clear();
             OnExit();
@@ -567,6 +582,37 @@ namespace MusicInYourHands
         public void SimulateParticles(float seconds)
         {
             foreach (var ps in GetComponentsInChildren<ParticleSystem>(true)) ps.Simulate(seconds, true, false);
+        }
+
+        static readonly int RoomOcclusionId = Shader.PropertyToID("_RoomOcclusion");
+        static readonly int DepthBiasId = Shader.PropertyToID("_EnvironmentDepthBias");
+        // The world's copies of shared materials that hide behind the real room (InRoom): the shared one, the depth bias
+        // asked for and the copy, made once each.
+        readonly List<Material> roomShared = new List<Material>();
+        readonly List<float> roomBias = new List<float>();
+        readonly List<Material> roomCopies = new List<Material>();
+
+        /// <summary>
+        /// For a world <see cref="HiddenByRealRoom"/>: the material to draw one of its things that sits in the room with,
+        /// a copy of a shared material (glow, ring, line, lettering, bubble) that hides behind real things. Effects on your
+        /// hands keep the shared material and stay in front, as do the menu and the other worlds. <paramref name="depthBias"/>
+        /// pulls the thing towards you by that share of its distance before it is tested against the room, so something
+        /// on or flush with a real surface (the ceiling, the floor) doesn't flicker against it; below 0 keeps the shader's
+        /// own. Each copy is made once and kept (call it from OnBuild). Outside play (the editor's previews, which have
+        /// no room depth) and for other worlds it returns the shared material unchanged.
+        /// </summary>
+        protected Material InRoom(Material shared, float depthBias = -1f)
+        {
+            if (shared == null || !HiddenByRealRoom || !Application.isPlaying) return shared;
+            for (int i = 0; i < roomShared.Count; i++)
+                if (roomShared[i] == shared && Mathf.Approximately(roomBias[i], depthBias)) return roomCopies[i];
+            var copy = new Material(shared) { name = $"{shared.name} (in the room)" };
+            copy.SetFloat(RoomOcclusionId, 1f);
+            if (depthBias >= 0f) copy.SetFloat(DepthBiasId, depthBias);
+            roomShared.Add(shared);
+            roomBias.Add(depthBias);
+            roomCopies.Add(copy);
+            return copy;
         }
 
         /// <summary>Destroys immediately in the editor (previews) and normally while playing.</summary>

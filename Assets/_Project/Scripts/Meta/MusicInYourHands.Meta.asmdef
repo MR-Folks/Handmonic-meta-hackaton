@@ -5,7 +5,8 @@
         "MusicInYourHands.Runtime",
         "Oculus.VR",
         "meta.xr.mrutilitykit",
-        "Meta.XR.Audio"
+        "Meta.XR.Audio",
+        "Meta.XR.EnvironmentDepth"
     ],
     "defineConstraints": [
         "META_XR_CORE"
