@@ -38,6 +38,8 @@ namespace MusicInYourHands
         [SerializeField] Vector2 pinchThresholds = new Vector2(0.85f, 0.5f);
         [Tooltip("A fingertip nearer the menu than the first distance (m) touches instead of pointing, until it is farther than the second (Meta's hover zone).")]
         [SerializeField] Vector2 touchZone = new Vector2(0.15f, 0.2f);
+        [Tooltip("How the cassette deck's turntable turns under the hands: how long it glides, how a brushing hand pulls it along, how a hand catches it, and its top speed.")]
+        [SerializeField] DeckRing.Tuning turntable = new DeckRing.Tuning();
 
         /// <summary>Raised by the menu button feed (Meta's menu gesture); the menu opens or closes.</summary>
         public static event Action ToggleRequested;
@@ -791,7 +793,7 @@ namespace MusicInYourHands
             library.BackPressed += OnLibraryBack;
             if (deck == null)
             {
-                deck = new CassetteDeck(transform, glowMaterial);
+                deck = new CassetteDeck(transform, glowMaterial, turntable);
                 deck.SongListRequested += () => ShowSongList(lastView);
                 deck.PickerOpened += OnDeckPicker;
             }

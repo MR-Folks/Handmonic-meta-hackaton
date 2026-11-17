@@ -8,17 +8,20 @@ namespace MusicInYourHands
     /// The cassette deck: choosing a song by hand. The menu's song bubble opens it, and a small table rises out of the
     /// floor in front of you, within reach whether you sit or stand. On its left a round turntable carries one
     /// cassette per song, standing round its rim with their labels facing out: the cassette nearest you is the front
-    /// one, lit up with its title floating above it, and the rest go round into the distance. Turn the turntable by
-    /// pinching its edge and dragging, or sweep an open hand across the cassettes; it coasts, then settles with one
-    /// cassette at the front. On the right stands a radio with its cassette door open. Pinch a cassette (or close
-    /// your hand round it) to pick it up; bring it to the door and a glowing outline shows where it will go; let go
-    /// and it drops in, the door shuts with a clunk, the light comes on and the song plays while the reels turn and
-    /// the speakers pump with the bass. Let go anywhere else and it floats home. Putting in another pops the first
-    /// one out, back to its place. The radio's keys play or pause, stop and eject, pressed with a fingertip like the
-    /// menu's buttons. A blank cassette at the end of the ring adds a song from the headset (the file picker), and a
-    /// button on the table opens the song list for lyrics, removing songs and Audius credits. Close it with the
-    /// table's close button or Meta's menu gesture; the world plays on behind it the whole time.
-    /// Everything is built here from code and Resources (DeckParts), so the scene needs nothing new.
+    /// one, lit up with its title floating above it, and the rest go round into the distance. It turns like a heavy,
+    /// well-oiled turntable (DeckRing): pinch its edge and it follows the hand closely, and spins on at the hand's speed
+    /// when let go; slide an open hand across the cassettes and it is pulled softly along, a quick slide flicking it
+    /// into a spin. It glides for a few seconds, ticking as each cassette passes, and settles with one at the front,
+    /// unless a hand put back into it catches it first. On the right stands a radio with its cassette door open. Pinch
+    /// a cassette (or close your hand round it) to pick it up (taking one off a spinning turntable catches it too);
+    /// bring it to the door and a glowing outline shows where it will go; let go and it drops in, the door shuts with
+    /// a clunk, the light comes on and the song plays while the reels turn and the speakers pump with the bass. Let go
+    /// anywhere else and it floats home. Putting in another pops the first one out, back to its place. The radio's
+    /// keys play or pause, stop and eject, pressed with a fingertip like the menu's buttons. A blank cassette at the
+    /// end of the ring adds a song from the headset (the file picker), and a button on the table opens the song list
+    /// for lyrics, removing songs and Audius credits. Close it with the table's close button or Meta's menu gesture;
+    /// the world plays on behind it the whole time.
+    /// Everything is built here from code and Resources (DeckParts); the world menu keeps the turntable's tuning.
     /// </summary>
     public sealed partial class CassetteDeck
     {
@@ -81,12 +84,12 @@ namespace MusicInYourHands
         readonly Vector3 speakerLeftRest, speakerRightRest;
         readonly Renderer ghost;
         readonly Transform ghostRoot;
-        readonly AudioPool voices;
+        readonly AudioPool voices, ticks;
         readonly MaterialPropertyBlock block = new MaterialPropertyBlock();
         readonly List<Cassette> pool = new List<Cassette>();
         readonly List<Cassette> ring = new List<Cassette>();
         readonly Cassette blank;
-        readonly DeckRing turning = new DeckRing();
+        readonly DeckRing turning;
         readonly ParticleSystem sparks;
 
         // Measured from the models.
@@ -122,8 +125,10 @@ namespace MusicInYourHands
         /// <summary>Raised when the blank cassette has opened the headset's file picker; the deck has stepped aside.</summary>
         public event Action PickerOpened;
 
-        public CassetteDeck(Transform parent, Material glowMaterial)
+        /// <summary>Builds the deck, hidden, under <paramref name="parent"/>; <paramref name="feel"/> is how its turntable turns.</summary>
+        public CassetteDeck(Transform parent, Material glowMaterial, DeckRing.Tuning feel = null)
         {
+            turning = new DeckRing(feel);
             root = new GameObject("Cassette Deck").transform;
             root.SetParent(parent, false);
             rise = new GameObject("Rise").transform;
@@ -230,6 +235,8 @@ namespace MusicInYourHands
             var main = sparks.main;
             main.maxParticles = 80;
             voices = new AudioPool(root, 4);
+            // The turntable's ticks have voices of their own, so a long spin never moves or retunes the deck's other sounds.
+            ticks = new AudioPool(root, 2);
             root.gameObject.SetActive(false);
         }
 
@@ -338,8 +345,9 @@ namespace MusicInYourHands
             foreach (var h in hands)
             {
                 h.Holding = h.Hovered = null;
-                h.Dragging = false;
+                h.Dragging = h.Spun = false;
             }
+            turning.Release(false);
             foreach (var c in pool)
             {
                 if (c.Place == Place.Ejecting || c.Place == Place.Returning || c.Place == Place.Held) c.Place = Place.Ring;
@@ -419,10 +427,12 @@ namespace MusicInYourHands
             bool ready = IsOpen && openClock > RiseSeconds * 0.8f;
             StepHands(rig, ready, dt);
             StepKeys(rig, ready, dt);
-            if (!AnyDragging()) turning.Step(dt);
+            turning.Step(dt);
             if (turning.Front != lastFront && turning.Count > 0)
             {
-                if (lastFront >= 0 && ready) voices.Play(DeckSounds.Tick, CassettePoint(turning.Front), 0.35f, 0.9f + 0.03f * (turning.Front % 7));
+                // A tick as each cassette passes the front, a little softer the faster it spins.
+                float tick = Mathf.Lerp(0.35f, 0.2f, Mathf.Abs(turning.Velocity) / turning.Feel.TopSpeed);
+                if (lastFront >= 0 && ready) ticks.Play(DeckSounds.Tick, CassettePoint(turning.Front), tick, 0.9f + 0.03f * (turning.Front % 7));
                 lastFront = turning.Front;
             }
             StepCassettes(bus, dt);
@@ -828,6 +838,21 @@ namespace MusicInYourHands
 
         /// <summary>True while the turntable is still turning or settling.</summary>
         public bool Turning => turning.Moving;
+
+        /// <summary>How fast the turntable turns, in cassettes per second (positive brings later songs to the front).</summary>
+        public float TurnSpeed => turning.Velocity;
+
+        /// <summary>Where the turntable is, in cassettes: whole numbers put a cassette squarely at the front.</summary>
+        public float TurnPosition => turning.Scroll;
+
+        /// <summary>Where the front cassette stands on the turntable (or would, while it is in the radio or a hand), in the world.</summary>
+        public Vector3 FrontPlace => ring.Count > 0 && turning.Front >= 0 ? CassetteHome(ring[turning.Front]) : slot.position;
+
+        /// <summary>The angle between the front cassette and the next, in degrees.</summary>
+        public float TurnPitch => turning.FrontPitch * Mathf.Rad2Deg;
+
+        /// <summary>How the turntable turns under the hands.</summary>
+        public DeckRing.Tuning TurnFeel => turning.Feel;
 
         /// <summary>True while the glowing outline shows that a held cassette would snap into the radio.</summary>
         public bool ShowsSnapPreview => ghostRoot.gameObject.activeSelf;
