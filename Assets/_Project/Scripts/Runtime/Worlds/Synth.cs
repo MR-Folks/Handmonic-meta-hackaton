@@ -4,8 +4,8 @@ using UnityEngine;
 namespace MusicInYourHands
 {
     /// <summary>
-    /// Small sounds made in code, so worlds can answer the player's touch: a plucked string and a bell-like chime.
-    /// Notes are in A minor pentatonic, the key of the demo song.
+    /// Small sounds made in code, so worlds can answer the player's touch: a plucked string, a bell-like chime and a
+    /// bubble's pop. Notes are in A minor pentatonic, the key of the demo song.
     /// </summary>
     public static class Synth
     {
@@ -108,6 +108,44 @@ namespace MusicInYourHands
                 data[i] = (hum * 0.25f + crackle * 0.6f) * env * 0.35f;
             }
             return Store(key, data, rate);
+        }
+
+        /// <summary>
+        /// A soft bubble pop, the "it pressed" sound of a bubble: 65 ms of a sine that springs up from about 470 Hz to
+        /// 1.3 kHz, with a brief octave on top for crispness. It fades in over 2.5 ms and out over the last 12 ms, so it
+        /// starts and ends on silence, with no click.
+        /// </summary>
+        public static AudioClip Pop()
+        {
+            const string key = "pop";
+            if (Cache.TryGetValue(key, out var clip)) return clip;
+            int rate = Rate;
+            return Store(key, PopSamples(rate), rate);
+        }
+
+        /// <summary>The pop's samples at <paramref name="rate"/> Hz, its loudest sample at 0.55 (also for the editor checks).</summary>
+        public static float[] PopSamples(int rate)
+        {
+            int length = (int)(rate * 0.065f);
+            var data = new float[length];
+            float attack = rate * 0.0025f, tail = rate * 0.012f;
+            float phase = 0f, peak = 0f;
+            for (int i = 0; i < length; i++)
+            {
+                float t = i / (float)rate;
+                // The pitch rises quickly and levels off, like a bubble's ring as it bursts.
+                float frequency = 470f + 820f * (1f - Mathf.Exp(-t / 0.011f));
+                float fadeIn = Mathf.Sin(0.5f * Mathf.PI * Mathf.Min(1f, i / attack));
+                float fadeOut = Mathf.Sin(0.5f * Mathf.PI * Mathf.Min(1f, (length - 1 - i) / tail));
+                float env = fadeIn * fadeIn * fadeOut * fadeOut * Mathf.Exp(-t / 0.017f);
+                float s = Mathf.Sin(phase) + 0.22f * Mathf.Sin(2f * phase) * Mathf.Exp(-t / 0.008f);
+                data[i] = s * env;
+                peak = Mathf.Max(peak, Mathf.Abs(data[i]));
+                phase += 2f * Mathf.PI * frequency / rate;
+            }
+            float scale = peak > 0f ? 0.55f / peak : 0f;
+            for (int i = 0; i < length; i++) data[i] *= scale;
+            return data;
         }
 
         /// <summary>A spray can's hiss: a second of bright noise that loops seamlessly.</summary>

@@ -6,9 +6,9 @@ namespace MusicInYourHands
     /// <summary>
     /// The Bubble notes world, an underwater moment in your room. Every melody note rises from below as a soap bubble,
     /// the moment it is sung, placed by pitch from left (low) to right (high); low notes make big bubbles, high notes
-    /// small ones. They wobble with the bass as they float up. Pop one with a fingertip and you hear its note right at
-    /// your finger, with a ring and a spray of droplets; brush one with your palm and it drifts away. Your skin has a
-    /// soap-film sheen.
+    /// small ones. They wobble with the bass as they float up. Pop one with a fingertip and you hear a soft pop and its
+    /// note right at your finger, with a ring and a spray of droplets; brush one with your palm and it drifts away. Your
+    /// skin has a soap-film sheen.
     /// All around you swim shoals of small fish, each shoal its own colour, circling you from arm's length to across
     /// the room and never coming near your face. They swim faster when the song is louder, the stripe along each fish
     /// glows with its part of the music, a wave of light runs through them on every beat and now and then a kick makes
@@ -172,7 +172,7 @@ namespace MusicInYourHands
         readonly float[] lastBands = new float[MusicBus.BandCount];
         readonly float[] cooldown = new float[MusicBus.BandCount];
         MaterialPropertyBlock block;
-        AudioPool voices;
+        AudioPool voices, popVoices;
         ParticleSystem droplets;
         Vector3 center, right, forward, anchor;
         float eyeY, songTime, lookAway;
@@ -249,6 +249,8 @@ namespace MusicInYourHands
                 pops.Add(p);
             }
             voices = new AudioPool(transform, 6);
+            // The pops get their own voices, so a quick run of pops never cuts off a note still ringing.
+            popVoices = new AudioPool(transform, 2);
             droplets = Effects.MakeSparkSystem("Droplets", transform, glowMaterial);
             var main = droplets.main;
             main.gravityModifier = 0.25f;
@@ -612,6 +614,8 @@ namespace MusicInYourHands
                     float d = Vector3.Distance(tip, b.Position);
                     if (d < b.Radius * 0.95f && b.Age > 0.25f)
                     {
+                        // A soft pop at once, under the bubble's note (which may wait a moment to land on the beat).
+                        popVoices.Play(Synth.Pop(), tip, 0.25f);
                         Musical.Play(voices, frame, b.Midi, tip, 0.4f);
                         Burst(b, true);
                         Acted("pop");
