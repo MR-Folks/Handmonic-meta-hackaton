@@ -1542,6 +1542,9 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 9eac96caf5a340eb99c21e1e08aa5e80, type: 2}
   - {fileID: 11400000, guid: 871367888b9847e4b4d65005b06d8e18, type: 2}
   - {fileID: 11400000, guid: afb643e518ac4bef9b478ea475e315a3, type: 2}
+  - {fileID: 11400000, guid: 77bbc00d27a74539860ecbcd7b6529ef, type: 2}
+  - {fileID: 11400000, guid: 42d30d17da644a0e90c2e85a5587884a, type: 2}
+  - {fileID: 11400000, guid: 69525c2523584f7ebc29e7f37a7b04f2, type: 2}
   playOnStart: 1
   loop: 1
   startSource: 0

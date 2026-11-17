@@ -32,9 +32,13 @@ namespace MusicInYourHands.EditorTools
         const string Root = "Assets/_Project";
         const string UrpPath = Root + "/Settings/URP-Quest.asset";
         const string RendererPath = Root + "/Settings/URP-Quest_Renderer.asset";
-        // The demo songs, rendered by Tools/render_songs.py: (file name in Audio and Songs, title). The first one starts.
+        // The built-in songs: (file name in Audio and Songs, title). The first one starts. The first four are rendered by
+        // Tools/render_songs.py (a .wav with .notes melody); the rest are sung songs made by Tools/elevenlabs_songs.py (an .mp3).
         static readonly (string file, string title)[] DemoSongs =
-            { ("GlassRoom", "Glass Room"), ("NeonTide", "Neon Tide"), ("RainyWindow", "Rainy Window"), ("PaperBoat", "Paper Boat") };
+        {
+            ("GlassRoom", "Glass Room"), ("NeonTide", "Neon Tide"), ("RainyWindow", "Rainy Window"), ("PaperBoat", "Paper Boat"),
+            ("TurnItUpToLight", "Turn It Up to Light"), ("TheWorldIsHumming", "The World Is Humming"), ("SlowMotionGlow", "Slow Motion Glow")
+        };
         public const string MainScenePath = Root + "/Scenes/Main.unity";
         const string ApplicationId = "com.musicinyourhands.app";
         // The OpenXR features the app turns on for Android. HandInteractionProfile (XR_EXT_hand_interaction) carries Meta's
@@ -280,11 +284,12 @@ namespace MusicInYourHands.EditorTools
                 }
                 song.title = title;
                 song.artist = "Music In Your Hands demo";
-                song.clip = AssetDatabase.LoadAssetAtPath<AudioClip>($"{Root}/Audio/{file}.wav");
+                song.clip = AssetDatabase.LoadAssetAtPath<AudioClip>($"{Root}/Audio/{file}.wav")
+                    ?? AssetDatabase.LoadAssetAtPath<AudioClip>($"{Root}/Audio/{file}.mp3");
                 song.lyrics = AssetDatabase.LoadAssetAtPath<TextAsset>($"{Root}/Audio/{file}.lrc");
                 song.notes = AssetDatabase.LoadAssetAtPath<TextAsset>($"{Root}/Audio/{file}.notes");
                 EditorUtility.SetDirty(song);
-                if (song.clip == null) Debug.LogWarning($"[Setup] {file}.wav was not found, so {title} has no audio.");
+                if (song.clip == null) Debug.LogWarning($"[Setup] {file}.wav or .mp3 was not found, so {title} has no audio.");
                 if (song.lyrics == null) Debug.LogWarning($"[Setup] {file}.lrc was not found, so {title} has no lyrics.");
                 songs[i] = song;
             }

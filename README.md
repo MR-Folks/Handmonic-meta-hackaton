@@ -10,7 +10,8 @@ A hand-tracked mixed reality music visualizer for Meta Quest 3. You play with th
 ## Project layout
 ```
 Assets/_Project/
-  Audio/      four demo songs (WAV), their word-timed lyrics (LRC) and melody notes (.notes)
+  Audio/      four demo songs (WAV) with melody notes (.notes) and three sung songs (MP3), all with word-timed
+              lyrics (LRC)
   Songs/      SongAsset files: audio + lyrics + offset
   Resources/  AudiusSongs.txt (the songs streamed from Audius), the baked lettering, and CassetteDeck/ (the cassette
               deck's four models and their materials)
@@ -30,6 +31,7 @@ Tools/
   render_songs.py        renders the demo songs, their LRC lyrics and .notes melodies
   songkit.py             the instruments, voice and file writers the songs share
   songs/                 one script per demo song
+  elevenlabs_songs.py    makes the sung songs with ElevenLabs Music and times their lyrics word by word
   blender/cassette_deck.py  builds the cassette deck's models in Blender and exports them to Resources/CassetteDeck
 ```
 
@@ -82,6 +84,16 @@ Four original songs ship with the app, so they are safe to use anywhere, includi
 | Paper Boat | folk waltz in 3/4, G major, 144 BPM: nylon guitar, upright bass, brushes, glockenspiel |
 
 In the menu, the arrow bubbles on either side of the listen bubble step to the previous and next song. `python3 Tools/render_songs.py` renders them all again (or name some, like `neon_tide`); each song is a short script in `Tools/songs`, and a new one there is picked up automatically. Add its SongAsset to **Songs** on `MusicBus` (or to `DemoSongs` in `ProjectSetup`).
+
+Three sung songs follow them, made with [ElevenLabs Music](https://elevenlabs.io/music) from original lyrics (the output is cleared for commercial use on a paid ElevenLabs plan):
+
+| Song | Style |
+| --- | --- |
+| Turn It Up to Light | synth-pop, 118 BPM, female vocal, about 2:28 |
+| The World Is Humming | indie folk, 92 BPM, fingerpicked guitar, male vocal with harmonies, about 2:20 |
+| Slow Motion Glow | lo-fi hip hop and neo-soul, 80 BPM, rap verses with a sung hook, about 2:16 |
+
+Their lyrics show word by word: ElevenLabs' forced alignment times each sung word. They have no `.notes` melody, so the worlds that play along with the tune behave as they do for people's own songs. `Tools/elevenlabs_songs.py` holds their lyrics and section plans and makes them again (`ELEVENLABS_API_KEY` must be set, with the Music and Forced alignment permissions; `--only SlowMotionGlow` for one song, `--align-only` to re-time the lyrics of MP3s already made). It writes to a folder you choose; listen first, then copy the `.mp3` and `.lrc` into `Assets/_Project/Audio`.
 
 ## People's own songs
 People can play their own music: they copy an audio file (`.mp3`, `.ogg` or `.wav`) into the app's `Songs` folder on the headset, with an optional `.lrc` lyrics file of the same name, and it joins the songs the arrows step through. Lines show at the times in the `.lrc`; words too when it has a time per word, otherwise they are spread across the line. Name files `Artist - Title`, or use `[ti:]` and `[ar:]` tags in the `.lrc`.
