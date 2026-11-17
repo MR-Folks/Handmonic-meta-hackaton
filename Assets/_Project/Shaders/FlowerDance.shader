@@ -9,6 +9,8 @@
 // Parts: 0 stem, 1 leaf, 2 petal, 3 flower centre, 4 calyx (the green cup under the head), 5 grass, 6 shadow.
 // Pass 1 lays a soft contact shadow under each flower (it darkens the real floor over passthrough); pass 2 draws the
 // flowers solid, in soft two-tone cartoon shading with a light rim, richer and glowing as a flower gets bold.
+// Real things hide the flowers and their shadows behind them while the real room's depth is on (RoomOcclusion.hlsl);
+// the depth bias keeps the real floor and table tops they grow from from cutting into their roots.
 Shader "MusicInYourHands/FlowerDance"
 {
     Properties
@@ -16,6 +18,7 @@ Shader "MusicInYourHands/FlowerDance"
         _Shade ("Shadow side brightness", Range(0, 1)) = 0.62
         _Rim ("Rim light", Float) = 0.3
         _ShadowColor ("Contact shadow (alpha: strength)", Color) = (0.02, 0.04, 0.01, 0.42)
+        _EnvironmentDepthBias ("Real-room depth bias (share of the distance)", Float) = 0.08
     }
 
     SubShader
@@ -24,6 +27,7 @@ Shader "MusicInYourHands/FlowerDance"
 
         HLSLINCLUDE
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+        #include "RoomOcclusion.hlsl"
 
         // As many flowers as FlowerDance.MaxFlowers.
         #define FLOWERS 48
@@ -32,6 +36,7 @@ Shader "MusicInYourHands/FlowerDance"
             float _Shade;
             float _Rim;
             float4 _ShadowColor;
+            float _EnvironmentDepthBias;
         CBUFFER_END
 
         // Per flower, set by FlowerDance every frame through its property block. These live outside UnityPerMaterial:
@@ -105,11 +110,13 @@ Shader "MusicInYourHands/FlowerDance"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
+            #pragma multi_compile _ HARD_OCCLUSION SOFT_OCCLUSION
 
             struct Varyings
             {
                 float4 positionCS : SV_POSITION;
                 float3 spot : TEXCOORD0;    // xy: across the shadow (-1..1); z: strength
+                META_DEPTH_VERTEX_OUTPUT(1)
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -134,6 +141,7 @@ Shader "MusicInYourHands/FlowerDance"
                 float3 centre = root.xyz + Yaw(float3(tip.x, 0, tip.z) * 0.5, root.w);
                 float3 positionWS = centre + float3(input.positionOS.x * radius, 0.004, input.positionOS.z * radius);
                 output.positionCS = TransformWorldToHClip(positionWS);
+                ROOM_OCCLUSION_WORLD(output, positionWS);
                 output.spot = float3(input.positionOS.xz, saturate(size * 1.6));
                 return output;
             }
@@ -143,7 +151,8 @@ Shader "MusicInYourHands/FlowerDance"
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
                 float d = length(input.spot.xy);
                 float a = smoothstep(1.0, 0.15, d);
-                return half4(_ShadowColor.rgb, a * a * _ShadowColor.a * input.spot.z);
+                float visible = META_DEPTH_GET_OCCLUSION_VALUE(input, _EnvironmentDepthBias);
+                return half4(_ShadowColor.rgb, a * a * _ShadowColor.a * input.spot.z * visible);
             }
             ENDHLSL
         }
@@ -161,6 +170,7 @@ Shader "MusicInYourHands/FlowerDance"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
+            #pragma multi_compile _ HARD_OCCLUSION SOFT_OCCLUSION
 
             struct Varyings
             {
@@ -312,7 +322,10 @@ Shader "MusicInYourHands/FlowerDance"
                 float grey = dot(color, float3(0.3, 0.59, 0.11));
                 float3 rich = max(0, lerp(grey, color, 1.6)) * 1.3 + base * 0.3 + rim * base * 1.5;
                 color = lerp(color, rich, saturate(bold * head));
-                return half4(color, 1);
+                // Opaque over passthrough: where something real is in front, colour and alpha fade out together.
+                half4 result = half4(color, 1);
+                META_DEPTH_OCCLUDE_OUTPUT_PREMULTIPLY_WORLDPOS(input.positionWS, result, _EnvironmentDepthBias);
+                return result;
             }
             ENDHLSL
         }

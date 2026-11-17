@@ -5,7 +5,8 @@
 // into a scanned wall it fades (SolarSystemRoom.hlsl). A brighter trail runs behind the planet (_Head: where the
 // planet is, 0-1 round the ring), far parts are a little dimmer, _Pulse lights the whole ring (a planet just let go),
 // the beat's wave of light sweeps along it from the sun (_SunPos, _Wave), and _Dashes breaks it into dashes that flow
-// along it: the orbit a carried planet will take when you let it go.
+// along it: the orbit a carried planet will take when you let it go. Real things hide it behind them while the real
+// room's depth is on (RoomOcclusion.hlsl).
 Shader "MusicInYourHands/SolarSystemOrbit"
 {
     Properties
@@ -20,6 +21,7 @@ Shader "MusicInYourHands/SolarSystemOrbit"
         _Clock ("Time (set by SolarSystem)", Float) = 0
         _SunPos ("Sun position (set by SolarSystem)", Vector) = (0, 0, 0, 0)
         _Wave ("Beat wave: seconds since, strength, speed, width (set by SolarSystem)", Vector) = (9, 0, 3.5, 0.3)
+        _EnvironmentDepthBias ("Real-room depth bias (share of the distance)", Float) = 0.03
     }
 
     SubShader
@@ -38,8 +40,10 @@ Shader "MusicInYourHands/SolarSystemOrbit"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
+            #pragma multi_compile _ HARD_OCCLUSION SOFT_OCCLUSION
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "SolarSystemRoom.hlsl"
+            #include "RoomOcclusion.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _Color;
@@ -52,6 +56,7 @@ Shader "MusicInYourHands/SolarSystemOrbit"
                 float _Clock;
                 float4 _SunPos;
                 float4 _Wave;
+                float _EnvironmentDepthBias;
             CBUFFER_END
 
             struct Attributes
@@ -68,6 +73,7 @@ Shader "MusicInYourHands/SolarSystemOrbit"
                 float2 uv : TEXCOORD0;
                 // x: how much of the line shows here (walls, distance), y: the beat's wave passing.
                 float2 shade : TEXCOORD1;
+                META_DEPTH_VERTEX_OUTPUT(2)
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -86,6 +92,7 @@ Shader "MusicInYourHands/SolarSystemOrbit"
                 float width = _Width * max(dist, 0.3);
                 float3 positionWS = centreWS + side * (width * 3 * (input.uv.y * 2 - 1));
                 output.positionCS = TransformWorldToHClip(positionWS);
+                ROOM_OCCLUSION_WORLD(output, positionWS);
                 output.uv = input.uv;
                 float shade = lerp(1.0, 0.6, saturate((dist - 1.2) / 2.5)) * smoothstep(0.12, 0.3, dist) * SolarInRoom(centreWS);
                 output.shade = float2(shade, SolarWave(distance(centreWS, _SunPos.xyz), _Wave));
@@ -106,7 +113,8 @@ Shader "MusicInYourHands/SolarSystemOrbit"
                 float pulse = _Pulse + input.shade.y;
                 float k = (core + glow) * (1 + trail * 4 + pulse * 3) * dash * input.shade.x;
                 float3 color = lerp(_Color.rgb, float3(1, 1, 1), saturate(trail * 0.5 + pulse * 0.35) * core);
-                return half4(color, saturate(k * _Color.a * _Alpha));
+                float visible = META_DEPTH_GET_OCCLUSION_VALUE(input, _EnvironmentDepthBias);
+                return half4(color, saturate(k * _Color.a * _Alpha) * visible);
             }
             ENDHLSL
         }

@@ -26,7 +26,9 @@ Material:
     m_Ints: []
     m_Floats:
     - _Core: 0.6
+    - _EnvironmentDepthBias: 0.03
     - _Intensity: 1
+    - _RoomOcclusion: 0
     - _Softness: 1.6
     - _ZTest: 4
     m_Colors:

@@ -5,7 +5,8 @@
 // comes the music: _Glow (the planet's band) brightens its day side and its air, _Twinkle flashes it for a melody
 // note, and _Highlight rims it in white while a pinch is close enough to pick it up. The sun lights itself: hot white
 // in the middle, deep orange at the edge, its surface slowly boiling, brighter with _SunPower.
-// It writes depth, so orbits, rings and comets behind a planet are hidden by it.
+// It writes depth, so orbits, rings and comets behind a planet are hidden by it. Real things hide it behind them while
+// the real room's depth is on (RoomOcclusion.hlsl).
 Shader "MusicInYourHands/SolarSystemPlanet"
 {
     Properties
@@ -24,6 +25,7 @@ Shader "MusicInYourHands/SolarSystemPlanet"
         _Highlight ("Within reach 0-1 (set by SolarSystem)", Float) = 0
         _Clock ("Time (set by SolarSystem)", Float) = 0
         _Alpha ("Fade (set by SolarSystem)", Float) = 1
+        _EnvironmentDepthBias ("Real-room depth bias (share of the distance)", Float) = 0.03
     }
 
     SubShader
@@ -42,7 +44,9 @@ Shader "MusicInYourHands/SolarSystemPlanet"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
+            #pragma multi_compile _ HARD_OCCLUSION SOFT_OCCLUSION
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "RoomOcclusion.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float _Kind;
@@ -59,6 +63,7 @@ Shader "MusicInYourHands/SolarSystemPlanet"
                 float _Highlight;
                 float _Clock;
                 float _Alpha;
+                float _EnvironmentDepthBias;
             CBUFFER_END
 
             struct Attributes
@@ -146,6 +151,7 @@ Shader "MusicInYourHands/SolarSystemPlanet"
                 cities = 0;
                 water = 0;
                 float3 s = d + _Seed * float3(1.7, 2.3, 1.1);
+                float3 result;
                 if (_Kind < 1.5)
                 {
                     // Rocky: dusty plains with darker lowlands, pocked with small craters.
@@ -153,16 +159,16 @@ Shader "MusicInYourHands/SolarSystemPlanet"
                     float3 c = lerp(_ColorB.rgb, _ColorA.rgb, smoothstep(0.3, 0.7, n));
                     float pits = Noise(s * 13);
                     c *= 0.9 + smoothstep(0.66, 0.74, pits) * 0.25 - smoothstep(0.74, 0.84, pits) * 0.3;
-                    return c;
+                    result = c;
                 }
-                if (_Kind < 2.5)
+                else if (_Kind < 2.5)
                 {
                     // Cloudy: soft bands of cloud swirled by slow eddies.
                     float swirl = Fbm(s * 2.2 + float3(0, _Clock * 0.02, 0));
                     float bands = sin(d.y * 6.5 + swirl * 5.0) * 0.5 + 0.5;
-                    return lerp(_ColorB.rgb, _ColorA.rgb, smoothstep(0.1, 0.9, bands * 0.55 + swirl * 0.55));
+                    result = lerp(_ColorB.rgb, _ColorA.rgb, smoothstep(0.1, 0.9, bands * 0.55 + swirl * 0.55));
                 }
-                if (_Kind < 3.5)
+                else if (_Kind < 3.5)
                 {
                     // Earth: deep blue oceans, green and sandy continents, ice at the poles, drifting clouds.
                     float shape = Fbm(s * 1.7);
@@ -175,17 +181,17 @@ Shader "MusicInYourHands/SolarSystemPlanet"
                     c = lerp(c, float3(1, 1, 1), cloud * 0.9);
                     cities = land * (1 - ice) * (1 - cloud) * smoothstep(0.55, 0.8, Noise(s * 18));
                     water = (1 - land) * (1 - ice) * (1 - cloud);
-                    return c;
+                    result = c;
                 }
-                if (_Kind < 4.5)
+                else if (_Kind < 4.5)
                 {
                     // Mars: rusty plains, dark markings and small white polar caps.
                     float n = Fbm(s * 2.4);
                     float3 c = lerp(_ColorA.rgb, _ColorB.rgb, smoothstep(0.45, 0.65, n));
                     c *= 0.92 + Noise(s * 12) * 0.14;
-                    return lerp(c, float3(0.97, 0.95, 0.92), smoothstep(0.87, 0.91, abs(d.y) + n * 0.05));
+                    result = lerp(c, float3(0.97, 0.95, 0.92), smoothstep(0.87, 0.91, abs(d.y) + n * 0.05));
                 }
-                if (_Kind < 5.5)
+                else if (_Kind < 5.5)
                 {
                     // Banded giant: light zones and darker belts with turbulent edges, and (with _Spot) a great storm.
                     float turbulence = Fbm(float3(d.x * 2.5, d.y * 9, d.z * 2.5) + s);
@@ -199,16 +205,20 @@ Shader "MusicInYourHands/SolarSystemPlanet"
                     c *= 0.93 + fine * 0.1;
                     float2 storm = float2(atan2(d.z, d.x) - 0.7, (d.y + 0.36) * 3.0);
                     c = lerp(c, _ColorC.rgb, saturate(exp(-dot(storm, storm) * 16) * 1.4 * _Spot));
-                    return c;
+                    result = c;
                 }
-                // Ice giant: a calm haze with faint bands; with _Spot a dark storm and bright streaks of high cloud.
-                float haze = Fbm(s * 1.8);
-                float stripes = sin(d.y * 8 + haze * 2) * 0.5 + 0.5;
-                float3 ice = lerp(_ColorA.rgb, _ColorB.rgb, stripes * 0.35 + smoothstep(0.55, 1.0, abs(d.y)) * 0.45);
-                float2 dark = float2(atan2(d.z, d.x) + 1.2, (d.y + 0.3) * 3.2);
-                ice = lerp(ice, _ColorC.rgb, saturate(exp(-dot(dark, dark) * 20) * _Spot));
-                ice += smoothstep(0.72, 0.9, Noise(float3(d.x * 2.5, d.y * 14, d.z * 2.5) + s)) * 0.2 * _Spot;
-                return ice;
+                else
+                {
+                    // Ice giant: a calm haze with faint bands; with _Spot a dark storm and bright streaks of high cloud.
+                    float haze = Fbm(s * 1.8);
+                    float stripes = sin(d.y * 8 + haze * 2) * 0.5 + 0.5;
+                    float3 ice = lerp(_ColorA.rgb, _ColorB.rgb, stripes * 0.35 + smoothstep(0.55, 1.0, abs(d.y)) * 0.45);
+                    float2 dark = float2(atan2(d.z, d.x) + 1.2, (d.y + 0.3) * 3.2);
+                    ice = lerp(ice, _ColorC.rgb, saturate(exp(-dot(dark, dark) * 20) * _Spot));
+                    ice += smoothstep(0.72, 0.9, Noise(float3(d.x * 2.5, d.y * 14, d.z * 2.5) + s)) * 0.2 * _Spot;
+                    result = ice;
+                }
+                return result;
             }
 
             half4 frag(Varyings input) : SV_Target
@@ -218,7 +228,8 @@ Shader "MusicInYourHands/SolarSystemPlanet"
                 float3 v = normalize(GetWorldSpaceViewDir(input.positionWS));
                 float mu = saturate(dot(n, v));
                 float3 d = normalize(input.direction);
-                if (_Kind < 0.5) return half4(SunSurface(d, mu), _Alpha);
+                float visible = META_DEPTH_GET_OCCLUSION_VALUE_WORLDPOS(input.positionWS, _EnvironmentDepthBias);
+                if (_Kind < 0.5) return half4(SunSurface(d, mu), _Alpha * visible);
 
                 float3 l = normalize(_SunPos.xyz - input.positionWS);
                 float ndl = dot(n, l);
@@ -243,7 +254,7 @@ Shader "MusicInYourHands/SolarSystemPlanet"
                 color += lerp(_Air.rgb, float3(1, 1, 1), 0.5) * _Twinkle * (0.3 + rim * 1.4);
                 // Within reach of a pinch: a white rim.
                 color += float3(1.0, 0.96, 0.88) * _Highlight * (rim * 1.6 + 0.1);
-                return half4(color, _Alpha);
+                return half4(color, _Alpha * visible);
             }
             ENDHLSL
         }

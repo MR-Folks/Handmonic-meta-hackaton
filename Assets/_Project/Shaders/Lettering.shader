@@ -9,6 +9,8 @@
 // - _Outline draws a solid outline in _OutlineColor around the letters, as graffiti pieces have.
 // - _Halo adds a soft glow around the letters in their own colour, for neon tubes (Neon sign).
 // - _Reveal sprays the word on from left to right, across the text's object-space width (_Extent: min x, max x).
+// - _RoomOcclusion hides the words behind real things while the real room's depth is on (RoomOcclusion.hlsl); only the
+//   copies the worlds hidden by the real room make set it (their sung words, World.InRoom).
 Shader "MusicInYourHands/Lettering"
 {
     Properties
@@ -26,6 +28,8 @@ Shader "MusicInYourHands/Lettering"
         _Outline ("Outline 0-1", Float) = 0
         _OutlineColor ("Outline colour", Color) = (1, 1, 1, 1)
         _Alpha ("Fade", Float) = 1
+        _RoomOcclusion ("Hidden by the real room 0-1 (a world's own copy)", Float) = 0
+        _EnvironmentDepthBias ("Real-room depth bias (share of the distance)", Float) = 0.03
     }
 
     SubShader
@@ -44,7 +48,9 @@ Shader "MusicInYourHands/Lettering"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
+            #pragma multi_compile _ HARD_OCCLUSION SOFT_OCCLUSION
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "RoomOcclusion.hlsl"
 
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
@@ -63,6 +69,8 @@ Shader "MusicInYourHands/Lettering"
                 float _Outline;
                 float4 _OutlineColor;
                 float _Alpha;
+                float _RoomOcclusion;
+                float _EnvironmentDepthBias;
             CBUFFER_END
 
             struct Attributes
@@ -173,6 +181,8 @@ Shader "MusicInYourHands/Lettering"
                 }
 
                 color *= 1 + _Glow;
+                float visible = META_DEPTH_GET_OCCLUSION_VALUE_WORLDPOS(input.positionWS, _EnvironmentDepthBias);
+                alpha *= lerp(1, visible, _RoomOcclusion);
                 return half4(color, saturate(alpha * _Color.a * input.color.a * _Alpha));
             }
             ENDHLSL

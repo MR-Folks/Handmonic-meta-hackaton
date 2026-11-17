@@ -2,7 +2,8 @@
 // skin that ripples out from where it was struck. Cymbals: brass that shines and shimmers out from a strike. One mesh
 // per piece; uv1.x says which part a vertex belongs to (0 shell, 1 skin, 2 rim, 3 stand, 4 cymbal). Per piece, through
 // its property block: _Color, _Glow (a strike), _Pulse (the music), _Wake (the world fading in) and _Hit.
-// Opaque, so the kit reads as solid things standing in the room.
+// Opaque, so the kit reads as solid things standing in the room, and real things hide it behind them while the real
+// room's depth is on (RoomOcclusion.hlsl).
 Shader "MusicInYourHands/AirStringsDrum"
 {
     Properties
@@ -14,6 +15,7 @@ Shader "MusicInYourHands/AirStringsDrum"
         _Pulse ("Music pulse 0-1", Float) = 0
         _Wake ("Awake 0-1", Float) = 1
         _Hit ("Strike: xy on the skin (-1..1), z seconds since, w strength", Vector) = (0, 0, 9, 0)
+        _EnvironmentDepthBias ("Real-room depth bias (share of the distance)", Float) = 0.04
     }
 
     SubShader
@@ -31,7 +33,9 @@ Shader "MusicInYourHands/AirStringsDrum"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
+            #pragma multi_compile _ HARD_OCCLUSION SOFT_OCCLUSION
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "RoomOcclusion.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _Color;
@@ -41,6 +45,7 @@ Shader "MusicInYourHands/AirStringsDrum"
                 float _Pulse;
                 float _Wake;
                 float4 _Hit;
+                float _EnvironmentDepthBias;
             CBUFFER_END
 
             struct Attributes
@@ -137,7 +142,10 @@ Shader "MusicInYourHands/AirStringsDrum"
                 }
 
                 color *= lerp(0.15, 1, saturate(_Wake));
-                return half4(color, 1);
+                // Opaque over passthrough: where something real is in front, colour and alpha fade out together.
+                half4 result = half4(color, 1);
+                META_DEPTH_OCCLUDE_OUTPUT_PREMULTIPLY_WORLDPOS(input.positionWS, result, _EnvironmentDepthBias);
+                return result;
             }
             ENDHLSL
         }

@@ -35,6 +35,7 @@ namespace MusicInYourHands.EditorTools
             bool ok = true;
             ok &= CheckWorldCatalog();
             ok &= CheckWorldHooks();
+            ok &= CheckRoomOcclusion();
             ok &= CheckHandJoints();
             ok &= CheckDebugMaterial(out var material);
             ok &= CheckPreview(material);

@@ -14,6 +14,7 @@ Shader "MusicInYourHands/SolarSystemRings"
         _SunPower ("Sunlight (set by SolarSystem)", Float) = 1
         _Glow ("Music glow 0-1 (set by SolarSystem)", Float) = 0
         _Alpha ("Fade (set by SolarSystem)", Float) = 1
+        _EnvironmentDepthBias ("Real-room depth bias (share of the distance)", Float) = 0.03
     }
 
     SubShader
@@ -32,7 +33,9 @@ Shader "MusicInYourHands/SolarSystemRings"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
+            #pragma multi_compile _ HARD_OCCLUSION SOFT_OCCLUSION
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "RoomOcclusion.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _ColorA;
@@ -43,6 +46,7 @@ Shader "MusicInYourHands/SolarSystemRings"
                 float _SunPower;
                 float _Glow;
                 float _Alpha;
+                float _EnvironmentDepthBias;
             CBUFFER_END
 
             struct Attributes
@@ -112,7 +116,8 @@ Shader "MusicInYourHands/SolarSystemRings"
                 float tone = Bands(r * 31 + 3);
                 float3 color = lerp(_ColorB.rgb, _ColorA.rgb, saturate(tone * 0.6 + density * 0.5));
                 color *= (0.3 + 0.75 * (1 - shadow * 0.85)) * _SunPower * (1 + _Glow * 0.45);
-                return half4(color, saturate(density * 0.9 * _Alpha));
+                float visible = META_DEPTH_GET_OCCLUSION_VALUE_WORLDPOS(input.positionWS, _EnvironmentDepthBias);
+                return half4(color, saturate(density * 0.9 * _Alpha) * visible);
             }
             ENDHLSL
         }
