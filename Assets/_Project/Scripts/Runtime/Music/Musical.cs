@@ -21,7 +21,8 @@ namespace MusicInYourHands
         public static int Pitch(MusicFrame music, int wanted)
         {
             wanted = Fold(wanted);
-            var track = music.Notes;
+            // Notes made from the lyrics have the singing's timing but not its pitches: fit to the fallback scale instead.
+            var track = music.Notes != null && music.Notes.IsFromLyrics ? null : music.Notes;
             bool any = false;
             System.Array.Clear(nearby, 0, 12);
             int sounding = -1;

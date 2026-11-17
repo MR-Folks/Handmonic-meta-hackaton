@@ -33,7 +33,47 @@ namespace MusicInYourHands
         public IReadOnlyList<Note> Notes => notes;
         public bool IsEmpty => notes.Count == 0;
 
+        /// <summary>
+        /// True when the notes were made from the lyrics' word timings (<see cref="FromLyrics"/>): their times are the
+        /// singing's, but their pitches are not the song's, so nothing should be tuned to them.
+        /// </summary>
+        public bool IsFromLyrics { get; private set; }
+
         NoteTrack(List<Note> notes) => this.notes = notes;
+
+        // Pitches for notes made from lyrics: A minor pentatonic from middle C up, the scale worlds fall back to.
+        static readonly int[] LyricPitches = { 60, 62, 64, 67, 69, 72, 74, 76, 79 };
+
+        /// <summary>
+        /// For a song with timed lyrics but no .notes melody (the ElevenLabs songs, people's own songs): one note per
+        /// sung word, at the word's time and lasting until the next word (at most a second), so the worlds that play
+        /// with the melody (bubbles, rain, droplets, twinkling planets) still move with the singing. The pitches only
+        /// climb through each line and fall back at its end; they are not the sung melody (see <see cref="IsFromLyrics"/>).
+        /// <paramref name="lyricsOffset"/> is the song's lyrics offset, so the notes land when the words are shown.
+        /// </summary>
+        public static NoteTrack FromLyrics(LyricsTrack lyrics, float lyricsOffset)
+        {
+            if (lyrics == null || lyrics.Lines.Count == 0) return Empty;
+            var list = new List<Note>();
+            var lines = lyrics.Lines;
+            for (int l = 0; l < lines.Count; l++)
+            {
+                var words = lines[l].Words;
+                for (int k = 0; k < words.Length; k++)
+                {
+                    float time = words[k].Time - lyricsOffset;
+                    float next = k + 1 < words.Length ? words[k + 1].Time - lyricsOffset
+                        : l + 1 < lines.Count ? lines[l + 1].Time - lyricsOffset : time + 0.6f;
+                    float length = Math.Max(0.12f, Math.Min(1f, next - time));
+                    // Up through the first half of the line and back down, each line starting a step higher.
+                    int step = k < (words.Length + 1) / 2 ? k : words.Length - 1 - k;
+                    int midi = LyricPitches[(step + l % 3) % LyricPitches.Length];
+                    list.Add(new Note(Math.Max(0f, time), midi, length));
+                }
+            }
+            list.Sort((a, b) => a.Time.CompareTo(b.Time));
+            return new NoteTrack(list) { IsFromLyrics = true };
+        }
 
         public static NoteTrack Parse(string text)
         {
