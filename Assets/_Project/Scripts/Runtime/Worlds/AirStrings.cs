@@ -11,12 +11,14 @@ namespace MusicInYourHands
     /// can follow the melody if you like, but nothing is scored and nothing is wrong. Plucks ring along the string,
     /// throw off sparks and a few notes of light that float up, and give your fingertip a little shiver.
     ///
-    /// Round the harp stands a ring of nine neon taiko drums, their skins tilted towards you: small high ones beside
-    /// the harp, bigger and deeper ones further round, and the biggest behind you. They arrive with the music: first
-    /// a single boom behind you, then one more drum on each beat, each from its own place round your head, until all
-    /// nine are there. Strike a skin with your palm or fingers and it booms from where it stands, a ripple runs out
-    /// from where you hit it and a ring of light spreads across the floor beneath it. Between strikes the big drums
-    /// breathe with the bass and the small ones with the higher sounds.
+    /// Round the harp stands a drum kit: nine neon taiko drums with their skins tilted towards you (small high ones
+    /// beside the harp, bigger and deeper ones further round, the biggest behind you) and four brass cymbals on stands
+    /// above them, as on a drum set: a hi-hat on the left, a ride on the right and a crash and a splash further round.
+    /// Strike a skin or a cymbal with your palm or fingers and it sounds from where it stands, louder the harder you
+    /// hit, and rings on for a while: the drums boom and the cymbals shimmer. A drum's skin ripples out from where you
+    /// hit it and a ring of light spreads across the floor beneath it; a cymbal swings and its shine runs out across
+    /// the metal. Between strikes the big drums breathe with the bass and the small ones and the cymbals with the
+    /// higher sounds.
     /// </summary>
     public class AirStrings : World
     {
@@ -28,7 +30,7 @@ namespace MusicInYourHands
 
         public override int MenuIcon => 3;
 
-        public override string Hint => "Brush the strings, or drum on the drums around you";
+        public override string Hint => "Brush the strings, or play the drums and cymbals around you";
 
         public override HandTheme Theme => new HandTheme
         {
@@ -61,15 +63,13 @@ namespace MusicInYourHands
         [Tooltip("How close (m) to a string's line a fingertip must pass for it to pluck.")]
         [SerializeField] float reach = 0.035f;
 
-        [Header("Drums")]
-        [Tooltip("How fast (m/s) a palm or fingertip must come down onto a skin for the drum to sound.")]
+        [Header("Drums and cymbals")]
+        [Tooltip("How fast (m/s) a palm or fingertip must come down onto a skin or cymbal for it to sound.")]
         [SerializeField] float strikeSpeed = 0.35f;
-        [Tooltip("How fast (m/s) a strike must be for the loudest boom.")]
+        [Tooltip("How fast (m/s) a strike must be for the loudest sound.")]
         [SerializeField] float fullStrikeSpeed = 2f;
-        [Tooltip("Seconds before the same hand can strike the same drum again.")]
+        [Tooltip("Seconds before the same hand can strike the same drum or cymbal again.")]
         [SerializeField] float strikeRest = 0.12f;
-        [Tooltip("Seconds a drum waits to arrive when no beat comes.")]
-        [SerializeField] float wakeWithoutBeat = 1.2f;
 
         static readonly int ColorId = Shader.PropertyToID("_Color");
         static readonly int GlowId = Shader.PropertyToID("_Glow");
@@ -101,24 +101,29 @@ namespace MusicInYourHands
             public int Midi;
         }
 
-        /// <summary>One drum of the ring: where it stands round you, its size, and its sound.</summary>
-        readonly struct DrumSpec
+        enum Kind { Drum, HiHat, Ride, Crash, Splash }
+
+        /// <summary>One piece of the kit, a drum or a cymbal: where it stands round you, its size, and its sound.</summary>
+        readonly struct PieceSpec
         {
+            public readonly Kind Kind;
             /// <summary>Degrees round from straight ahead, positive to the right.</summary>
             public readonly float Angle;
-            /// <summary>How far out from below your eyes its skin's centre is (m).</summary>
+            /// <summary>How far out from below your eyes its centre is (m).</summary>
             public readonly float Distance;
-            /// <summary>Height of its skin's centre relative to your eyes (m).</summary>
+            /// <summary>Height of its centre (a drum's skin, a cymbal's bell) relative to your eyes (m).</summary>
             public readonly float Height;
+            /// <summary>Its radius, and for a drum the depth of its barrel (m).</summary>
             public readonly float Radius, Depth;
-            /// <summary>How far its skin leans towards you from level (degrees).</summary>
+            /// <summary>How far it leans towards you from level (degrees).</summary>
             public readonly float Tilt;
-            /// <summary>Its boom's pitch (Hz) and how fast the boom dies away (per second).</summary>
+            /// <summary>A drum's pitch (Hz), and how fast the sound dies away (per second).</summary>
             public readonly float Pitch, Decay;
             public readonly Color Color;
 
-            public DrumSpec(float angle, float distance, float height, float radius, float depth, float tilt, float pitch, float decay, Color color)
+            public PieceSpec(Kind kind, float angle, float distance, float height, float radius, float depth, float tilt, float pitch, float decay, Color color)
             {
+                Kind = kind;
                 Angle = angle;
                 Distance = distance;
                 Height = height;
@@ -129,52 +134,63 @@ namespace MusicInYourHands
                 Decay = decay;
                 Color = color;
             }
+
+            public bool IsCymbal => Kind != Kind.Drum;
         }
 
-        // In the order they arrive: the big drum behind you first, then round both sides towards the small ones beside
-        // the harp. The front is left to the harp.
-        static readonly DrumSpec[] Kit =
+        // The front is left to the harp. The drums stand in a ring at hand height, the cymbals above the gaps between
+        // them, higher up, as on a drum set.
+        static readonly PieceSpec[] Kit =
         {
-            new DrumSpec(180f, 0.8f, -0.58f, 0.2f, 0.36f, 42f, 55f, 3.5f, new Color(1f, 0.3f, 0.68f)),
-            new DrumSpec(150f, 0.66f, -0.6f, 0.16f, 0.3f, 30f, 69f, 4.5f, new Color(0.95f, 0.36f, 0.86f)),
-            new DrumSpec(-150f, 0.66f, -0.6f, 0.16f, 0.3f, 30f, 65f, 4.5f, new Color(0.56f, 0.5f, 1f)),
-            new DrumSpec(122f, 0.6f, -0.55f, 0.145f, 0.26f, 26f, 87f, 5.5f, new Color(1f, 0.28f, 0.52f)),
-            new DrumSpec(-122f, 0.6f, -0.55f, 0.145f, 0.26f, 26f, 78f, 5.5f, new Color(0.62f, 0.42f, 1f)),
-            new DrumSpec(94f, 0.53f, -0.45f, 0.11f, 0.19f, 30f, 131f, 7.5f, new Color(1f, 0.34f, 0.64f)),
-            new DrumSpec(-94f, 0.53f, -0.45f, 0.11f, 0.19f, 30f, 117f, 7.5f, new Color(0.72f, 0.45f, 1f)),
-            new DrumSpec(68f, 0.48f, -0.36f, 0.085f, 0.13f, 34f, 196f, 11f, new Color(1f, 0.44f, 0.8f)),
-            new DrumSpec(-68f, 0.48f, -0.36f, 0.085f, 0.13f, 34f, 175f, 11f, new Color(0.86f, 0.46f, 1f))
+            new PieceSpec(Kind.Drum, 180f, 0.8f, -0.58f, 0.2f, 0.36f, 42f, 55f, 1.4f, new Color(1f, 0.3f, 0.68f)),
+            new PieceSpec(Kind.Drum, 150f, 0.66f, -0.6f, 0.16f, 0.3f, 30f, 69f, 1.8f, new Color(0.95f, 0.36f, 0.86f)),
+            new PieceSpec(Kind.Drum, -150f, 0.66f, -0.6f, 0.16f, 0.3f, 30f, 65f, 1.8f, new Color(0.56f, 0.5f, 1f)),
+            new PieceSpec(Kind.Drum, 122f, 0.6f, -0.55f, 0.145f, 0.26f, 26f, 87f, 2.1f, new Color(1f, 0.28f, 0.52f)),
+            new PieceSpec(Kind.Drum, -122f, 0.6f, -0.55f, 0.145f, 0.26f, 26f, 78f, 2.1f, new Color(0.62f, 0.42f, 1f)),
+            new PieceSpec(Kind.Drum, 94f, 0.53f, -0.45f, 0.11f, 0.19f, 30f, 131f, 2.7f, new Color(1f, 0.34f, 0.64f)),
+            new PieceSpec(Kind.Drum, -94f, 0.53f, -0.45f, 0.11f, 0.19f, 30f, 117f, 2.7f, new Color(0.72f, 0.45f, 1f)),
+            new PieceSpec(Kind.Drum, 68f, 0.48f, -0.36f, 0.085f, 0.13f, 34f, 196f, 3.4f, new Color(1f, 0.44f, 0.8f)),
+            new PieceSpec(Kind.Drum, -68f, 0.48f, -0.36f, 0.085f, 0.13f, 34f, 175f, 3.4f, new Color(0.86f, 0.46f, 1f)),
+            new PieceSpec(Kind.HiHat, -81f, 0.47f, -0.19f, 0.12f, 0f, 8f, 0f, 7f, new Color(1f, 0.8f, 0.42f)),
+            new PieceSpec(Kind.Ride, 81f, 0.5f, -0.12f, 0.17f, 0f, 14f, 0f, 0.9f, new Color(1f, 0.72f, 0.38f)),
+            new PieceSpec(Kind.Crash, -108f, 0.6f, -0.02f, 0.17f, 0f, 24f, 0f, 1.1f, new Color(1f, 0.86f, 0.5f)),
+            new PieceSpec(Kind.Splash, 108f, 0.6f, -0.03f, 0.13f, 0f, 24f, 0f, 2.4f, new Color(1f, 0.76f, 0.52f))
         };
 
-        sealed class Drum
+        sealed class Piece
         {
-            public DrumSpec Spec;
+            public PieceSpec Spec;
             public Transform Root;
             public MeshRenderer Renderer;
             public Mesh Mesh;
+            public AudioSource Voice;
             public AudioClip Sound;
             public Renderer Wave;
             public Vector3 Centre, Normal, Foot;
+            /// <summary>Level, from you out towards it.</summary>
+            public Vector3 Outward;
+            public Quaternion Rest;
             /// <summary>False when a scanned wall leaves no room for it.</summary>
             public bool Placed;
-            /// <summary>Seconds since it arrived, or below 0 while it hasn't yet.</summary>
-            public float WakeAge = -1f;
-            public float Wake, Glow, Pulse;
-            /// <summary>The last strike: where on the skin (-1..1), seconds since, and how hard.</summary>
+            public float Glow, Pulse;
+            /// <summary>The last strike: where on it (-1..1), seconds since, and how hard.</summary>
             public Vector4 Hit = new Vector4(0f, 0f, 9f, 0f);
             public float WaveAge = -1f, WaveStrength;
-            public readonly float[] Rest = new float[2];
+            /// <summary>A struck cymbal's swing: seconds since, how far (degrees) and about which axis.</summary>
+            public float SwingAge = -1f, Swing;
+            public Vector3 SwingAxis = Vector3.right;
+            public readonly float[] Wait = new float[2];
             public readonly bool[] Armed = { true, true };
         }
 
         // Each hand strikes with its palm and its five fingertips.
         const int HitPoints = 6;
-        // Segments round a drum.
+        // Segments round a drum or a cymbal.
         const int Around = 28;
 
         HarpString[] strings;
         Vector3[] path;
-        AudioPool voices, drumVoices;
+        AudioPool voices;
         ParticleSystem sparks, notes;
         MaterialPropertyBlock block;
         readonly float[,] lastSide = new float[10, 8];
@@ -183,9 +199,12 @@ namespace MusicInYourHands
         float beatTime = -10f;
         MusicFrame frame;
 
-        Drum[] drums;
-        int arrived;
-        float sinceArrival;
+        Piece[] pieces;
+        // The kit's sounds are made once per run, on a worker thread started as the app loads (see MakeSoundsEarly).
+        static System.Threading.Tasks.Task<float[][]> soundWork;
+        static int soundRate;
+        float[][] soundData;
+        int soundsMade;
         readonly Vector3[] handPoints = new Vector3[HitPoints];
         readonly float[,] lastHeight = new float[Kit.Length, HitPoints * 2];
         readonly bool[,] hadHeight = new bool[Kit.Length, HitPoints * 2];
@@ -220,24 +239,21 @@ namespace MusicInYourHands
             notes = Effects.MakeSparkSystem("Notes", transform, glowMaterial);
             var main = notes.main;
             main.gravityModifier = -0.02f;
-            BuildDrums();
+            BuildKit();
         }
 
         protected override void OnEnter()
         {
             System.Array.Clear(hadSide, 0, hadSide.Length);
-            // The drums arrive again, one by one, each time the world starts.
             System.Array.Clear(hadHeight, 0, hadHeight.Length);
-            arrived = 0;
-            sinceArrival = wakeWithoutBeat * 0.6f;
-            foreach (var d in drums)
+            // The kit stands ready from the start; it is shown once it has been placed round you.
+            foreach (var p in pieces)
             {
-                d.WakeAge = -1f;
-                d.Wake = d.Glow = d.Pulse = 0f;
-                d.WaveAge = -1f;
-                d.Armed[0] = d.Armed[1] = true;
-                d.Root.gameObject.SetActive(false);
-                d.Wave.gameObject.SetActive(false);
+                p.Glow = p.Pulse = 0f;
+                p.WaveAge = p.SwingAge = -1f;
+                p.Armed[0] = p.Armed[1] = true;
+                p.Root.gameObject.SetActive(false);
+                p.Wave.gameObject.SetActive(false);
             }
         }
 
@@ -258,15 +274,11 @@ namespace MusicInYourHands
                 var tangent = side + forward * (2f * curve * x / Mathf.Max(width * 0.5f, 0.01f));
                 s.Normal = tangent.normalized;
             }
-            PlaceDrums(view);
+            PlaceKit(view);
         }
 
-        /// <summary>Each beat sends a pulse up the strings, one after the other, and brings the next drum.</summary>
-        protected override void OnBeat(MusicFrame music)
-        {
-            beatTime = Now;
-            if (arrived < drums.Length) Arrive(true);
-        }
+        /// <summary>Each beat sends a pulse up the strings, one after the other.</summary>
+        protected override void OnBeat(MusicFrame music) => beatTime = Now;
 
         /// <summary>
         /// Each sung word appears beside the string that hums its note (or the next string along) and glides up it,
@@ -293,7 +305,8 @@ namespace MusicInYourHands
                 Strum(rig, dt);
                 Strike(rig, dt);
             }
-            DrawDrums(music, dt);
+            FinishSounds();
+            DrawKit(music, dt);
 
             for (int i = 0; i < stringCount; i++)
             {
@@ -492,84 +505,110 @@ namespace MusicInYourHands
             s.Ripple.SetPropertyBlock(block);
         }
 
-        // ---- The drums ----
+        // ---- The drum kit ----
 
-        void BuildDrums()
+        void BuildKit()
         {
-            drums = new Drum[Kit.Length];
+            pieces = new Piece[Kit.Length];
             for (int i = 0; i < Kit.Length; i++)
             {
                 var spec = Kit[i];
-                var go = new GameObject($"Drum {i}");
+                var go = new GameObject(spec.IsCymbal ? $"Cymbal {i} ({spec.Kind})" : $"Drum {i}");
                 go.transform.SetParent(transform, false);
-                var mesh = new Mesh { name = $"Drum {i}" };
+                var mesh = new Mesh { name = go.name };
                 go.AddComponent<MeshFilter>().sharedMesh = mesh;
                 var r = go.AddComponent<MeshRenderer>();
                 r.sharedMaterial = drumMaterial;
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 r.receiveShadows = false;
+                // Each piece has its own voice, so its sound rings on from where it stands while others are struck.
+                var voice = go.AddComponent<AudioSource>();
+                voice.playOnAwake = false;
+                voice.spatialBlend = 1f;
+                voice.minDistance = 0.4f;
+                voice.maxDistance = 6f;
+                voice.rolloffMode = AudioRolloffMode.Logarithmic;
+                voice.dopplerLevel = 0f;
                 go.SetActive(false);
-                drums[i] = new Drum
+                pieces[i] = new Piece
                 {
                     Spec = spec,
                     Root = go.transform,
                     Renderer = r,
                     Mesh = mesh,
-                    Sound = MakeDrumSound($"Drum {i}", spec.Pitch, spec.Decay, 31 + i),
+                    Voice = voice,
                     Wave = Effects.MakeQuad($"Drum Wave {i}", transform, ringMaterial)
                 };
-                drums[i].Wave.gameObject.SetActive(false);
+                pieces[i].Wave.gameObject.SetActive(false);
             }
-            drumVoices = new AudioPool(transform, 10);
+            StartSounds();
         }
 
         /// <summary>
-        /// Stands the drums in a ring round you, at your height, their skins leaning towards you. With a room scan, a
-        /// drum that would stand in a wall comes closer, or stays away when there is no room for it at all.
+        /// Stands the kit round you at your height, leaning towards you. With a room scan, a piece that would stand in a
+        /// wall comes closer, or stays away when there is no room for it at all.
         /// </summary>
-        void PlaceDrums(Camera view)
+        void PlaceKit(Camera view)
         {
             var forward = Effects.FlatForward(view);
             var side = Vector3.Cross(Vector3.up, forward).normalized;
             var eye = view.transform.position;
             float floorY = Effects.FloorY(view);
-            foreach (var d in drums)
+            foreach (var p in pieces)
             {
-                var s = d.Spec;
+                var s = p.Spec;
                 float angle = s.Angle * Mathf.Deg2Rad;
                 var outward = forward * Mathf.Cos(angle) + side * Mathf.Sin(angle);
                 float distance = s.Distance;
-                d.Placed = true;
+                p.Placed = true;
                 if (Room.Scanned && Room.Hit(Room.Walls, eye + Vector3.up * s.Height, outward, out _, out float wall))
                 {
                     distance = Mathf.Min(distance, wall - s.Radius - 0.08f);
-                    if (distance < 0.34f) d.Placed = false;
+                    if (distance < 0.34f) p.Placed = false;
                 }
-                d.Centre = eye + outward * distance + Vector3.up * s.Height;
+                p.Centre = eye + outward * distance + Vector3.up * s.Height;
+                p.Outward = outward;
                 float tilt = s.Tilt * Mathf.Deg2Rad;
-                d.Normal = (Vector3.up * Mathf.Cos(tilt) - outward * Mathf.Sin(tilt)).normalized;
-                var across = Vector3.ProjectOnPlane(-outward, d.Normal).normalized;
-                d.Root.localScale = Vector3.one;
-                d.Root.SetPositionAndRotation(d.Centre, Quaternion.LookRotation(across, d.Normal));
-                d.Foot = new Vector3(d.Centre.x, floorY + 0.004f, d.Centre.z);
-                BuildDrumMesh(d, floorY);
-                if (!d.Placed) d.Root.gameObject.SetActive(false);
+                p.Normal = (Vector3.up * Mathf.Cos(tilt) - outward * Mathf.Sin(tilt)).normalized;
+                var across = Vector3.ProjectOnPlane(-outward, p.Normal).normalized;
+                p.Rest = Quaternion.LookRotation(across, p.Normal);
+                p.Root.localScale = Vector3.one;
+                p.Root.SetPositionAndRotation(p.Centre, p.Rest);
+                p.Foot = new Vector3(p.Centre.x, floorY + 0.004f, p.Centre.z);
+                if (s.IsCymbal) BuildCymbalMesh(p, floorY);
+                else BuildDrumMesh(p, floorY);
+                p.Root.gameObject.SetActive(p.Placed);
             }
+        }
+
+        void ClearMesh()
+        {
+            meshVertices.Clear();
+            meshNormals.Clear();
+            meshUvs.Clear();
+            meshParts.Clear();
+            meshTriangles.Clear();
+        }
+
+        void ApplyMesh(Mesh mesh)
+        {
+            mesh.Clear();
+            mesh.SetVertices(meshVertices);
+            mesh.SetNormals(meshNormals);
+            mesh.SetUVs(0, meshUvs);
+            mesh.SetUVs(1, meshParts);
+            mesh.SetTriangles(meshTriangles, 0);
+            mesh.RecalculateBounds();
         }
 
         /// <summary>
         /// A taiko drum in its own space, its skin's centre at the origin facing up: a barrel bulging a little at its
         /// middle, the skin, a bottom, a rim at each end, and three legs down to the floor.
         /// </summary>
-        void BuildDrumMesh(Drum d, float floorY)
+        void BuildDrumMesh(Piece p, float floorY)
         {
-            var s = d.Spec;
-            meshVertices.Clear();
-            meshNormals.Clear();
-            meshUvs.Clear();
-            meshParts.Clear();
-            meshTriangles.Clear();
-
+            var s = p.Spec;
+            ClearMesh();
             const int along = 6;
             for (int j = 0; j <= along; j++)
             {
@@ -601,22 +640,87 @@ namespace MusicInYourHands
             {
                 float angle = (k / 3f + 0.25f) * Mathf.PI * 2f;
                 var top = new Vector3(Mathf.Cos(angle) * s.Radius * 0.98f, -s.Depth * 0.72f, Mathf.Sin(angle) * s.Radius * 0.98f);
-                var topWorld = d.Root.TransformPoint(top);
+                var topWorld = p.Root.TransformPoint(top);
                 if (topWorld.y - floorY < 0.06f) continue;
-                var spread = Vector3.ProjectOnPlane(topWorld - d.Centre, Vector3.up);
+                var spread = Vector3.ProjectOnPlane(topWorld - p.Centre, Vector3.up);
                 if (spread.sqrMagnitude > 1e-6f) spread = spread.normalized * (s.Radius * 0.55f);
                 var footWorld = new Vector3(topWorld.x, floorY, topWorld.z) + spread;
-                AddRod(top, d.Root.InverseTransformPoint(footWorld), 0.006f);
+                AddRod(top, p.Root.InverseTransformPoint(footWorld), 0.006f);
+            }
+            ApplyMesh(p.Mesh);
+        }
+
+        /// <summary>
+        /// A cymbal in its own space, its bell at the origin facing up: a shallow bowed disc with a raised bell (two of
+        /// them, closed together, for the hi-hat), on a stand with a pole and three feet.
+        /// </summary>
+        void BuildCymbalMesh(Piece p, float floorY)
+        {
+            var s = p.Spec;
+            ClearMesh();
+            int plates = s.Kind == Kind.HiHat ? 2 : 1;
+            const int rings = 12;
+            for (int plate = 0; plate < plates; plate++)
+            {
+                // The hi-hat's lower plate sits just below, facing up into the top one.
+                float flip = plate == 0 ? 1f : -1f;
+                float drop = plate == 0 ? 0f : -0.016f;
+                int start = meshVertices.Count;
+                for (int j = 0; j <= rings; j++)
+                {
+                    float t = j / (float)rings;
+                    float height = CymbalProfile(t) * s.Radius;
+                    float slope = CymbalSlope(t);
+                    for (int i = 0; i <= Around; i++)
+                    {
+                        float u = i / (float)Around;
+                        var radial = new Vector3(Mathf.Cos(u * Mathf.PI * 2f), 0f, Mathf.Sin(u * Mathf.PI * 2f));
+                        var normal = (Vector3.up - radial * slope).normalized * flip;
+                        AddVertex(radial * (s.Radius * t) + Vector3.up * (drop + height * flip), normal,
+                            new Vector2(radial.x * t, radial.z * t), 4f);
+                    }
+                }
+                for (int j = 0; j < rings; j++)
+                {
+                    for (int i = 0; i < Around; i++)
+                    {
+                        int a = start + j * (Around + 1) + i;
+                        int b = a + Around + 1;
+                        AddQuad(a, a + 1, b + 1, b);
+                    }
+                }
             }
 
-            var mesh = d.Mesh;
-            mesh.Clear();
-            mesh.SetVertices(meshVertices);
-            mesh.SetNormals(meshNormals);
-            mesh.SetUVs(0, meshUvs);
-            mesh.SetUVs(1, meshParts);
-            mesh.SetTriangles(meshTriangles, 0);
-            mesh.RecalculateBounds();
+            // The stand: a boom from under the bell leaning out and down, beyond the drums, to three feet on the floor.
+            var under = Vector3.down * (plates == 2 ? 0.03f : 0.012f);
+            var underWorld = p.Root.TransformPoint(under);
+            if (underWorld.y - floorY > 0.1f)
+            {
+                var standWorld = new Vector3(underWorld.x, floorY, underWorld.z) + p.Outward * 0.35f;
+                var hubWorld = standWorld + Vector3.up * 0.12f;
+                AddRod(under, p.Root.InverseTransformPoint(hubWorld), 0.008f);
+                for (int k = 0; k < 3; k++)
+                {
+                    float angle = k / 3f * Mathf.PI * 2f + 0.5f;
+                    var footWorld = standWorld + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * 0.16f;
+                    AddRod(p.Root.InverseTransformPoint(hubWorld), p.Root.InverseTransformPoint(footWorld), 0.006f);
+                }
+            }
+            ApplyMesh(p.Mesh);
+        }
+
+        /// <summary>A cymbal's height (share of its radius) at a share t of the way out: a raised bell and a shallow bow.</summary>
+        static float CymbalProfile(float t)
+        {
+            float bell = t < 0.22f ? Mathf.Sqrt(1f - t * t / (0.22f * 0.22f)) * 0.1f : 0f;
+            return bell + 0.05f * (1f - t);
+        }
+
+        /// <summary>The slope of <see cref="CymbalProfile"/> (height per distance out).</summary>
+        static float CymbalSlope(float t)
+        {
+            float bell = t < 0.21f ? -0.1f * t / (0.22f * 0.22f) / Mathf.Sqrt(1f - t * t / (0.22f * 0.22f)) : 0f;
+            return Mathf.Clamp(bell, -3f, 0f) - 0.05f;
         }
 
         void AddVertex(Vector3 position, Vector3 normal, Vector2 uv, float part)
@@ -645,8 +749,8 @@ namespace MusicInYourHands
             for (int i = 0; i <= Around; i++)
             {
                 float u = i / (float)Around;
-                var p = new Vector2(Mathf.Cos(u * Mathf.PI * 2f), Mathf.Sin(u * Mathf.PI * 2f));
-                AddVertex(new Vector3(p.x * radius, y, p.y * radius), normal, skin ? p : new Vector2(u, 1f), part);
+                var q = new Vector2(Mathf.Cos(u * Mathf.PI * 2f), Mathf.Sin(u * Mathf.PI * 2f));
+                AddVertex(new Vector3(q.x * radius, y, q.y * radius), normal, skin ? q : new Vector2(u, 1f), part);
             }
             for (int i = 0; i < Around; i++)
             {
@@ -674,7 +778,7 @@ namespace MusicInYourHands
             }
         }
 
-        /// <summary>A thin four-sided rod: a leg of the stand.</summary>
+        /// <summary>A thin four-sided rod: a leg or a pole of a stand.</summary>
         void AddRod(Vector3 from, Vector3 to, float radius)
         {
             var along = (to - from).normalized;
@@ -696,27 +800,9 @@ namespace MusicInYourHands
             }
         }
 
-        /// <summary>The next drum arrives, with a soft boom from where it stands when it comes on a beat.</summary>
-        void Arrive(bool boom)
-        {
-            sinceArrival = 0f;
-            while (arrived < drums.Length)
-            {
-                var d = drums[arrived++];
-                if (!d.Placed) continue;
-                d.WakeAge = 0f;
-                d.Glow = 0.8f;
-                d.Hit = new Vector4(0f, 0f, 0f, 0.6f);
-                d.WaveAge = 0f;
-                d.WaveStrength = 0.5f;
-                if (boom) drumVoices.Play(d.Sound, d.Centre, 0.25f);
-                return;
-            }
-        }
-
         /// <summary>
-        /// A palm or fingertip coming down through a drum's skin, inside its rim and fast enough, strikes it: louder
-        /// the faster it came. The hand has to lift clear of the skin before it can strike that drum again.
+        /// A palm or fingertip coming down through a skin or a cymbal, inside its edge and fast enough, strikes it:
+        /// louder the faster it came. The hand has to lift clear before it can strike that piece again.
         /// </summary>
         void Strike(HandRig rig, float dt)
         {
@@ -727,11 +813,14 @@ namespace MusicInYourHands
                 bool live = hand.IsTracked && !MenuOpen;
                 handPoints[0] = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
                 for (int f = 0; f < 5; f++) handPoints[f + 1] = hand.TipJoints[f] != null ? hand.TipJoints[f].position : hand.Tips[f];
-                for (int i = 0; i < drums.Length; i++)
+                for (int i = 0; i < pieces.Length; i++)
                 {
-                    var d = drums[i];
-                    d.Rest[side] -= dt;
-                    bool usable = live && d.Placed && d.Wake > 0.6f;
+                    var p = pieces[i];
+                    p.Wait[side] -= dt;
+                    bool usable = live && p.Placed;
+                    // How far below its surface a hand still counts as striking it: through a drum's barrel, or just
+                    // past a thin cymbal.
+                    float below = p.Spec.IsCymbal ? 0.07f : p.Spec.Depth;
                     bool clear = true;
                     for (int k = 0; k < HitPoints; k++)
                     {
@@ -741,50 +830,62 @@ namespace MusicInYourHands
                             hadHeight[i, slot] = false;
                             continue;
                         }
-                        var offset = handPoints[k] - d.Centre;
-                        float height = Vector3.Dot(offset, d.Normal);
-                        var across = offset - d.Normal * height;
-                        bool over = across.sqrMagnitude < d.Spec.Radius * d.Spec.Radius * 1.17f;
+                        var offset = handPoints[k] - p.Centre;
+                        float height = Vector3.Dot(offset, p.Normal);
+                        var across = offset - p.Normal * height;
+                        bool over = across.sqrMagnitude < p.Spec.Radius * p.Spec.Radius * 1.17f;
                         if (over && height < 0.03f) clear = false;
-                        if (hadHeight[i, slot] && over && lastHeight[i, slot] > 0f && height <= 0.004f && height > -d.Spec.Depth
-                            && d.Armed[side] && d.Rest[side] <= 0f && dt > 0f)
+                        if (hadHeight[i, slot] && over && lastHeight[i, slot] > 0f && height <= 0.004f && height > -below
+                            && p.Armed[side] && p.Wait[side] <= 0f && dt > 0f)
                         {
                             float speed = (lastHeight[i, slot] - height) / dt;
                             if (speed > strikeSpeed)
                             {
-                                Boom(d, across, Mathf.Clamp01((speed - strikeSpeed) / Mathf.Max(fullStrikeSpeed - strikeSpeed, 0.1f)));
-                                d.Rest[side] = strikeRest;
-                                d.Armed[side] = false;
+                                Sound(p, across, Mathf.Clamp01((speed - strikeSpeed) / Mathf.Max(fullStrikeSpeed - strikeSpeed, 0.1f)));
+                                p.Wait[side] = strikeRest;
+                                p.Armed[side] = false;
                                 shiver[side] = 1f;
-                                Acted("drum");
+                                Acted(p.Spec.IsCymbal ? "cymbal" : "drum");
                             }
                         }
                         lastHeight[i, slot] = height;
                         hadHeight[i, slot] = true;
                     }
-                    if (clear) d.Armed[side] = true;
+                    if (clear) p.Armed[side] = true;
                 }
             }
         }
 
-        void Boom(Drum d, Vector3 across, float strength)
+        void Sound(Piece p, Vector3 across, float strength)
         {
             float loud = 0.3f + 0.7f * strength;
-            d.Glow = 1f;
-            var local = d.Root.InverseTransformDirection(across) / Mathf.Max(d.Spec.Radius, 1e-3f);
-            d.Hit = new Vector4(local.x, local.z, 0f, loud);
-            d.WaveAge = 0f;
-            d.WaveStrength = loud;
-            drumVoices.Play(d.Sound, d.Centre, 0.4f + 0.6f * strength, Random.Range(0.97f, 1.03f));
+            p.Glow = 1f;
+            var local = p.Root.InverseTransformDirection(across) / Mathf.Max(p.Spec.Radius, 1e-3f);
+            p.Hit = new Vector4(local.x, local.z, 0f, loud);
+            if (p.Sound != null && p.Voice.isActiveAndEnabled) p.Voice.PlayOneShot(p.Sound, 0.4f + 0.6f * strength);
 
-            var at = d.Centre + across + d.Normal * 0.01f;
+            if (p.Spec.IsCymbal)
+            {
+                // The cymbal swings about the line across it, away from where it was struck.
+                p.SwingAge = 0f;
+                p.Swing = (p.Spec.Kind == Kind.HiHat ? 3f : 7f) * (0.4f + strength);
+                var axis = Vector3.Cross(p.Normal, across);
+                p.SwingAxis = axis.sqrMagnitude > 1e-8f ? axis.normalized : p.Root.right;
+            }
+            else
+            {
+                p.WaveAge = 0f;
+                p.WaveStrength = loud;
+            }
+
+            var at = p.Centre + across + p.Normal * 0.01f;
             for (int k = 0; k < 8 + (int)(strength * 10f); k++)
             {
                 sparks.Emit(new ParticleSystem.EmitParams
                 {
                     position = at + Random.insideUnitSphere * 0.02f,
-                    velocity = d.Normal * Random.Range(0.1f, 0.4f) + Random.insideUnitSphere * 0.15f,
-                    startColor = Color.Lerp(d.Spec.Color, Color.white, Random.Range(0f, 0.4f)),
+                    velocity = p.Normal * Random.Range(0.1f, 0.4f) + Random.insideUnitSphere * 0.15f,
+                    startColor = Color.Lerp(p.Spec.Color, Color.white, Random.Range(0f, 0.4f)),
                     startSize = Random.Range(0.005f, 0.012f),
                     startLifetime = Random.Range(0.35f, 0.8f)
                 }, 1);
@@ -792,121 +893,351 @@ namespace MusicInYourHands
         }
 
         /// <summary>
-        /// The drums arrive (popping up out of nothing), breathe with the music, and show their last strike: a glow,
-        /// the ripple on the skin, and a ring of light spreading on the floor below.
+        /// The kit breathes with the music and shows its last strikes: a glow, a drum's skin rippling and a ring of light
+        /// spreading on the floor below it, a cymbal swinging with its shine running out across the metal.
         /// </summary>
-        void DrawDrums(MusicFrame music, float dt)
+        void DrawKit(MusicFrame music, float dt)
         {
-            sinceArrival += dt;
-            if (arrived < drums.Length && sinceArrival > wakeWithoutBeat) Arrive(false);
-            foreach (var d in drums)
+            foreach (var p in pieces)
             {
-                bool shown = d.Placed && d.WakeAge >= 0f;
-                if (d.Root.gameObject.activeSelf != shown) d.Root.gameObject.SetActive(shown);
-                if (!shown)
+                if (!p.Placed || !p.Root.gameObject.activeSelf)
                 {
-                    if (d.Wave.gameObject.activeSelf) d.Wave.gameObject.SetActive(false);
+                    if (p.Wave.gameObject.activeSelf) p.Wave.gameObject.SetActive(false);
                     continue;
                 }
-                d.WakeAge += dt;
-                d.Wake = Mathf.Clamp01(d.WakeAge / 0.5f);
-                d.Root.localScale = Vector3.one * Mathf.Max(EaseOutBack(d.Wake), 0.001f);
-
-                // The big drums breathe with the bass and the kick, the middle ones with the low sounds, the small
-                // ones with the middle of the music.
-                float target = d.Spec.Radius > 0.14f ? music.Band(0) * 0.55f + music.Kick * 0.5f
-                    : d.Spec.Radius > 0.1f ? music.Band(1) * 0.7f
+                var s = p.Spec;
+                // The big drums breathe with the bass and the kick, the middle ones with the low sounds, the small ones
+                // with the middle of the music, and the cymbals with its top.
+                float target = s.IsCymbal ? music.Band(s.Kind == Kind.HiHat || s.Kind == Kind.Ride ? 4 : 5) * 0.7f
+                    : s.Radius > 0.14f ? music.Band(0) * 0.55f + music.Kick * 0.5f
+                    : s.Radius > 0.1f ? music.Band(1) * 0.7f
                     : music.Band(3) * 0.8f;
-                d.Pulse = Mathf.Lerp(d.Pulse, Mathf.Clamp01(target), 1f - Mathf.Exp(-dt * 12f));
-                d.Glow = Mathf.MoveTowards(d.Glow, 0f, dt * 2.2f);
-                d.Hit.z += dt;
+                p.Pulse = Mathf.Lerp(p.Pulse, Mathf.Clamp01(target), 1f - Mathf.Exp(-dt * 12f));
+                p.Glow = Mathf.MoveTowards(p.Glow, 0f, dt * (s.IsCymbal ? 1.2f : 2.2f));
+                p.Hit.z += dt;
+
+                if (p.SwingAge >= 0f)
+                {
+                    p.SwingAge += dt;
+                    float fade = Mathf.Exp(-p.SwingAge * 2.4f);
+                    float angle = p.Swing * Mathf.Sin(p.SwingAge * 12f) * fade;
+                    p.Root.rotation = Quaternion.AngleAxis(angle, p.SwingAxis) * p.Rest;
+                    if (fade < 0.01f)
+                    {
+                        p.SwingAge = -1f;
+                        p.Root.rotation = p.Rest;
+                    }
+                }
 
                 block.Clear();
-                block.SetColor(ColorId, d.Spec.Color);
-                block.SetFloat(GlowId, d.Glow);
-                block.SetFloat(PulseId, d.Pulse);
-                block.SetFloat(WakeId, Mathf.Lerp(0.3f, 1f, d.Wake));
-                block.SetVector(HitId, d.Hit);
-                d.Renderer.SetPropertyBlock(block);
-                DrawWave(d, dt);
+                block.SetColor(ColorId, s.Color);
+                block.SetFloat(GlowId, p.Glow);
+                block.SetFloat(PulseId, p.Pulse);
+                block.SetFloat(WakeId, Mathf.Lerp(0.3f, 1f, FadeIn));
+                block.SetVector(HitId, p.Hit);
+                p.Renderer.SetPropertyBlock(block);
+                DrawWave(p, dt);
             }
         }
 
-        void DrawWave(Drum d, float dt)
+        void DrawWave(Piece p, float dt)
         {
-            bool show = d.WaveAge >= 0f;
-            if (d.Wave.gameObject.activeSelf != show) d.Wave.gameObject.SetActive(show);
+            bool show = p.WaveAge >= 0f;
+            if (p.Wave.gameObject.activeSelf != show) p.Wave.gameObject.SetActive(show);
             if (!show) return;
-            d.WaveAge += dt;
-            float u = d.WaveAge / 1.1f;
+            p.WaveAge += dt;
+            float u = p.WaveAge / 1.1f;
             if (u >= 1f)
             {
-                d.WaveAge = -1f;
-                d.Wave.gameObject.SetActive(false);
+                p.WaveAge = -1f;
+                p.Wave.gameObject.SetActive(false);
                 return;
             }
-            d.Wave.transform.SetPositionAndRotation(d.Foot, LyingFlat);
-            d.Wave.transform.localScale = Vector3.one * ((0.25f + u * 1.5f) * (0.6f + d.WaveStrength * 0.6f));
+            p.Wave.transform.SetPositionAndRotation(p.Foot, LyingFlat);
+            p.Wave.transform.localScale = Vector3.one * ((0.25f + u * 1.5f) * (0.6f + p.WaveStrength * 0.6f));
             block.Clear();
-            block.SetColor(ColorId, d.Spec.Color);
+            block.SetColor(ColorId, p.Spec.Color);
             block.SetFloat(RadiusId, 0.85f);
             block.SetFloat(ThicknessId, 0.05f * (1f - u) + 0.01f);
-            block.SetFloat(AlphaId, (1f - u) * (1f - u) * d.WaveStrength);
-            d.Wave.SetPropertyBlock(block);
+            block.SetFloat(AlphaId, (1f - u) * (1f - u) * p.WaveStrength);
+            p.Wave.SetPropertyBlock(block);
         }
 
+        // ---- The kit's sounds, made in code ----
+
+        /// <summary>Starts making the kit's sounds as the app loads, so they are ready by the time the world is chosen.</summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        static void MakeSoundsEarly() => MakeSounds();
+
         /// <summary>
-        /// A taiko boom made in code: a low tone that drops in pitch as it sounds, two overtones so it carries on small
-        /// speakers, and a short slap of noise for the hand on the skin.
+        /// Makes every piece's sound on a worker thread (once), so nothing stalls a frame; the world makes its clips from
+        /// the results a few at a time once they are ready (see <see cref="FinishSounds"/>).
         /// </summary>
-        static AudioClip MakeDrumSound(string name, float pitch, float decay, int seed)
+        static void MakeSounds()
         {
-            int rate = AudioSettings.outputSampleRate > 0 ? AudioSettings.outputSampleRate : 48000;
-            int length = (int)(rate * Mathf.Clamp(4.5f / decay, 0.5f, 1.6f));
+            if (soundWork != null && !soundWork.IsFaulted) return;
+            soundRate = AudioSettings.outputSampleRate > 0 ? AudioSettings.outputSampleRate : 48000;
+            int rate = soundRate;
+            soundWork = System.Threading.Tasks.Task.Run(() =>
+            {
+                var all = new float[Kit.Length][];
+                for (int i = 0; i < Kit.Length; i++)
+                {
+                    var s = Kit[i];
+                    all[i] = s.IsCymbal ? MakeCymbal(rate, s.Kind, s.Decay, 57 + i) : MakeDrum(rate, s.Pitch, s.Decay, 31 + i);
+                }
+                return all;
+            });
+        }
+
+        void StartSounds()
+        {
+            soundsMade = 0;
+            soundData = null;
+            MakeSounds();
+        }
+
+        void FinishSounds()
+        {
+            if (soundsMade >= pieces.Length) return;
+            if (soundData == null)
+            {
+                if (soundWork == null || !soundWork.IsCompleted) return;
+                if (soundWork.IsFaulted)
+                {
+                    // Once, rather than every frame: the kit stays silent.
+                    Debug.LogException(soundWork.Exception);
+                    soundsMade = pieces.Length;
+                    return;
+                }
+                soundData = soundWork.Result;
+                // The clips hold the sounds from here on; let the worker's copy go.
+                soundWork = null;
+            }
+            // Two clips a frame, so no single frame does it all.
+            for (int n = 0; n < 2 && soundsMade < pieces.Length; n++, soundsMade++)
+            {
+                var data = soundData[soundsMade];
+                var clip = AudioClip.Create(pieces[soundsMade].Root.name, data.Length, 1, soundRate, false);
+                clip.SetData(data, 0);
+                pieces[soundsMade].Sound = clip;
+            }
+            if (soundsMade >= pieces.Length) soundData = null;
+        }
+
+        // Modes of a struck drum skin (the ratios of a circular membrane), each fainter than the last.
+        static readonly float[] SkinModes = { 1f, 1.59f, 2.14f, 2.3f, 2.65f, 2.92f, 3.16f, 3.5f, 4.06f, 4.6f };
+        static readonly float[] SkinLevels = { 1f, 0.55f, 0.38f, 0.3f, 0.22f, 0.16f, 0.12f, 0.1f, 0.08f, 0.06f };
+
+        const int SineSize = 4096;
+        static readonly float[] SineTable = MakeSineTable();
+
+        static float[] MakeSineTable()
+        {
+            var table = new float[SineSize];
+            for (int i = 0; i < SineSize; i++) table[i] = (float)System.Math.Sin(i * 2.0 * System.Math.PI / SineSize);
+            return table;
+        }
+
+        /// <summary>A sine for a phase in turns (0 to 1), from the table: quick enough to make seconds of sound.</summary>
+        static float Sine(float turns) => SineTable[(int)(turns * SineSize) & (SineSize - 1)];
+
+        /// <summary>
+        /// A taiko boom: the skin's modes, its pitch falling a little just after the strike as the skin relaxes, a low
+        /// thump that gives the strike its weight, the slap of the hand, and a short room echo so it rings on.
+        /// </summary>
+        static float[] MakeDrum(int rate, float pitch, float decay, int seed)
+        {
+            float seconds = Mathf.Clamp(5.5f / decay, 1.4f, 3.2f) + 0.7f;
+            int length = (int)(rate * seconds);
             var data = new float[length];
             var random = new System.Random(seed);
-            double phase = 0;
-            float noise = 0f;
+            int modes = SkinModes.Length;
+            var phase = new float[modes];
+            var level = new float[modes];
+            var fade = new float[modes];
+            for (int m = 0; m < modes; m++)
+            {
+                phase[m] = (float)random.NextDouble() * 0.05f;
+                level[m] = SkinLevels[m];
+                fade[m] = Mathf.Exp(-decay * (1f + m * 0.6f) / rate);
+            }
+            float thumpPitch = Mathf.Max(pitch * 0.75f, 60f), thumpPhase = 0f, thump = 0.45f;
+            float thumpFade = Mathf.Exp(-16f / rate), slapFade = Mathf.Exp(-60f / rate), slap = 0.8f;
+            float low = 0f, lower = 0f;
             for (int i = 0; i < length; i++)
             {
                 float t = i / (float)rate;
-                float frequency = pitch * (1f + 0.9f * Mathf.Exp(-t * 30f));
-                phase += 2.0 * System.Math.PI * frequency / rate;
-                float body = Mathf.Exp(-t * decay);
-                float tone = Mathf.Sin((float)phase) * 0.6f
-                    + Mathf.Sin((float)(phase * 2.0)) * 0.3f * Mathf.Exp(-t * decay * 0.8f)
-                    + Mathf.Sin((float)(phase * 3.01)) * 0.12f * Mathf.Exp(-t * decay * 1.6f);
-                noise += ((float)random.NextDouble() * 2f - 1f - noise) * 0.35f;
-                float slap = noise * Mathf.Exp(-t * 55f) * 0.6f;
-                float attack = Mathf.Min(1f, t / 0.0015f);
-                data[i] = (tone * body + slap) * attack * 0.7f;
+                float bend = 1f + 0.55f * Mathf.Exp(-t * 24f) - 0.025f * (1f - Mathf.Exp(-t * 1.2f));
+                float tone = 0f;
+                for (int m = 0; m < modes; m++)
+                {
+                    phase[m] += pitch * SkinModes[m] * bend / rate;
+                    if (phase[m] >= 1f) phase[m] -= 1f;
+                    tone += Sine(phase[m]) * level[m];
+                    level[m] *= fade[m];
+                }
+                thumpPhase += thumpPitch / rate;
+                if (thumpPhase >= 1f) thumpPhase -= 1f;
+                float white = (float)random.NextDouble() * 2f - 1f;
+                low += (white - low) * 0.5f;
+                lower += (low - lower) * 0.06f;
+                float attack = Mathf.Min(1f, t / 0.0012f);
+                data[i] = (tone * 0.6f + Sine(thumpPhase) * thump + (low - lower) * slap) * attack;
+                thump *= thumpFade;
+                slap *= slapFade;
             }
-            var clip = AudioClip.Create(name, length, 1, rate, false);
-            clip.SetData(data, 0);
-            return clip;
+            Echo(data, rate, 0.26f);
+            Normalize(data, 0.85f);
+            FadeEnd(data, rate);
+            return data;
         }
 
-        static float EaseOutBack(float x)
+        /// <summary>
+        /// A cymbal: a cloud of inharmonic partials (the shimmer of a metal plate) over hissing noise, with a bright tick
+        /// as it is struck. The ride adds a clear bell, the crash swells for a moment, and the hi-hat is short and dry.
+        /// </summary>
+        static float[] MakeCymbal(int rate, Kind kind, float decay, int seed)
         {
-            const float c1 = 1.70158f, c3 = c1 + 1f;
-            return 1f + c3 * Mathf.Pow(x - 1f, 3f) + c1 * Mathf.Pow(x - 1f, 2f);
+            var random = new System.Random(seed);
+            bool hat = kind == Kind.HiHat;
+            float seconds = hat ? 0.9f : kind == Kind.Splash ? 2.4f : 4.5f;
+            int length = (int)(rate * seconds);
+            var data = new float[length];
+            int count = hat ? 18 : 36;
+            float lowest = kind == Kind.Ride ? 380f : hat ? 1800f : kind == Kind.Splash ? 900f : 520f;
+            float highest = hat ? 11000f : 9500f;
+            var phase = new float[count];
+            var step = new float[count];
+            var level = new float[count];
+            var fade = new float[count];
+            for (int k = 0; k < count; k++)
+            {
+                float frequency = lowest * Mathf.Pow(highest / lowest, Mathf.Pow((float)random.NextDouble(), 0.8f));
+                step[k] = frequency / rate;
+                phase[k] = (float)random.NextDouble();
+                level[k] = (0.6f + 0.4f * (float)random.NextDouble()) / Mathf.Sqrt(1f + k);
+                fade[k] = Mathf.Exp(-decay * (0.6f + 1.4f * (float)random.NextDouble()) * (1f + frequency / 9000f) / rate);
+            }
+            // The ride's bell: a few clear partials that ring through the wash.
+            float[] bellStep = { 612f / rate, 1490f / rate, 2280f / rate };
+            float[] bellLevel = { 0.32f, 0.2f, 0.12f };
+            float[] bellFade = { Mathf.Exp(-1.6f / rate), Mathf.Exp(-2.4f / rate), Mathf.Exp(-3.2f / rate) };
+            var bellPhase = new float[3];
+            float hiss = 0f, previous = 0f, noise = hat ? 0.9f : 0.45f;
+            float noiseFade = Mathf.Exp(-decay * (hat ? 1.5f : 1.2f) / rate), tick = 0.7f, tickFade = Mathf.Exp(-300f / rate);
+            for (int i = 0; i < length; i++)
+            {
+                float t = i / (float)rate;
+                float shimmer = 0f;
+                for (int k = 0; k < count; k++)
+                {
+                    phase[k] += step[k];
+                    if (phase[k] >= 1f) phase[k] -= 1f;
+                    shimmer += Sine(phase[k]) * level[k];
+                    level[k] *= fade[k];
+                }
+                float bell = 0f;
+                if (kind == Kind.Ride)
+                {
+                    for (int k = 0; k < 3; k++)
+                    {
+                        bellPhase[k] += bellStep[k];
+                        if (bellPhase[k] >= 1f) bellPhase[k] -= 1f;
+                        bell += Sine(bellPhase[k]) * bellLevel[k];
+                        bellLevel[k] *= bellFade[k];
+                    }
+                }
+                float white = (float)random.NextDouble() * 2f - 1f;
+                hiss = 0.85f * (hiss + white - previous);
+                previous = white;
+                float swell = kind == Kind.Crash ? 1f - 0.6f * Mathf.Exp(-t * 30f) : 1f;
+                data[i] = (shimmer * 0.35f + hiss * noise) * swell + bell + white * tick;
+                noise *= noiseFade;
+                tick *= tickFade;
+            }
+            if (!hat) Echo(data, rate, 0.2f);
+            Normalize(data, hat ? 0.7f : 0.8f);
+            FadeEnd(data, rate);
+            return data;
         }
 
-        /// <summary>For previews: every drum has arrived, and one (or none, with -1) was just struck.</summary>
+        /// <summary>A small room's echo (Schroeder's four combs and two all-passes), mixed in by <paramref name="wet"/>.</summary>
+        static void Echo(float[] data, int rate, float wet)
+        {
+            float scale = rate / 44100f;
+            int[] combLengths = { 1116, 1188, 1277, 1356 };
+            int[] passLengths = { 556, 441 };
+            var combs = new float[4][];
+            var combAt = new int[4];
+            var store = new float[4];
+            for (int k = 0; k < 4; k++) combs[k] = new float[Mathf.Max(1, (int)(combLengths[k] * scale))];
+            var passes = new float[2][];
+            var passAt = new int[2];
+            for (int k = 0; k < 2; k++) passes[k] = new float[Mathf.Max(1, (int)(passLengths[k] * scale))];
+            const float feedback = 0.83f, damp = 0.25f;
+            for (int i = 0; i < data.Length; i++)
+            {
+                float input = data[i] * 0.25f, sum = 0f;
+                for (int k = 0; k < 4; k++)
+                {
+                    var buffer = combs[k];
+                    float y = buffer[combAt[k]];
+                    store[k] = y * (1f - damp) + store[k] * damp;
+                    buffer[combAt[k]] = input + store[k] * feedback;
+                    if (++combAt[k] >= buffer.Length) combAt[k] = 0;
+                    sum += y;
+                }
+                for (int k = 0; k < 2; k++)
+                {
+                    var buffer = passes[k];
+                    float held = buffer[passAt[k]];
+                    float output = held - sum;
+                    buffer[passAt[k]] = sum + held * 0.5f;
+                    if (++passAt[k] >= buffer.Length) passAt[k] = 0;
+                    sum = output;
+                }
+                data[i] = data[i] * (1f - wet) + sum * wet;
+            }
+        }
+
+        /// <summary>Fades the last moments of a sound to silence, so a tail still ringing never stops with a click.</summary>
+        static void FadeEnd(float[] data, int rate)
+        {
+            int span = Mathf.Min(data.Length, (int)(rate * 0.6f));
+            for (int i = 0; i < span; i++)
+            {
+                float u = i / (float)span;
+                data[data.Length - span + i] *= 0.5f + 0.5f * Mathf.Cos(u * Mathf.PI);
+            }
+        }
+
+        static void Normalize(float[] data, float peak)
+        {
+            float most = 1e-6f;
+            for (int i = 0; i < data.Length; i++) most = Mathf.Max(most, Mathf.Abs(data[i]));
+            float gain = peak / most;
+            for (int i = 0; i < data.Length; i++) data[i] *= gain;
+        }
+
+        /// <summary>For previews: one piece of the kit (or none, with -1) was just struck.</summary>
         public void PreviewDrums(int struck)
         {
             Build();
-            arrived = drums.Length;
-            for (int i = 0; i < drums.Length; i++)
+            if (struck < 0 || struck >= pieces.Length) return;
+            var p = pieces[struck];
+            p.Glow = 1f;
+            p.Hit = new Vector4(0.25f, -0.2f, 0.12f, 1f);
+            if (p.Spec.IsCymbal)
             {
-                var d = drums[i];
-                d.WakeAge = 1f;
-                d.Placed = true;
-                if (i != struck) continue;
-                d.Glow = 1f;
-                d.Hit = new Vector4(0.25f, -0.2f, 0.12f, 1f);
-                d.WaveAge = 0.25f;
-                d.WaveStrength = 1f;
+                p.SwingAge = 0.08f;
+                p.Swing = 7f;
+                p.SwingAxis = Vector3.right;
+            }
+            else
+            {
+                p.WaveAge = 0.25f;
+                p.WaveStrength = 1f;
             }
         }
 

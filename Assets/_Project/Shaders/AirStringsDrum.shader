@@ -1,7 +1,8 @@
-// The taiko drums of the Air strings world: a dark barrel lit at its edges, glowing hoops and rims, and a skin that
-// ripples out from where it was struck. One mesh per drum; uv1.x says which part a vertex belongs to (0 shell, 1 skin,
-// 2 rim, 3 stand). Per drum, through its property block: _Color, _Glow (a strike), _Pulse (the music), _Wake and _Hit.
-// Opaque, so the drums read as solid things standing in the room.
+// The drum kit of the Air strings world. Taiko drums: a dark barrel lit at its edges, glowing hoops and rims, and a
+// skin that ripples out from where it was struck. Cymbals: brass that shines and shimmers out from a strike. One mesh
+// per piece; uv1.x says which part a vertex belongs to (0 shell, 1 skin, 2 rim, 3 stand, 4 cymbal). Per piece, through
+// its property block: _Color, _Glow (a strike), _Pulse (the music), _Wake (the world fading in) and _Hit.
+// Opaque, so the kit reads as solid things standing in the room.
 Shader "MusicInYourHands/AirStringsDrum"
 {
     Properties
@@ -112,10 +113,27 @@ Shader "MusicInYourHands/AirStringsDrum"
                     // Rims: bright neon, brighter on the beat and when struck.
                     color = neon * (1.05 + _Pulse * 0.9 + _Glow * 1.4) + 0.08;
                 }
-                else
+                else if (input.part < 3.5)
                 {
                     // Stand.
                     color = _Body.rgb * 0.7 + neon * (0.18 + edge * 0.3);
+                }
+                else
+                {
+                    // Cymbal: brass with fine lathe grooves, a shine that moves as you look across it, a bright bell
+                    // and edge, and the strike's shimmer running out across the metal from where it landed.
+                    float r = length(input.uv);
+                    float grooves = sin(r * 150) * 0.5 + 0.5;
+                    float3 brass = lerp(float3(0.36, 0.24, 0.08), float3(0.86, 0.66, 0.3), saturate(0.35 + 0.5 * n.y + 0.25 * grooves));
+                    float3 bounced = reflect(-v, n);
+                    float shine = pow(saturate(dot(bounced, normalize(float3(0.25, 1, 0.35)))), 16);
+                    float bell = smoothstep(0.24, 0.16, r);
+                    float rim = smoothstep(0.88, 1.0, r);
+                    float age = _Hit.z;
+                    float d = distance(input.uv, _Hit.xy);
+                    float shimmer = exp(-pow((d - age * 3.2) / 0.14, 2)) * exp(-age * 1.4) * _Hit.w;
+                    color = brass * light * (0.75 + grooves * 0.12) + shine * (0.55 + _Glow * 0.8)
+                        + neon * (rim * (0.6 + _Pulse + _Glow) + bell * (0.12 + _Pulse * 0.3) + shimmer * 1.3 + _Glow * 0.25);
                 }
 
                 color *= lerp(0.15, 1, saturate(_Wake));

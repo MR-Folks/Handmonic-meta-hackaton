@@ -497,7 +497,6 @@ MonoBehaviour:
   strikeSpeed: 0.35
   fullStrikeSpeed: 2
   strikeRest: 0.12
-  wakeWithoutBeat: 1.2
 --- !u!4 &179923060
 Transform:
   m_ObjectHideFlags: 0
