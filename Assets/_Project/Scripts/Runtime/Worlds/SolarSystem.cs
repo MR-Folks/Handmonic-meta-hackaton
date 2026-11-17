@@ -486,10 +486,7 @@ namespace MusicInYourHands
             sunVoice = voice.AddComponent<AudioSource>();
             sunVoice.playOnAwake = false;
             sunVoice.loop = true;
-            sunVoice.spatialBlend = 1f;
-            sunVoice.minDistance = 0.4f;
-            sunVoice.maxDistance = 6f;
-            sunVoice.dopplerLevel = 0f;
+            SpatialAudio.Spatialize(sunVoice);
             sunVoice.volume = 0f;
 
             BuildSky();

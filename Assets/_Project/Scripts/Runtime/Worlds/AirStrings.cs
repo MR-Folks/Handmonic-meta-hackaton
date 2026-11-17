@@ -524,11 +524,7 @@ namespace MusicInYourHands
                 // Each piece has its own voice, so its sound rings on from where it stands while others are struck.
                 var voice = go.AddComponent<AudioSource>();
                 voice.playOnAwake = false;
-                voice.spatialBlend = 1f;
-                voice.minDistance = 0.4f;
-                voice.maxDistance = 6f;
-                voice.rolloffMode = AudioRolloffMode.Logarithmic;
-                voice.dopplerLevel = 0f;
+                SpatialAudio.Spatialize(voice);
                 go.SetActive(false);
                 pieces[i] = new Piece
                 {

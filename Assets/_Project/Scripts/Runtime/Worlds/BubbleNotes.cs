@@ -599,7 +599,7 @@ namespace MusicInYourHands
                     float d = Vector3.Distance(tip, b.Position);
                     if (d < b.Radius * 0.95f && b.Age > 0.25f)
                     {
-                        Musical.Play(voices, frame, b.Midi, tip, 0.4f);
+                        Musical.Play(voices, frame, b.Midi, b.Position, 0.4f);
                         Burst(b, true);
                         Acted("pop");
                         return true;

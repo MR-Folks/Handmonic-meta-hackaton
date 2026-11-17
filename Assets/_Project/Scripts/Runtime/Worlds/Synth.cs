@@ -141,7 +141,10 @@ namespace MusicInYourHands
         }
     }
 
-    /// <summary>A few 3D audio sources reused round-robin, so sounds come from where they happen.</summary>
+    /// <summary>
+    /// A few audio sources reused round-robin, each spatialized by Meta XR Audio (SpatialAudio), so every sound comes
+    /// from where it happens in the room and picks up the room's reflections.
+    /// </summary>
     public sealed class AudioPool
     {
         readonly AudioSource[] sources;
@@ -156,11 +159,7 @@ namespace MusicInYourHands
                 go.transform.SetParent(parent, false);
                 var s = go.AddComponent<AudioSource>();
                 s.playOnAwake = false;
-                s.spatialBlend = 1f;
-                s.minDistance = 0.4f;
-                s.maxDistance = 6f;
-                s.rolloffMode = AudioRolloffMode.Logarithmic;
-                s.dopplerLevel = 0f;
+                SpatialAudio.Spatialize(s);
                 sources[i] = s;
             }
         }

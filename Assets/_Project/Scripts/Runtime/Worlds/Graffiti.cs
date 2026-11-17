@@ -135,8 +135,7 @@ namespace MusicInYourHands
             hiss.clip = Synth.Hiss();
             hiss.loop = true;
             hiss.playOnAwake = false;
-            hiss.spatialBlend = 1f;
-            hiss.minDistance = 0.3f;
+            SpatialAudio.Spatialize(hiss, 0.3f);
             hiss.volume = 0f;
         }
 
