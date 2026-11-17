@@ -25,11 +25,13 @@ namespace MusicInYourHands
     /// while a dashed ring shows the orbit it will take: round you, as far out as you hold it. Let go and it settles
     /// onto that orbit, at the speed that distance gives it. Hold an open palm out to the sun and it warms: it burns
     /// brighter, its corona reaches out, embers stream across to your hand and a soft tone rises.
-    /// The words: overhead, the lyrics become constellations under your ceiling. Each sung word lights up as a star with
-    /// its word beside it, and a line of light draws across to it from the word before, so the line of the song is
-    /// traced in stars. The stars twinkle with the music and pulse on the beat, and each new line forms a new
-    /// constellation while the last one fades. Point up at a star and its word floats down in front of you to read up
-    /// close. Songs without lyrics spell out their title instead.
+    /// The words: overhead, your ceiling opens onto a starry night sky that pulses with the music, and the lyrics become
+    /// constellations in it. Each sung word lights up as a star with its word beside it, and a line of light draws
+    /// across to it from the word before, so the line of the song is traced in stars. The stars twinkle with the music
+    /// and pulse on the beat, and each new line forms a new constellation while the last one fades. Point up at a star
+    /// and its word floats down in front of you to read up close. With a room scan the sky fills your ceiling; until
+    /// then it opens a little above your head and fades out around you. Songs without lyrics spell out their title
+    /// instead.
     /// </summary>
     public class SolarSystem : World
     {
@@ -65,6 +67,7 @@ namespace MusicInYourHands
         [SerializeField] Material ringsMaterial;
         [SerializeField] Material ringMaterial;
         [SerializeField] Material lineMaterial;
+        [SerializeField] Material skyMaterial;
 
         [Header("Around you")]
         [Tooltip("How far below your eyes the planets go round you (m): about chest height, where your hands are.")]
@@ -148,6 +151,7 @@ namespace MusicInYourHands
         static readonly int ReferenceId = Shader.PropertyToID("_Reference");
         static readonly int SizeId = Shader.PropertyToID("_Size");
         static readonly int RimId = Shader.PropertyToID("_Rim");
+        static readonly int SoftId = Shader.PropertyToID("_Soft");
         static readonly int PlanetPosId = Shader.PropertyToID("_PlanetPos");
         static readonly int PlanetRadiusId = Shader.PropertyToID("_PlanetRadius");
         static readonly int RadiusId = Shader.PropertyToID("_Radius");
@@ -290,6 +294,9 @@ namespace MusicInYourHands
         float flare, flareAge = 9f, warmth, emberDebt;
         bool fresh = true, sunPlaced, burst;
 
+        // The night sky without a room scan: how wide it is and how softly it fades out around you (m).
+        const float OpenSkySize = 10f;
+        const float OpenSkySoft = 3f;
         const int StarsPerLine = 14;
         const int StarSets = 2;
 
@@ -319,6 +326,9 @@ namespace MusicInYourHands
         readonly Color[] starLineColors = new Color[StarsPerLine * 8];
         readonly Vector3[] pointerPath = new Vector3[2];
         Material starLettering;
+        Renderer nightSky;
+        Vector2 skySize;
+        float skySoft;
         MeshRenderer reading;
         Mesh readingMesh;
         Star pointed;
@@ -558,10 +568,11 @@ namespace MusicInYourHands
             ChooseSunSpot(forward);
             fresh = false;
 
-            // The constellations form over where you stand: under the scanned ceiling, or a little above your head.
+            // The night sky opens over where you stand: on the scanned ceiling, or a little above your head.
             skyHead = eye;
             skyForward = forward;
             skyCeiling = Room.Ceiling(Mathf.Max(eye.y + 0.85f, floorY + 2.4f));
+            PlaceSky();
         }
 
         /// <summary>
@@ -702,6 +713,7 @@ namespace MusicInYourHands
             DrawPlanets(music, view);
             PointAtStars(rig, view, dt);
             foreach (var sky in skies) DrawConstellation(sky, music, view);
+            DrawNightSky(music);
             DrawReading(music, view, dt);
             DrawHands(view, dt);
             Hum(music);
@@ -1467,13 +1479,13 @@ namespace MusicInYourHands
             return mesh;
         }
 
-        // ---- The words overhead ----
+        // ---- The night sky and its words ----
 
-        /// <summary>The stars and words of two constellations, the word you read and your pointing line.</summary>
+        /// <summary>The sky over the ceiling, the stars and words of two constellations, the word you read and your pointing line.</summary>
         void BuildSky()
         {
             starLettering = new Material(letteringMaterial) { name = "Star Lettering", mainTexture = TypeFace.Bold.Atlas };
-            // A firm dark edge keeps the pale words readable against a bright ceiling.
+            // A firm dark edge keeps the pale words readable where the sky thins out over a bright ceiling.
             starLettering.SetFloat(RimId, 0.8f);
             for (int s = 0; s < StarSets; s++)
             {
@@ -1488,6 +1500,11 @@ namespace MusicInYourHands
                     sky.Stars[i] = star;
                 }
                 skies[s] = sky;
+            }
+            if (skyMaterial != null)
+            {
+                nightSky = Effects.MakeQuad("Night Sky", transform, skyMaterial);
+                nightSky.gameObject.SetActive(false);
             }
             reading = Glyphs.MakeLetter("Reading", transform, starLettering, out readingMesh);
             reading.gameObject.SetActive(false);
@@ -1508,6 +1525,51 @@ namespace MusicInYourHands
             foreach (var sky in skies) ClearConstellation(sky);
             reading.gameObject.SetActive(false);
             pointer.SetVisible(false);
+            if (nightSky != null) nightSky.gameObject.SetActive(false);
+        }
+
+        /// <summary>Lays the night sky over the ceiling: across the scanned walls, or centred above you without a scan.</summary>
+        void PlaceSky()
+        {
+            if (nightSky == null) return;
+            var center = new Vector3(skyHead.x, skyCeiling, skyHead.z);
+            var along = skyForward;
+            skySize = Vector2.one * OpenSkySize;
+            skySoft = OpenSkySoft;
+            if (Room.Walls.Count > 0)
+            {
+                along = Vector3.ProjectOnPlane(Room.Walls[0].Right, Vector3.up).normalized;
+                var across = Vector3.Cross(Vector3.up, along);
+                Vector2 min = Vector2.positiveInfinity, max = Vector2.negativeInfinity;
+                foreach (var wall in Room.Walls)
+                    for (int end = -1; end <= 1; end += 2)
+                    {
+                        var p = wall.Center + wall.Right * (end * wall.Size.x * 0.5f);
+                        var local = new Vector2(Vector3.Dot(p, across), Vector3.Dot(p, along));
+                        min = Vector2.Min(min, local);
+                        max = Vector2.Max(max, local);
+                    }
+                var middle = (min + max) * 0.5f;
+                center = across * middle.x + along * middle.y + Vector3.up * skyCeiling;
+                skySize = max - min;
+                skySoft = 0.2f;
+            }
+            // Just under the ceiling, so it never fights with anything at the ceiling's own height.
+            nightSky.transform.SetPositionAndRotation(center + Vector3.down * 0.02f, Quaternion.LookRotation(Vector3.up, along));
+            nightSky.transform.localScale = new Vector3(skySize.x, skySize.y, 1f);
+            nightSky.gameObject.SetActive(true);
+        }
+
+        /// <summary>The sky's stars and glow pulse with the kick and the high band.</summary>
+        void DrawNightSky(MusicFrame music)
+        {
+            if (nightSky == null) return;
+            block.Clear();
+            block.SetVector(SizeId, skySize);
+            block.SetFloat(SoftId, skySoft);
+            block.SetFloat(AlphaId, FadeIn);
+            block.SetFloat(PulseId, music.Kick * 0.5f + music.Band(5) * 0.5f);
+            nightSky.SetPropertyBlock(block);
         }
 
         static void ClearConstellation(Constellation sky)

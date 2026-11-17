@@ -635,6 +635,7 @@ MonoBehaviour:
   ringsMaterial: {fileID: 2100000, guid: 24dd6462e955ec54a8715367bdb02cd6, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
+  skyMaterial: {fileID: 2100000, guid: a377da8a64af84ae68901afb43ab9d32, type: 2}
   orbitDrop: 0.32
   headRoom: 0.22
   headGap: 0.3
@@ -2916,6 +2917,9 @@ MonoBehaviour:
   portalMaterial: {fileID: 2100000, guid: 53c2dc8117af54513bc605e734cc2dde, type: 2}
   holdOpen: 0.9
   changeTime: 0.8
+  skipWindow: 0.35
+  roomDistance: 2
+  cameraRest: 20
 --- !u!4 &1985145954
 Transform:
   m_ObjectHideFlags: 0
