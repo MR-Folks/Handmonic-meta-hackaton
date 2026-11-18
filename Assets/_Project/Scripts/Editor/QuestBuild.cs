@@ -55,6 +55,10 @@ namespace MusicInYourHands.EditorTools
             var storePass = Environment.GetEnvironmentVariable(KeystorePassVariable);
             var alias = Variable(AliasVariable, DefaultAlias);
             var keyPass = Variable(KeyPassVariable, storePass);
+            // Gradle runs as a child of this process with its environment, and a failed Gradle run prints that whole
+            // environment into the build log. Forget the passwords' variables before building.
+            Environment.SetEnvironmentVariable(KeystorePassVariable, null);
+            Environment.SetEnvironmentVariable(KeyPassVariable, null);
             if (string.IsNullOrEmpty(keystore) || !File.Exists(keystore) || string.IsNullOrEmpty(storePass))
             {
                 var message = $"[Build] Release build needs {KeystoreVariable} (an existing keystore file) and " +

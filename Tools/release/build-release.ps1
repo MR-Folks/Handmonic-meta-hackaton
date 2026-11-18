@@ -67,6 +67,17 @@ Get-ChildItem (Join-Path $root "Library\Bee\Android") -Recurse -Filter build.gra
         } catch { }
     }
 
+# A failed Gradle run prints its environment into the log. QuestBuild clears the password variables before
+# building, but scrub any that got there anyway.
+if (Test-Path $log) {
+    $text = [System.IO.File]::ReadAllText($log)
+    $clean = [regex]::Replace($text, "(?m)^(\s*(FTM_KEYSTORE_PASS|FTM_KEY_PASS)\s*=).*$", '$1 <removed>')
+    if ($clean -ne $text) { [System.IO.File]::WriteAllText($log, $clean) }
+}
+if (Select-String -Path $log -Pattern "keystore password was incorrect" -Quiet) {
+    Write-Host "The keystore password was not right. Run this again and type it carefully." -ForegroundColor Red
+}
+
 Select-String -Path $log -Pattern "\[Build\]" | ForEach-Object { $_.Line }
 if ($code -ne 0 -or -not (Test-Path $apk)) {
     Write-Host "The build failed (exit $code). See $log" -ForegroundColor Red
