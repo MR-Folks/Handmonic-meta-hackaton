@@ -13,7 +13,8 @@ namespace MusicInYourHands
     /// listening to the room, turns the lyrics on and off and opens the cassette deck (CassetteDeck), where you choose a
     /// song by putting its cassette in a radio; the menu steps aside for it. The deck's song list button brings the menu
     /// back with the song page (SongLibrary) in the honeycomb's place, and the page's Back button returns to the deck.
-    /// Bubbles near where you look are a little larger.
+    /// The honeycomb's last cell, just above the end of the song row, is a "?" bubble ("Show me how"): the menu closes
+    /// and the onboarding's lessons start again. Bubbles near where you look are a little larger.
     /// The menu opens half a metre along your gaze, within reach, so you can touch a bubble or button with your index
     /// fingertip, or point at it from farther away and pinch. It stays put while you look round it, but once you have
     /// looked well away for a moment it glides back in front of you, up or down as well as sideways, and never away from
@@ -84,11 +85,18 @@ namespace MusicInYourHands
         const int NextSong = -4;
         const int LyricsToggle = -5;
         const int Library = -6;
-        const int ExtraBubbles = 6;
+        const int Help = -7;
+        /// <summary>The bubbles of the song row under the honeycomb.</summary>
+        const int SongRow = 6;
+        /// <summary>The bubbles that aren't worlds: the song row, and the "?" at the end of the honeycomb.</summary>
+        public const int ExtraBubbles = SongRow + 1;
+        const string HelpName = "Show me how";
         static readonly Color ListenColor = new Color(0.98f, 0.62f, 0.5f);
         static readonly Color SongColor = new Color(0.72f, 0.7f, 1f);
         static readonly Color LyricsColor = new Color(0.55f, 0.85f, 1f);
         static readonly Color AddColor = new Color(0.55f, 0.95f, 0.7f);
+        // The onboarding's warm colour, for the "?" and the words the onboarding asks the caption to show.
+        static readonly Color HelpColor = new Color(1f, 0.85f, 0.55f);
 
         sealed class Bubble
         {
@@ -156,6 +164,7 @@ namespace MusicInYourHands
         Bubble captioned;
         int captionedState = -1;
         SongAsset captionedSong, hintLoading, hintFailed;
+        string captionedPrompt;
         bool hinted;
         // The glide back in front of you: degrees per second sideways and up, and metres per second nearer or farther.
         Vector2 glideSpeed;
@@ -195,6 +204,27 @@ namespace MusicInYourHands
 
         /// <summary>True while the menu is gliding back in front of you (for the editor checks).</summary>
         public bool Gliding => gliding;
+
+        /// <summary>
+        /// Words for the caption over the honeycomb while no bubble is pointed at, in place of the current world's name
+        /// (the onboarding's "Touch a world"); null for the usual caption.
+        /// </summary>
+        public string Prompt { get; set; }
+
+        /// <summary>A world whose bubble gently swells and glows to invite a touch (the onboarding's lesson); -1 for none.</summary>
+        public int Beckoned { get; set; } = -1;
+
+        /// <summary>
+        /// Where a world's bubble rests on the open menu, in world space (without its gentle bob). False while the menu is
+        /// closed or showing the song page, or for a world without a bubble. The onboarding points its ghost finger at one.
+        /// </summary>
+        public bool BubblePosition(int world, out Vector3 position)
+        {
+            position = default;
+            if (root == null || world < 0 || world >= bubbles.Length || bubbles[world].World != world) return false;
+            position = root.TransformPoint(bubbles[world].Slot);
+            return open && !library.IsOpen;
+        }
 
         void OnEnable()
         {
@@ -431,8 +461,10 @@ namespace MusicInYourHands
                 bool aimed = open && !library.IsOpen && (pointers[0].Target == i || pointers[1].Target == i);
                 b.Hover = Mathf.MoveTowards(b.Hover, aimed ? 1f : 0f, dt * 7f);
                 if (aimed) hovered = i;
+                // A bubble the onboarding invites you to touch swells and glows a little, gently pulsing.
+                float lift = b.World >= 0 && b.World == Beckoned && !library.IsOpen ? Mathf.Max(b.Hover, 0.35f + 0.25f * Mathf.Sin(t * 4f)) : b.Hover;
 
-                float scale = size * (1f + b.Hover * (Swell - 1f) + b.Pop * 0.45f);
+                float scale = size * (1f + lift * (Swell - 1f) + b.Pop * 0.45f);
                 b.Renderer.transform.position = world;
                 b.Renderer.transform.localScale = Vector3.one * Mathf.Max(scale, 1e-4f);
                 Effects.Face(b.Renderer.transform, view);
@@ -442,7 +474,7 @@ namespace MusicInYourHands
                 block.Clear();
                 block.SetColor(ColorId, BubbleColor(b, manager));
                 block.SetFloat(IconId, b.World >= 0 ? manager.Worlds[b.World].MenuIcon : Icon(b.World));
-                block.SetFloat(HoverId, b.Hover);
+                block.SetFloat(HoverId, lift);
                 block.SetFloat(SelectedId, selected ? 1f : 0f);
                 block.SetFloat(AlphaId, Mathf.Clamp01(show) * (1f - b.Pop * 0.85f) + b.Pop * 0.15f);
                 if (bus != null) block.SetVector(EqId, new Vector4(bus.Bands[1], bus.Bands[2], bus.Bands[3], bus.Bands[4]));
@@ -509,14 +541,14 @@ namespace MusicInYourHands
 
         static float Icon(int bubble) => bubble switch
         {
-            ListenToggle => 7f, NextSong => 14f, PreviousSong => 15f, LyricsToggle => 23f, Library => 24f, _ => 6f
+            ListenToggle => 7f, NextSong => 14f, PreviousSong => 15f, LyricsToggle => 23f, Library => 24f, Help => 31f, _ => 6f
         };
 
         static bool IsSongStep(Bubble b) => b.World == PreviousSong || b.World == NextSong;
 
         Color BubbleColor(Bubble b, WorldManager manager) =>
             b.World >= 0 ? manager.Worlds[b.World].Color : b.World == ListenToggle ? ListenColor : IsSongStep(b) ? SongColor
-            : b.World == LyricsToggle ? LyricsColor : b.World == Library ? AddColor : new Color(0.85f, 0.85f, 1f);
+            : b.World == LyricsToggle ? LyricsColor : b.World == Library ? AddColor : b.World == Help ? HelpColor : new Color(0.85f, 0.85f, 1f);
 
         string BubbleName(Bubble b, WorldManager manager, MusicBus bus) =>
             b.World >= 0 ? manager.Worlds[b.World].DisplayName
@@ -524,6 +556,7 @@ namespace MusicInYourHands
             : IsSongStep(b) ? SongStepName(bus, b.World == NextSong ? 1 : -1)
             : b.World == LyricsToggle ? LyricsOption.On ? "Turn lyrics off" : "Turn lyrics on"
             : b.World == Library ? "Choose a song on the cassette deck"
+            : b.World == Help ? HelpName
             : bus == null ? "Music" : bus.IsPlaying ? $"Pause {bus.Title}" : $"Play {bus.Title}";
 
         static string SongStepName(MusicBus bus, int step)
@@ -740,16 +773,20 @@ namespace MusicInYourHands
             int state = (bus != null ? 1 : 0) | (bus != null && bus.IsPlaying ? 2 : 0) | (bus != null && bus.IsListening ? 4 : 0) |
                         (LyricsOption.On ? 8 : 0) | ((bus != null ? bus.Songs.Count : 0) << 4);
             var song = bus != null ? bus.CurrentSong : null;
-            if (subject != captioned || state != captionedState || song != captionedSong)
+            // The onboarding's words, while no bubble is pointed at.
+            string prompt = hovered < 0 ? Prompt : null;
+            if (subject != captioned || state != captionedState || song != captionedSong || !ReferenceEquals(prompt, captionedPrompt))
             {
                 captioned = subject;
                 captionedState = state;
                 captionedSong = song;
-                string text = previewCaption ?? (subject != null ? BubbleName(subject, manager, bus) : "");
+                captionedPrompt = prompt;
+                string text = previewCaption ?? prompt ?? (subject != null ? BubbleName(subject, manager, bus) : "");
                 caption.Text = SongLibrary.Fit(text, CaptionSize, textWidth);
             }
-            var color = subject != null ? Color.Lerp(Color.white, BubbleColor(subject, manager), hovered >= 0 ? 0.3f : 0.15f) : Color.white;
-            color.a = show * (hovered >= 0 ? 1f : 0.8f);
+            var color = prompt != null ? Color.Lerp(Color.white, HelpColor, 0.45f)
+                : subject != null ? Color.Lerp(Color.white, BubbleColor(subject, manager), hovered >= 0 ? 0.3f : 0.15f) : Color.white;
+            color.a = show * (hovered >= 0 || prompt != null ? 1f : 0.8f);
             caption.Color = color;
 
             var loading = bus != null ? bus.Loading : null;
@@ -789,6 +826,13 @@ namespace MusicInYourHands
                 // The menu steps aside as the cassette deck rises.
                 closeAt = openTime + 0.3f;
                 if (lastView != null) deck.Open(lastView, bus);
+            }
+            else if (b.World == Help)
+            {
+                // The menu closes, and once it has, the lessons start again with how to open it.
+                closeAt = openTime + 0.35f;
+                var onboarding = Onboarding.Instance;
+                if (onboarding != null) onboarding.Replay();
             }
             else if (bus == null) return;
             else if (b.World == ListenToggle) bus.ToggleListen();
@@ -852,18 +896,18 @@ namespace MusicInYourHands
         }
 
         /// <summary>
-        /// Lays the worlds out as one honeycomb in menu order, row by row, with the song row under it, the caption over
-        /// it and the two hint lines under the song row. It tries every number of rows and keeps the one that fits
-        /// AimArea best at the menu's distance (the narrower and lower, the better, both counted against the area), so the
-        /// honeycomb shrinks and stays centred as worlds are removed. The middle of the menu is halfway between the top
-        /// of the caption and the foot of the second hint line. Fills <paramref name="slots"/> (worlds, then the song row)
-        /// and places the text.
+        /// Lays the worlds out as one honeycomb in menu order, row by row, the "?" in the cell after the last world, with the
+        /// song row under it, the caption over it and the two hint lines under the song row. It tries every number of rows
+        /// and keeps the one that fits AimArea best at the menu's distance (the narrower and lower, the better, both counted
+        /// against the area), so the honeycomb shrinks and stays centred as worlds are removed. The middle of the menu is
+        /// halfway between the top of the caption and the foot of the second hint line. Fills <paramref name="slots"/>
+        /// (worlds, the song row, then the "?") and places the text.
         /// </summary>
         void LayOut(int count, Vector2[] slots)
         {
             float step = Spacing, rowStep = step * 0.866f;
             float big = bubbleDiameter * NearGaze, swollen = big * Swell * 0.5f;
-            float songWidth = (ExtraBubbles - 1) * step + big;
+            float songWidth = (SongRow - 1) * step + big;
             // The caption's baseline above the top row, clear of a swollen bubble; the song row under the bottom row; the
             // first hint line's baseline under the song row, its capitals a little below a bubble near your gaze; then the
             // second hint line.
@@ -875,13 +919,15 @@ namespace MusicInYourHands
             float aimWidth = 2f * viewDistance * Mathf.Tan(AimArea.x * 0.5f * Mathf.Deg2Rad);
             float aimHeight = 2f * viewDistance * Mathf.Tan(AimArea.y * 0.5f * Mathf.Deg2Rad);
 
-            var lengths = new int[Mathf.Max(count, 1)];
+            // The honeycomb's cells: the worlds, then the "?".
+            int cells = count + 1;
+            var lengths = new int[cells];
             var centres = new float[lengths.Length];
             int bestRows = 0;
             float bestCost = float.MaxValue, bestSum = float.MaxValue, bestWidth = songWidth;
-            for (int rows = count > 0 ? 1 : 0; rows <= count; rows++)
+            for (int rows = 1; rows <= cells; rows++)
             {
-                if (rows > 0) SplitRows(count, rows, lengths);
+                SplitRows(cells, rows, lengths);
                 float span = NestRows(lengths, rows, centres);
                 float width = Mathf.Max(rows > 0 ? span * step + big : 0f, songWidth);
                 float height = top + (rows > 0 ? (rows - 1) * rowStep + songBelow : 0f) + underSongs;
@@ -897,21 +943,22 @@ namespace MusicInYourHands
             }
 
             rowLengths = new int[bestRows];
-            if (bestRows > 0) SplitRows(count, bestRows, rowLengths);
+            if (bestRows > 0) SplitRows(cells, bestRows, rowLengths);
             NestRows(rowLengths, bestRows, centres);
             float songY = bestRows > 0 ? -(bestRows - 1) * rowStep - songBelow : 0f;
             // Centre it all on the menu's middle, from the top of the caption to the foot of the second hint line.
             float shift = -(top + songY - underSongs) * 0.5f;
+            // The worlds, then the "?" in the last cell (its slot follows the song row's).
             int next = 0;
             for (int r = 0; r < bestRows; r++)
-                for (int i = 0; i < rowLengths[r]; i++)
-                    slots[next++] = new Vector2((centres[r] + i - (rowLengths[r] - 1) * 0.5f) * step, -r * rowStep + shift);
+                for (int i = 0; i < rowLengths[r]; i++, next++)
+                    slots[next < count ? next : count + SongRow] = new Vector2((centres[r] + i - (rowLengths[r] - 1) * 0.5f) * step, -r * rowStep + shift);
             // The song row: previous, play or pause, next, listen, lyrics, the cassette deck.
-            for (int i = 0; i < ExtraBubbles; i++)
+            for (int i = 0; i < SongRow; i++)
             {
                 int world = i == 0 ? NowPlaying : ListenToggle - (i - 1);
                 int column = world == PreviousSong ? 0 : world == NowPlaying ? 1 : world == NextSong ? 2 : world == ListenToggle ? 3 : world == LyricsToggle ? 4 : 5;
-                slots[count + i] = new Vector2((column - (ExtraBubbles - 1) * 0.5f) * step, songY + shift);
+                slots[count + i] = new Vector2((column - (SongRow - 1) * 0.5f) * step, songY + shift);
             }
 
             textWidth = bestWidth;
@@ -955,11 +1002,11 @@ namespace MusicInYourHands
             LayOut(count, slots);
             for (int i = 0; i < bubbles.Length; i++)
             {
-                int world = i < count ? i : i == count ? NowPlaying : ListenToggle - (i - count - 1);
+                int world = i < count ? i : i == count ? NowPlaying : i < count + SongRow ? ListenToggle - (i - count - 1) : Help;
                 var slot = slots[i];
                 string objectName = world >= 0 ? $"Bubble {world}" : world == ListenToggle ? "Bubble Listen"
                     : world == PreviousSong ? "Bubble Previous Song" : world == NextSong ? "Bubble Next Song"
-                    : world == LyricsToggle ? "Bubble Lyrics" : world == Library ? "Bubble Library" : "Bubble Now Playing";
+                    : world == LyricsToggle ? "Bubble Lyrics" : world == Library ? "Bubble Library" : world == Help ? "Bubble Help" : "Bubble Now Playing";
                 var r = Effects.MakeQuad(objectName, root, bubbleMaterial);
                 float delay = 0.04f + slot.magnitude * 0.6f;
                 bubbles[i] = new Bubble { Renderer = r, World = world, Slot = slot, Delay = delay };

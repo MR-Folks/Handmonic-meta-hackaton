@@ -224,7 +224,7 @@ namespace MusicInYourHands.EditorTools
             foreach (var (what, e) in new[] { ("the bubbles", full), ("a swollen bubble", swollen), ("the words", text), ("the song page", page) })
                 if (!e.Inside(WorldMenu.DesignArea))
                     failures.Add($"{count} worlds: {what} reach outside the {WorldMenu.DesignArea.x:0}° × {WorldMenu.DesignArea.y:0}° design area ({e}).");
-            if (bubbleCount != count + 6) failures.Add($"{count} worlds: {bubbleCount} bubbles instead of {count + 6}.");
+            if (bubbleCount != count + WorldMenu.ExtraBubbles) failures.Add($"{count} worlds: {bubbleCount} bubbles instead of {count + WorldMenu.ExtraBubbles}.");
             if (smallest < 0.064f) failures.Add($"{count} worlds: a bubble shows only {smallest * 1000f:0.0} mm across, under the 64 mm hands need.");
             if (nearest < 0.499f) failures.Add($"{count} worlds: a bubble is only {nearest:0.000} m from the eyes, nearer than 50 cm.");
             if (smallestLetters < 1f || pageLetters < 1f)

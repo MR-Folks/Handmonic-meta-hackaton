@@ -6,7 +6,7 @@ Shader "MusicInYourHands/Bubble"
     Properties
     {
         _Color ("Color", Color) = (1, 0.37, 0.68, 1)
-        _Icon ("Emblem (-1 none, 0-30)", Float) = 0
+        _Icon ("Emblem (-1 none, 0-31)", Float) = 0
         _Hover ("Hover 0-1", Float) = 0
         _Selected ("Current world 0-1", Float) = 0
         _Alpha ("Alpha", Float) = 1
@@ -507,7 +507,7 @@ Shader "MusicInYourHands/Bubble"
                     }
                     // END emblem 29
                 }
-                else
+                else if (icon < 30.5)
                 {
                     // BEGIN emblem 30 (Shadow play)
                     // A lamp's pool of light on a wall, a hand's shadow waving in it.
@@ -520,6 +520,19 @@ Shader "MusicInYourHands/Bubble"
                     e *= 1 - hand;
                     e += Line(abs(length(p) - 0.62), 0.02) * 0.4;
                     // END emblem 30
+                }
+                else
+                {
+                    // BEGIN emblem 31 (Show me how)
+                    // The menu's "?", which shows the lessons again: a bold question mark whose dot bounces gently.
+                    float2 q = p - float2(0, 0.17);
+                    float a = atan2(q.y, q.x);
+                    // The hook: a ring open at its lower left, its foot at the bottom running into the stem.
+                    float hook = Line(abs(length(q) - 0.23), 0.07) * max(step(a, -2.55), step(-1.5708, a));
+                    float stem = Line(Segment(p, float2(0, -0.06), float2(0, -0.2)), 0.07);
+                    float spot = smoothstep(0.095, 0.065, length(p - float2(0, -0.43 + 0.045 * abs(sin(t * 2.2)))));
+                    e = max(max(hook, stem), spot);
+                    // END emblem 31
                 }
                 return saturate(e);
             }
