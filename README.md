@@ -13,11 +13,10 @@ Assets/_Project/
   Audio/      four demo songs (WAV) with melody notes (.notes) and three sung songs (MP3), all with word-timed
               lyrics (LRC)
   Songs/      SongAsset files: audio + lyrics + offset
-  Resources/  AudiusSongs.txt (the songs streamed from Audius), the baked lettering, and CassetteDeck/ (the cassette
-              deck's four models and their materials)
+  Resources/  the baked lettering and CassetteDeck/ (the cassette deck's four models and their materials)
   Scenes/     Main.unity
   Scripts/
-    Runtime/Music/   MusicBus (bands, beats, song time), SongAsset, AddedSongs, AudiusSongs
+    Runtime/Music/   MusicBus (bands, beats, song time), SongAsset, AddedSongs
     Runtime/Lyrics/  LyricsTrack (LRC parser and current line/word lookup)
     Runtime/Hands/   HandRig (palm, fingertips, pinch, fist, palm-up for every world)
     Runtime/Worlds/  World (the base every world builds on), the worlds, the menu and its song page
@@ -56,11 +55,11 @@ If settings drift, run **Music In Your Hands > Configure Project for Quest**. It
 ## The cassette deck
 The menu's song bubble (the cassette) opens the cassette deck, where you choose a song by hand. The menu steps aside and a small table rises out of the floor in front of you, the world playing on behind it: 68 cm high when you sit, taller when you stand, with the front cassette about 41 cm ahead and everything you touch within about 25° of the middle of your view.
 
-- **Choosing.** A turntable on the left holds one cassette per song, labels out, coloured by where the song comes from (warm for the demo songs, green for your own, blue for Audius), with a music note on the label of songs with lyrics. The cassette nearest you is the front one: it lights up, and its title, artist and lyrics show on a plate over the middle of the turntable (for a song from Audius, also its credit).
+- **Choosing.** A turntable on the left holds one cassette per song, labels out, coloured by where the song comes from (warm for the demo songs, green for your own), with a music note on the label of songs with lyrics. The cassette nearest you is the front one: it lights up, and its title, artist and lyrics show on a plate over the middle of the turntable.
 - **Turning.** It turns like a heavy, well-oiled turntable. Pinch its edge and drag it round: it follows your hand closely (smoothed, so tracking jitter never jerks it), and let go mid-turn it spins on at your hand's speed. Or slide an open hand across the cassettes or the platter: it doesn't lock to your hand but is pulled along softly, so a slow slide nudges it and a quick one flicks it into a spin. A spin glides for a few seconds, ticking as each cassette passes, and settles softly with one cassette at the front; put a hand back into it, or pinch its edge, and it brakes quickly but smoothly. Taking a cassette off a spinning turntable stops it too. **Turntable** on `WorldMenu` tunes the friction, how strongly a sliding hand pulls it, how quickly a hand catches it, its top speed, the grip's smoothing and the speed below which it settles.
 - **Playing.** Pinch a cassette (or close your hand round it) to pick it up and bring it to the radio's open door: a glowing outline shows where it goes, and letting go drops it in. The door shuts with a clunk, the light comes on and the song plays, with the reels turning and the speakers pumping with the bass. Let go anywhere else and it floats home; a new cassette pops the old one back to its place. The radio's keys play or pause, stop and eject, pressed with a fingertip like the menu's buttons; Play with the radio empty plays the front cassette.
 - **Adding a song.** Put the blank cassette at the end of the ring in the radio to open the headset's file picker; the new song gets its own cassette.
-- **Song list.** The **Song list** button on the table opens the song page (adding or changing lyrics, removing songs, the Audius tab and credits). Its **Back** button returns to the deck.
+- **Song list.** The **Song list** button on the table opens the song page (adding or changing lyrics, removing songs). Its **Back** button returns to the deck.
 - **Closing.** The table's **Close** button or Meta's menu gesture closes the deck and leaves you in your world. Listen mode, the lyrics switch and the previous and next song stay in the menu's song row.
 - **Models.** The cassette, radio, turntable and table are made by `Tools/blender/cassette_deck.py` (`blender -b --factory-startup -P Tools/blender/cassette_deck.py`), which exports them to `Assets/_Project/Resources/CassetteDeck`. The deck finds their parts by name and gives each material slot the deck's material of the same name (`Resources/CassetteDeck/Materials`, set up by **Update Cassette Deck Materials**), so a new export needs no code change.
 
@@ -102,15 +101,6 @@ People can play their own music: they copy an audio file (`.mp3`, `.ogg` or `.wa
 - The menu looks for new files each time it opens. An added song's audio is loaded only while it plays, and MP3 and OGG files stay compressed, so a song starts without a pause.
 - They have no melody notes, so the worlds that use them behave as in Listen mode.
 - The app only plays these files and shows their lyrics to the person wearing the headset; nothing is uploaded or shared.
-
-## Songs from Audius
-The app also streams a short, hand-picked list of songs from [Audius](https://audius.co), a free music service for independent artists. They come after your own songs in the arrow bubbles and on the cassette deck's turntable, and the song page (the deck's **Song list** button) has an **Audius** tab that lists them, each with its credit.
-
-- The list is `Assets/_Project/Resources/AudiusSongs.txt`: one track per line, its id and then its page. The first time the menu opens, the app asks Audius for those tracks in one request. A song's audio, a whole MP3 of 5 to 15 MB, streams in when it is chosen, stays compressed while it plays (decoding a whole song at once froze the headset for 0.7 s), and is freed when another song plays. The headset's log notes each one (`[Audius] Streamed <title>: <size> in <time>`). No account or API key is needed, and each play counts towards the track's plays on Audius.
-- **Picking songs.** A track's id is `data.id` at `https://api.audius.co/v1/resolve?url=<the song's page>&app_name=MusicInYourHands`. Only pick tracks published by their own artist or label, with no remixes, mashups, covers, DJ mixes, samples of other people's music or explicit lyrics: anyone can upload to Audius, and its license only holds if the publisher owns the song. Listen to each one all the way through before a release. The first ten picks (1 Nov 2026) are electronic, house, lo-fi, ambient, jazz, drum and bass and trance tracks from verified artists and labels, chosen by these rules from Audius's track details alone; nobody has listened to them yet.
-- **Credits.** Audius's [Open Music License](https://openaudiofoundation.org/open-music-license.pdf) lets music players stream its tracks. For commercial use (§1.5) it asks for the publisher's name, a copyright notice, a mention of the license and a link to the track. Each song on the Audius tab shows "© publisher", its **Credits** page shows all four, and while a song from Audius plays the menu shows a credit line under the song row. On the cassette deck, a song from Audius shows its title, publisher and license over the turntable when it is at the front, and its credit above the radio while it plays. If an artist asks to be left out, take their song off the list.
-- Without internet, the Audius tab says it couldn't reach Audius and offers **Try again**, and a song that can't stream says so in the menu. Everything else works offline. If an artist removes or locks a track, it drops off the list; **Run Editor Checks** warns when a picked song can't play any more, and fails if a streamed song takes 100 ms or more to get ready.
-- The app sends Audius nothing about the person, but Audius and the servers its music comes from see each request, including the headset's IP address, so the app's privacy policy should mention it. The `INTERNET` permission this needs is in `Assets/Plugins/Android/AndroidManifest.xml`.
 
 ## Adding a world
 Each world is one class in `Assets/_Project/Scripts/Runtime/Worlds` that extends `World`. The base class runs what every world shares, so a world describes itself and overrides the hooks it needs:

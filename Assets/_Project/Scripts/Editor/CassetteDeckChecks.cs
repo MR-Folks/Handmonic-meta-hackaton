@@ -132,7 +132,7 @@ namespace MusicInYourHands.EditorTools
             bso.ApplyModifiedPropertiesWithoutUndo();
             typeof(MusicBus).GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(bus, null);
             // The playlist as the menu's refresh makes it: the demo songs, then any added on this computer.
-            typeof(MusicBus).GetMethod("ListSongs", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(bus, null);
+            bus.RefreshSongs();
 
             var menu = new GameObject("WorldMenu").AddComponent<WorldMenu>();
             var wso = new SerializedObject(menu);

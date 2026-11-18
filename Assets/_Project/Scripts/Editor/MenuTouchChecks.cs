@@ -141,8 +141,8 @@ namespace MusicInYourHands.EditorTools
             Run(0.6f);
 
             // The song bubble opens the cassette deck and the menu steps aside. A touch presses the song page's buttons:
-            // open the page (as the deck's song list button does), then touch the Audius tab, which shows "Try again"
-            // here since there is no MusicBus to ask Audius.
+            // open the page (as the deck's song list button does), then touch its Add button, which shows a message here
+            // since the file picker only opens on the headset.
             OpenMenu();
             var library = Bubble("Bubble Library");
             Move(library - toward * 0.1f, 8);
@@ -154,20 +154,20 @@ namespace MusicInYourHands.EditorTools
             Run(0.7f);
             var page = root.Find("Song Library");
             bool pageShown = page.gameObject.activeSelf;
-            var tab = page.Find("Audius Tab").position;
-            bool retryBefore = page.Find("Try Again").gameObject.activeSelf;
-            Move(tab - toward * 0.06f, 6);
-            Move(tab + toward * 0.01f, 6);
+            var add = page.Find("Add").position;
+            bool messageBefore = page.Find("Message").gameObject.activeSelf;
+            Move(add - toward * 0.06f, 6);
+            Move(add + toward * 0.01f, 6);
             Run(0.2f);
-            bool tabbed = !retryBefore && page.Find("Try Again").gameObject.activeSelf;
+            bool added = !messageBefore && page.Find("Message").gameObject.activeSelf;
 
             menu.Close();
             LyricsOption.On = lyricsWere;
-            bool ok = !early && reached && ignored && cameBack && once && twice && pinched && deckOpened && pageShown && tabbed;
+            bool ok = !early && reached && ignored && cameBack && once && twice && pinched && deckOpened && pageShown && added;
             if (ok) Debug.Log("[Check] The menu answers touch and pinch: a fingertip presses a bubble as it reaches it, once per tap and never from behind, a far hand still points and pinches, the song bubble opens the cassette deck, and a touch presses the song page's buttons.");
             else Debug.LogError($"[Check] Menu touch: pressed early {early}, pressed on arrival {reached}, ignored from behind {ignored}, " +
                                 $"pressed after coming back out {cameBack}, held press counted once {once}, second tap {twice}, " +
-                                $"pinch from afar {pinched}, song bubble opened the deck {deckOpened}, song page opened {pageShown}, page tab touched {tabbed}.");
+                                $"pinch from afar {pinched}, song bubble opened the deck {deckOpened}, song page opened {pageShown}, page's Add button touched {added}.");
             return ok;
         }
     }

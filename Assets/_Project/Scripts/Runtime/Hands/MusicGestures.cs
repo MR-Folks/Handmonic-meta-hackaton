@@ -245,7 +245,7 @@ namespace MusicInYourHands
         }
 
         /// <summary>
-        /// While the song a swipe chose is still loading (read from the headset or streaming from Audius), its caption
+        /// While the song a swipe chose is still loading (read from the headset), its caption
         /// stays; once it plays the caption lingers a moment longer, and if it couldn't load the caption says so.
         /// </summary>
         void Await(IMusicRemote music)
@@ -260,7 +260,7 @@ namespace MusicInYourHands
             awaited = null;
             if (music == null) return;
             if (music.Failed == song)
-                Show(Fit(song.IsFromAudius ? "Couldn't stream " : "Couldn't play ", Title(song), ""),
+                Show(Fit("Couldn't play ", Title(song), ""),
                     awaitedStep > 0 ? NextIcon : PreviousIcon, false, FailColor, 0);
             else if (music.Current == song)
             {

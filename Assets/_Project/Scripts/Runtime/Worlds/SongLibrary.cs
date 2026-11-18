@@ -6,18 +6,17 @@ using UnityEngine;
 namespace MusicInYourHands
 {
     /// <summary>
-    /// The menu's song page, with a tab for the songs people add themselves and one for the songs from Audius. Your
+    /// The menu's song page, for the songs people add themselves. Your
     /// songs are listed with whether each has lyrics; touching or pinching a row plays that song, and each row can add or change its
     /// lyrics or remove the song. Adding a song is a guided step at a time: pick the song from the headset's files, it
     /// starts playing straight away, then the page offers to add its lyrics. The menu steps aside while the file
-    /// picker's window is open and comes back when it is done. The Audius tab lists the songs the app streams, each with
-    /// the credit its license asks for; a song's Credits page adds the link to its page on Audius.
+    /// picker's window is open and comes back when it is done.
     /// The page is reached from the cassette deck's song list button, and its Back button goes back to the deck.
     /// </summary>
     public sealed class SongLibrary
     {
         // Numbered for the editor screenshots (Preview), so new views go at the end.
-        enum View { List, AskLyrics, ConfirmRemove, Audius, Credits }
+        enum View { List, AskLyrics, ConfirmRemove }
 
         sealed class Button
         {
@@ -41,16 +40,15 @@ namespace MusicInYourHands
 
         sealed class Row
         {
-            public Button Play, Lyrics, Remove, Credits;
+            public Button Play, Lyrics, Remove;
             public Text Title, Status, Artist;
         }
 
         const int RowsPerPage = 4;
         const float Width = 0.6f, Height = 0.43f;
         const float RowStep = 0.062f, FirstRow = 0.105f;
-        const float TitleWidth = 0.3f, ArtistWidth = 0.21f, StreamedWidth = 0.37f;
+        const float TitleWidth = 0.3f, ArtistWidth = 0.21f;
         const float ToastSeconds = 4f;
-        const string StreamedNote = "Streamed from Audius under the " + AudiusSongs.License;
 
         static readonly int ColorId = Shader.PropertyToID("_Color");
         static readonly int EdgeId = Shader.PropertyToID("_Edge");
@@ -65,11 +63,9 @@ namespace MusicInYourHands
         static readonly Color Danger = new Color(0.72f, 0.2f, 0.26f, 0.96f);
         static readonly Color RowFill = new Color(1f, 1f, 1f, 0.05f);
         static readonly Color PlayingFill = new Color(0.42f, 0.38f, 1f, 0.26f);
-        static readonly Color TabOn = new Color(0.42f, 0.38f, 1f, 0.7f);
         static readonly Color Soft = new Color(1f, 1f, 1f, 0.72f);
         static readonly Color HasLyrics = new Color(0.55f, 0.95f, 0.7f);
         static readonly Color NoLyrics = new Color(1f, 0.8f, 0.45f);
-        static readonly Color Link = new Color(0.55f, 0.85f, 1f);
 
         readonly Transform page;
         readonly Renderer panel;
@@ -80,10 +76,10 @@ namespace MusicInYourHands
         readonly List<SongAsset> songs = new List<SongAsset>();
         readonly Row[] rows = new Row[RowsPerPage];
         readonly Material material;
-        readonly Button add, back, previous, next, confirm, decline, yours, streamed, retry;
-        readonly Text heading, count, pageNumber, line1, line2, line3, line4, footer, toast;
+        readonly Button add, back, previous, next, confirm, decline;
+        readonly Text heading, count, pageNumber, line1, line2, line3, toast;
 
-        View view, tab;
+        View view;
         SongAsset focus, playing;
         IReadOnlyList<SongAsset> previewSongs;
         int pageIndex;
@@ -121,8 +117,6 @@ namespace MusicInYourHands
             line1 = MakeText("Line 1", 0.022f, false);
             line2 = MakeText("Line 2", 0.0155f, false);
             line3 = MakeText("Line 3", 0.0125f, false);
-            line4 = MakeText("Line 4", 0.0125f, false);
-            footer = MakeText("Footer", 0.0118f, false);
             toast = MakeText("Message", 0.0135f, false);
             for (int i = 0; i < RowsPerPage; i++)
                 rows[i] = new Row
@@ -132,8 +126,7 @@ namespace MusicInYourHands
                     Status = MakeText($"Row {i} Lyrics Status", 0.0118f, true),
                     Artist = MakeText($"Row {i} Artist", 0.0118f, true),
                     Lyrics = MakeButton($"Row {i} Lyrics", 0.0125f),
-                    Remove = MakeButton($"Row {i} Remove", 0.018f),
-                    Credits = MakeButton($"Row {i} Credits", 0.0125f)
+                    Remove = MakeButton($"Row {i} Remove", 0.018f)
                 };
             add = MakeButton("Add", 0.0155f);
             back = MakeButton("Back", 0.0145f);
@@ -141,9 +134,6 @@ namespace MusicInYourHands
             next = MakeButton("Next Page", 0.018f);
             confirm = MakeButton("Confirm", 0.0155f);
             decline = MakeButton("Decline", 0.0155f);
-            yours = MakeButton("Your Songs Tab", 0.0145f);
-            streamed = MakeButton("Audius Tab", 0.0145f);
-            retry = MakeButton("Try Again", 0.0155f);
             page.gameObject.SetActive(false);
         }
 
@@ -163,11 +153,10 @@ namespace MusicInYourHands
             return t;
         }
 
-        /// <summary>Opens the page on the tab it last showed.</summary>
         public void Show()
         {
             IsOpen = true;
-            view = tab;
+            view = View.List;
             focus = null;
         }
 
@@ -186,7 +175,6 @@ namespace MusicInYourHands
             playing = current;
             IsOpen = true;
             view = (View)previewView;
-            tab = view == View.Audius || view == View.Credits ? View.Audius : View.List;
             focus = list != null && list.Count > 0 ? list[0] : null;
             if (view == View.List) toastLeft = ToastSeconds;
             if (view == View.List) toast.Label.Text = "Lyrics added to Sunday Morning";
@@ -202,7 +190,6 @@ namespace MusicInYourHands
             if (bus == null || !SongPicker.TryTake(out var result)) return false;
             outcome = result.Outcome;
             Show();
-            tab = view = View.List;
             switch (result.Outcome)
             {
                 case SongPicker.Outcome.Cancelled:
@@ -301,13 +288,6 @@ namespace MusicInYourHands
             bus.RefreshSongs();
         }
 
-        void SwitchTo(View which, MusicBus bus)
-        {
-            tab = view = which;
-            pageIndex = 0;
-            if (which == View.Audius) bus?.AskAudius();
-        }
-
         /// <summary>
         /// One frame of the page. <paramref name="aims"/> are where the two hands point or hover, in the menu's space,
         /// and <paramref name="presses"/> where each touched or pinched this frame.
@@ -327,8 +307,6 @@ namespace MusicInYourHands
             {
                 case View.AskLyrics: LayOutAskLyrics(); break;
                 case View.ConfirmRemove: LayOutConfirmRemove(bus); break;
-                case View.Audius: LayOutAudius(bus); break;
-                case View.Credits: LayOutCredits(bus); break;
                 default: LayOutList(bus); break;
             }
             if (toastLeft > 0f && view == View.List) Show(toast, null, new Vector2(0f, -0.14f), Soft);
@@ -362,26 +340,18 @@ namespace MusicInYourHands
             pressed.Click();
         }
 
-        /// <summary>The songs of the open tab: the ones added on the headset, or the ones from Audius.</summary>
         void Gather(MusicBus bus)
         {
             songs.Clear();
-            bool fromAudius = tab == View.Audius;
             var all = previewSongs ?? bus?.Songs;
             if (all != null)
                 foreach (var song in all)
-                    if (song != null && (fromAudius ? song.IsFromAudius : song.IsAdded)) songs.Add(song);
+                    if (song != null && song.IsAdded) songs.Add(song);
             if (previewSongs == null) playing = bus != null && !bus.IsListening ? bus.CurrentSong : null;
             pageIndex = Mathf.Clamp(pageIndex, 0, Mathf.Max(0, Pages - 1));
         }
 
         int Pages => (songs.Count + RowsPerPage - 1) / RowsPerPage;
-
-        void LayOutTabs(MusicBus bus)
-        {
-            Put(yours, new Vector2(-0.205f, 0.176f), new Vector2(0.13f, 0.034f), "Your songs", tab == View.List ? TabOn : Secondary, () => SwitchTo(View.List, bus));
-            Put(streamed, new Vector2(-0.085f, 0.176f), new Vector2(0.1f, 0.034f), "Audius", tab == View.Audius ? TabOn : Secondary, () => SwitchTo(View.Audius, bus));
-        }
 
         void LayOutPages()
         {
@@ -393,7 +363,7 @@ namespace MusicInYourHands
 
         void LayOutList(MusicBus bus)
         {
-            LayOutTabs(bus);
+            Show(heading, "Your songs", new Vector2(-Width * 0.5f + 0.03f, 0.172f), Color.white);
             if (songs.Count > 0) Show(count, songs.Count == 1 ? "1 song" : $"{songs.Count} songs", new Vector2(-Width * 0.5f + 0.03f, 0.145f), Soft);
             Put(add, new Vector2(0.17f, 0.165f), new Vector2(0.19f, 0.05f), "+  Add a song", Primary, () => Pick(SongPicker.Kind.Song, null));
             Put(back, new Vector2(-0.215f, -0.178f), new Vector2(0.11f, 0.042f), "Back", Secondary, Back);
@@ -431,77 +401,6 @@ namespace MusicInYourHands
                 focus = song;
                 view = View.ConfirmRemove;
             });
-        }
-
-        /// <summary>The Audius tab: the songs, or why there are none yet.</summary>
-        void LayOutAudius(MusicBus bus)
-        {
-            LayOutTabs(bus);
-            Put(back, new Vector2(-0.215f, -0.178f), new Vector2(0.11f, 0.042f), "Back", Secondary, Back);
-            var status = previewSongs != null ? AudiusSongs.Status.Ready : bus != null ? bus.AudiusStatus : AudiusSongs.Status.Unreachable;
-            if (status == AudiusSongs.Status.NotAsked) bus?.AskAudius();
-
-            if (songs.Count == 0)
-            {
-                if (status == AudiusSongs.Status.Unreachable)
-                {
-                    Show(line1, "Couldn't reach Audius", new Vector2(0f, 0.06f), Color.white);
-                    Show(line2, "Songs from Audius stream over the internet. Check the headset's Wi-Fi.", new Vector2(0f, 0.022f), Soft);
-                    Put(retry, new Vector2(0f, -0.04f), new Vector2(0.15f, 0.05f), "Try again", Primary, () => bus?.AskAudius(true));
-                }
-                else if (status == AudiusSongs.Status.Ready) Show(line1, "No songs from Audius right now", new Vector2(0f, 0.05f), Color.white);
-                else Show(line1, "Getting the songs from Audius…", new Vector2(0f, 0.05f), Soft);
-                return;
-            }
-
-            Show(count, songs.Count == 1 ? "1 song" : $"{songs.Count} songs", new Vector2(-Width * 0.5f + 0.03f, 0.145f), Soft);
-            for (int i = 0; i < RowsPerPage; i++)
-            {
-                int index = pageIndex * RowsPerPage + i;
-                if (index < songs.Count) LayOutStreamedRow(rows[i], songs[index], FirstRow - i * RowStep, bus);
-            }
-            Show(footer, StreamedNote, new Vector2(0f, -0.135f), Soft);
-            LayOutPages();
-        }
-
-        void LayOutStreamedRow(Row row, SongAsset song, float y, MusicBus bus)
-        {
-            bool isPlaying = song == playing;
-            bool streaming = bus != null && bus.Loading == song;
-            bool failed = bus != null && bus.Failed == song;
-            const float left = -Width * 0.5f + 0.042f;
-            Put(row.Play, new Vector2(0f, y), new Vector2(Width - 0.04f, 0.056f), "", isPlaying ? PlayingFill : RowFill, () => bus?.Play(song));
-            Show(row.Title, Fit(song.title, 0.0175f, StreamedWidth), new Vector2(left, y + 0.0095f), Color.white);
-            string detail = streaming ? "Streaming…" : failed ? "Couldn't stream it. Is the headset online?"
-                : isPlaying ? $"Playing now  ·  {AudiusSongs.Byline(song)}" : AudiusSongs.Byline(song);
-            Show(row.Status, Fit(detail, 0.0118f, StreamedWidth), new Vector2(left, y - 0.0135f), failed ? NoLyrics : streaming ? HasLyrics : Soft);
-            Put(row.Credits, new Vector2(0.195f, y), new Vector2(0.13f, 0.038f), "Credits", Secondary, () =>
-            {
-                focus = song;
-                view = View.Credits;
-            });
-        }
-
-        /// <summary>A song's credits, as its license asks: the song, its artist, the copyright owner, the license and a link.</summary>
-        void LayOutCredits(MusicBus bus)
-        {
-            var song = focus;
-            if (song == null)
-            {
-                view = View.Audius;
-                return;
-            }
-            const float wide = Width - 0.08f;
-            bool isPlaying = song == playing;
-            Show(heading, "Credits", new Vector2(-Width * 0.5f + 0.03f, 0.172f), Color.white);
-            Show(line1, Fit(song.title, 0.022f, wide), new Vector2(0f, 0.11f), Color.white);
-            Show(line2, Fit($"by {song.artist}", 0.0155f, wide), new Vector2(0f, 0.074f), Soft);
-            Show(line3, Fit($"© {song.owner}", 0.0125f, wide), new Vector2(0f, 0.046f), Soft);
-            Show(line4, Fit(AudiusSongs.ShortLink(song), 0.0125f, wide), new Vector2(0f, 0.02f), Link);
-            Show(footer, StreamedNote, new Vector2(0f, -0.008f), Soft);
-            Put(confirm, new Vector2(-0.08f, -0.075f), new Vector2(0.15f, 0.056f), isPlaying ? "Playing" : "Play", isPlaying ? Secondary : Primary,
-                () => { if (song != playing) bus?.Play(song); });
-            Put(decline, new Vector2(0.09f, -0.075f), new Vector2(0.13f, 0.056f), "Back", Secondary, () => view = View.Audius);
         }
 
         void LayOutAskLyrics()
