@@ -17,6 +17,8 @@ namespace MusicInYourHands
     /// them, rippling with the bass; pull your hands apart and it splashes.</item>
     /// </list>
     /// The sung words are carried by the element: carved into the rocks, or floating in bubbles of water.
+    /// The rocks, cracks, streams and ball of water sit in your room: real furniture in front of them hides them, and so
+    /// do your real hands, so a stream winds behind your hand and your fingers cut into the ball of water.
     /// </summary>
     public class EarthAndWater : World
     {
@@ -35,6 +37,8 @@ namespace MusicInYourHands
         public override int MenuIcon => 28;
 
         public override string Hint => "Move earth and water with your hands; clench both fists to switch";
+
+        public override bool HiddenByRealRoom => true;
 
         public override HandTheme Theme => Themes[current];
 
@@ -222,12 +226,12 @@ namespace MusicInYourHands
                 SungWords.Rim = 0.7f;
             }
 
-            motes = Effects.MakeSparkSystem("Motes", transform, glowMaterial);
+            motes = Effects.MakeSparkSystem("Motes", transform, InRoom(glowMaterial));
             var main = motes.main;
             main.maxParticles = 1000;
             main.gravityModifier = -0.015f;
             Drag(motes, 1.4f);
-            falling = Effects.MakeSparkSystem("Falling", transform, glowMaterial);
+            falling = Effects.MakeSparkSystem("Falling", transform, InRoom(glowMaterial));
             main = falling.main;
             main.maxParticles = 700;
             main.gravityModifier = 0.5f;
@@ -237,8 +241,9 @@ namespace MusicInYourHands
             streaks.velocityScale = 0.035f;
             streaks.lengthScale = 1.4f;
 
-            flash = Effects.MakeQuad("Change Flash", transform, glowMaterial);
-            ring = Effects.MakeQuad("Change Ring", transform, ringMaterial);
+            flash = Effects.MakeQuad("Change Flash", transform, InRoom(glowMaterial));
+            ring = Effects.MakeQuad("Change Ring", transform, InRoom(ringMaterial));
+            // The charge glows between your fists, so it stays in front of your hands.
             charge = Effects.MakeQuad("Fist Charge", transform, glowMaterial);
             Show(flash, false);
             Show(ring, false);
@@ -286,7 +291,7 @@ namespace MusicInYourHands
             bubbles = new Renderer[SungWordCount];
             for (int i = 0; i < bubbles.Length; i++)
             {
-                bubbles[i] = Effects.MakeQuad($"Word Bubble {i}", transform, bubbleMaterial);
+                bubbles[i] = Effects.MakeQuad($"Word Bubble {i}", transform, InRoom(bubbleMaterial));
                 Show(bubbles[i], false);
             }
         }

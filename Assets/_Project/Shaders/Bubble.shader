@@ -1,6 +1,8 @@
 // A soap-bubble button for the world menu, drawn on a camera-facing quad: a clear glass body, an iridescent rim,
 // a glossy highlight and a small animated emblem of the world inside. _Icon picks the emblem (-1 for none, as the
-// Bubble notes world uses it for its plain bubbles).
+// Bubble notes world uses it for its plain bubbles). The menu's bubbles always stay in front: only a world's own copy
+// with _RoomOcclusion 1 (Bubble notes', Earth and water's) hides behind real things while the real room's depth is on
+// (RoomOcclusion.hlsl).
 Shader "MusicInYourHands/Bubble"
 {
     Properties
@@ -12,6 +14,8 @@ Shader "MusicInYourHands/Bubble"
         _Alpha ("Alpha", Float) = 1
         _Eq ("Music bands for the now-playing emblem", Vector) = (0.5, 0.5, 0.5, 0.5)
         _Paused ("Paused 0-1", Float) = 0
+        _RoomOcclusion ("Hidden by the real room 0-1 (a world's own copy; 0 for the menu)", Float) = 0
+        _EnvironmentDepthBias ("Real-room depth bias (share of the distance)", Float) = 0.03
     }
 
     SubShader
@@ -30,7 +34,9 @@ Shader "MusicInYourHands/Bubble"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
+            #pragma multi_compile _ HARD_OCCLUSION SOFT_OCCLUSION
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "RoomOcclusion.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _Color;
@@ -40,6 +46,8 @@ Shader "MusicInYourHands/Bubble"
                 float _Alpha;
                 float4 _Eq;
                 float _Paused;
+                float _RoomOcclusion;
+                float _EnvironmentDepthBias;
             CBUFFER_END
 
             struct Attributes
@@ -53,6 +61,7 @@ Shader "MusicInYourHands/Bubble"
             {
                 float4 positionCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
+                META_DEPTH_VERTEX_OUTPUT(1)
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -63,6 +72,7 @@ Shader "MusicInYourHands/Bubble"
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
                 output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
                 output.uv = input.uv;
+                META_DEPTH_INITIALIZE_VERTEX_OUTPUT(output, input.positionOS.xyz);
                 return output;
             }
 
@@ -564,6 +574,8 @@ Shader "MusicInYourHands/Bubble"
                 color += _Color.rgb * _Selected * smoothstep(0.86, 0.95, r) * 0.9;
 
                 alpha *= _Alpha * smoothstep(1.0, 0.96, r);
+                float visible = META_DEPTH_GET_OCCLUSION_VALUE(input, _EnvironmentDepthBias);
+                alpha *= lerp(1, visible, _RoomOcclusion);
                 return half4(color, saturate(alpha));
             }
             ENDHLSL

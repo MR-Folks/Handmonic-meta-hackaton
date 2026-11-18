@@ -18,6 +18,8 @@ namespace MusicInYourHands
     /// to meet it, glowing, with a soft note and pollen rising to your palm.
     /// The whole garden is one mesh drawn in one go: the shader bends and poses every flower from a few values per
     /// flower that this class sets each frame.
+    /// The garden grows in your room: a chair or a table leg in front of a flower hides it, and so do your real hands as
+    /// they pass in front; the sun glowing in your palm stays on your hand.
     /// </summary>
     public class FlowerDance : World
     {
@@ -30,6 +32,8 @@ namespace MusicInYourHands
         public override int MenuIcon => 26;
 
         public override string Hint => "Your hand is the sun: move it and the flowers lean after it";
+
+        public override bool HiddenByRealRoom => true;
 
         // Sun-warm hands: golden edges and a glow of heat.
         public override HandTheme Theme => new HandTheme
@@ -271,16 +275,17 @@ namespace MusicInYourHands
             halos = new Renderer[HaloCount];
             for (int h = 0; h < HaloCount; h++)
             {
-                halos[h] = Effects.MakeQuad($"Flower Glow {h}", transform, glowMaterial);
+                halos[h] = Effects.MakeQuad($"Flower Glow {h}", transform, InRoom(glowMaterial));
                 halos[h].gameObject.SetActive(false);
             }
             suns = new Renderer[2];
             for (int s = 0; s < 2; s++)
             {
+                // The suns shine from your palms, so they stay in front of your hands.
                 suns[s] = Effects.MakeQuad(s == 0 ? "Sun L" : "Sun R", transform, glowMaterial);
                 suns[s].gameObject.SetActive(false);
             }
-            pollen = Effects.MakeSparkSystem("Pollen", transform, glowMaterial);
+            pollen = Effects.MakeSparkSystem("Pollen", transform, InRoom(glowMaterial));
             var main = pollen.main;
             main.maxParticles = 400;
             main.gravityModifier = -0.01f;

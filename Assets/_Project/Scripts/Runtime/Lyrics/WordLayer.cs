@@ -42,6 +42,7 @@ namespace MusicInYourHands
         static readonly int HaloId = Shader.PropertyToID("_Halo");
         static readonly int GlowId = Shader.PropertyToID("_Glow");
         static readonly int RimId = Shader.PropertyToID("_Rim");
+        static readonly int RoomOcclusionId = Shader.PropertyToID("_RoomOcclusion");
 
         readonly List<Word> words = new List<Word>();
         readonly LyricCursor cursor;
@@ -62,6 +63,15 @@ namespace MusicInYourHands
         public float Rim
         {
             set => material.SetFloat(RimId, value);
+        }
+
+        /// <summary>
+        /// Whether the words hide behind real things in front of them (the real room's depth, while a world that is
+        /// <see cref="World.HiddenByRealRoom"/> is on). World sets it for such worlds' sung words.
+        /// </summary>
+        public bool HiddenByRoom
+        {
+            set => material.SetFloat(RoomOcclusionId, value ? 1f : 0f);
         }
 
         /// <summary>The current word's position in its line (0 for the first word).</summary>

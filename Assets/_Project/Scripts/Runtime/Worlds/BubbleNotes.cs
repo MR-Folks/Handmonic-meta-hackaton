@@ -17,6 +17,8 @@ namespace MusicInYourHands
     /// popping works just as before.
     /// A trail of water winds round each hand and follows it through the air: at rest it coils round the palm, swept
     /// through the air it pours along behind the hand like a smooth ribbon, shedding drops where it whips round.
+    /// It all sits in your room: the fish swim behind your real sofa, and your real hands pass in front of the bubbles
+    /// (a fingertip popping one hides the part of it behind the finger) and wind through the water trails.
     /// </summary>
     public class BubbleNotes : World
     {
@@ -29,6 +31,8 @@ namespace MusicInYourHands
         public override int MenuIcon => 10;
 
         public override string Hint => "Pop the bubbles with a fingertip; hold out a hand and the fish gather";
+
+        public override bool HiddenByRealRoom => true;
 
         public override HandTheme Theme => new HandTheme
         {
@@ -239,13 +243,13 @@ namespace MusicInYourHands
             block = new MaterialPropertyBlock();
             for (int i = 0; i < maxBubbles; i++)
             {
-                var b = new Bubble { Renderer = Effects.MakeQuad($"Bubble {i}", transform, bubbleMaterial) };
+                var b = new Bubble { Renderer = Effects.MakeQuad($"Bubble {i}", transform, InRoom(bubbleMaterial)) };
                 b.Renderer.gameObject.SetActive(false);
                 bubbles.Add(b);
             }
             for (int i = 0; i < 10; i++)
             {
-                var p = new Pop { Ring = Effects.MakeQuad($"Pop {i}", transform, ringMaterial), Flash = Effects.MakeQuad($"Pop Flash {i}", transform, glowMaterial) };
+                var p = new Pop { Ring = Effects.MakeQuad($"Pop {i}", transform, InRoom(ringMaterial)), Flash = Effects.MakeQuad($"Pop Flash {i}", transform, InRoom(glowMaterial)) };
                 p.Ring.gameObject.SetActive(false);
                 p.Flash.gameObject.SetActive(false);
                 pops.Add(p);
@@ -253,7 +257,7 @@ namespace MusicInYourHands
             voices = new AudioPool(transform, 6);
             // The pops get their own voices, so a quick run of pops never cuts off a note still ringing.
             popVoices = new AudioPool(transform, 2);
-            droplets = Effects.MakeSparkSystem("Droplets", transform, glowMaterial);
+            droplets = Effects.MakeSparkSystem("Droplets", transform, InRoom(glowMaterial));
             var main = droplets.main;
             main.gravityModifier = 0.25f;
             BuildFish();
@@ -329,7 +333,7 @@ namespace MusicInYourHands
                 if (f.Eager < gatherShare) f.Rank = eager++;
                 fish[i] = f;
             }
-            fishBubbles = Effects.MakeSparkSystem("Fish Bubbles", transform, glowMaterial);
+            fishBubbles = Effects.MakeSparkSystem("Fish Bubbles", transform, InRoom(glowMaterial));
             var main = fishBubbles.main;
             main.maxParticles = 120;
             main.gravityModifier = -0.01f;

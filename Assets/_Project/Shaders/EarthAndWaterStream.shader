@@ -1,7 +1,8 @@
 // Earth and water: a stream of water flowing through the air, drawn on a camera-facing strip built by LineStrip (uv.x
 // from the hand to the tail, uv.y across). It is shaded as a round, see-through tube: deep blue in its body, lighter at
 // its edges, a bright highlight running along one side, and glints that flow down its length (_Length is the stream's
-// length in metres, so they keep their spacing). Vertex colour tints it and fades its ends.
+// length in metres, so they keep their spacing). Vertex colour tints it and fades its ends. Real things hide it behind
+// them while the real room's depth is on (RoomOcclusion.hlsl), so it winds behind your real hand.
 Shader "MusicInYourHands/EarthAndWaterStream"
 {
     Properties
@@ -11,6 +12,7 @@ Shader "MusicInYourHands/EarthAndWaterStream"
         _Length ("Stream length in metres (set by EarthAndWater)", Float) = 0.5
         _Clock ("Time (set by EarthAndWater)", Float) = 0
         _Alpha ("Fade (set by EarthAndWater)", Float) = 1
+        _EnvironmentDepthBias ("Real-room depth bias (share of the distance)", Float) = 0.02
     }
 
     SubShader
@@ -29,7 +31,9 @@ Shader "MusicInYourHands/EarthAndWaterStream"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
+            #pragma multi_compile _ HARD_OCCLUSION SOFT_OCCLUSION
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "RoomOcclusion.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _Deep;
@@ -37,6 +41,7 @@ Shader "MusicInYourHands/EarthAndWaterStream"
                 float _Length;
                 float _Clock;
                 float _Alpha;
+                float _EnvironmentDepthBias;
             CBUFFER_END
 
             struct Attributes
@@ -52,6 +57,7 @@ Shader "MusicInYourHands/EarthAndWaterStream"
                 float4 positionCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
                 float4 color : COLOR;
+                META_DEPTH_VERTEX_OUTPUT(1)
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -63,6 +69,7 @@ Shader "MusicInYourHands/EarthAndWaterStream"
                 output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
                 output.uv = input.uv;
                 output.color = input.color;
+                META_DEPTH_INITIALIZE_VERTEX_OUTPUT(output, input.positionOS.xyz);
                 return output;
             }
 
@@ -84,7 +91,8 @@ Shader "MusicInYourHands/EarthAndWaterStream"
                 color += (streak * 0.75 + glint * 0.45) * float3(0.9, 0.97, 1.0);
                 float soft = smoothstep(1.0, 0.72, abs(across));
                 float alpha = (_Deep.a * (0.5 + 0.5 * z) + edge * 0.45 + streak * 0.55 + glint * 0.4) * soft;
-                return half4(color * input.color.rgb, saturate(alpha * input.color.a) * _Alpha);
+                float visible = META_DEPTH_GET_OCCLUSION_VALUE(input, _EnvironmentDepthBias);
+                return half4(color * input.color.rgb, saturate(alpha * input.color.a) * _Alpha * visible);
             }
             ENDHLSL
         }

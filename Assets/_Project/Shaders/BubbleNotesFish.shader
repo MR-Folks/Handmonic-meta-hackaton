@@ -6,12 +6,14 @@
 // fish's colour on its flanks and a pale belly, a soft soap-film sheen like the bubbles', a stripe along each side that
 // glows with the fish's part of the music (_Tint.a), dark eyes with a glint, fins that look see-through with fine rays,
 // a rim of pale water light, light dancing over the back, and a glow when the beat's wave passes (_Swim.z).
+// Real things hide the fish behind them while the real room's depth is on (RoomOcclusion.hlsl): they swim behind your sofa.
 Shader "MusicInYourHands/BubbleNotesFish"
 {
     Properties
     {
         _Light ("Light direction", Vector) = (0.25, 1, -0.35, 0)
         _Water ("Water light colour", Color) = (0.62, 0.95, 1, 1)
+        _EnvironmentDepthBias ("Real-room depth bias (share of the distance)", Float) = 0.03
     }
 
     SubShader
@@ -29,11 +31,14 @@ Shader "MusicInYourHands/BubbleNotesFish"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
+            #pragma multi_compile _ HARD_OCCLUSION SOFT_OCCLUSION
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "RoomOcclusion.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _Light;
                 float4 _Water;
+                float _EnvironmentDepthBias;
             CBUFFER_END
 
             UNITY_INSTANCING_BUFFER_START(Fish)
@@ -162,7 +167,10 @@ Shader "MusicInYourHands/BubbleNotesFish"
                 c = lerp(c, float3(0.85, 0.7, 0.35) * (0.5 + 0.5 * wrap), iris);
                 c = lerp(c, float3(0.02, 0.02, 0.03), pupil);
                 c += glint * 0.9;
-                return half4(c, 1);
+                // Opaque over passthrough: where something real is in front, colour and alpha fade out together.
+                half4 result = half4(c, 1);
+                META_DEPTH_OCCLUDE_OUTPUT_PREMULTIPLY_WORLDPOS(input.positionWS, result, _EnvironmentDepthBias);
+                return result;
             }
             ENDHLSL
         }

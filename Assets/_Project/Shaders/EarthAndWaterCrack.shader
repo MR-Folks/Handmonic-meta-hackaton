@@ -1,6 +1,7 @@
 // Earth and water: the cracked floor around a rising rock, on a quad lying flat on the ground. Wandering cracks run out
 // from the rock's footprint (_Inner, a share of the quad's half width), with finer branches between them, and glow from
-// below with _Glow: brightly while the rock moves or on the beat, faintly while it stands. Additive.
+// below with _Glow: brightly while the rock moves or on the beat, faintly while it stands. Additive. Real things hide it
+// behind them while the real room's depth is on (RoomOcclusion.hlsl); it lies on the floor, so its depth bias is large.
 Shader "MusicInYourHands/EarthAndWaterCrack"
 {
     Properties
@@ -9,6 +10,7 @@ Shader "MusicInYourHands/EarthAndWaterCrack"
         _Glow ("Glow 0-1 (set by EarthAndWater)", Float) = 0.3
         _Inner ("Footprint radius 0-1 (set by EarthAndWater)", Float) = 0.35
         _Seed ("Seed (set by EarthAndWater)", Float) = 0
+        _EnvironmentDepthBias ("Real-room depth bias (share of the distance)", Float) = 0.1
     }
 
     SubShader
@@ -27,13 +29,16 @@ Shader "MusicInYourHands/EarthAndWaterCrack"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
+            #pragma multi_compile _ HARD_OCCLUSION SOFT_OCCLUSION
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "RoomOcclusion.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _Color;
                 float _Glow;
                 float _Inner;
                 float _Seed;
+                float _EnvironmentDepthBias;
             CBUFFER_END
 
             struct Attributes
@@ -47,6 +52,7 @@ Shader "MusicInYourHands/EarthAndWaterCrack"
             {
                 float4 positionCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
+                META_DEPTH_VERTEX_OUTPUT(1)
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -65,6 +71,7 @@ Shader "MusicInYourHands/EarthAndWaterCrack"
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
                 output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
                 output.uv = input.uv;
+                META_DEPTH_INITIALIZE_VERTEX_OUTPUT(output, input.positionOS.xyz);
                 return output;
             }
 
@@ -91,7 +98,8 @@ Shader "MusicInYourHands/EarthAndWaterCrack"
                 float outside = smoothstep(_Inner - 0.03, _Inner + 0.04, r);
                 float halo = exp(-pow((r - _Inner) / 0.1, 2)) * 0.4;
                 float glow = (max(wide, fine * 0.7) * outside + halo) * _Glow * smoothstep(1.0, 0.85, r);
-                return half4(_Color.rgb * (0.7 + glow * 0.3), saturate(glow));
+                float visible = META_DEPTH_GET_OCCLUSION_VALUE(input, _EnvironmentDepthBias);
+                return half4(_Color.rgb * (0.7 + glow * 0.3), saturate(glow) * visible);
             }
             ENDHLSL
         }

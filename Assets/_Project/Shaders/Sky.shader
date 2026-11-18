@@ -2,6 +2,8 @@
 // on the quad you look, so the sky sits at infinity beyond the room and doesn't move as you walk around. _MainTex holds
 // the Milky Way and faint nebula; the sharp stars are drawn here, so they stay pin points at any resolution, and they
 // twinkle with _Pulse. _Size is the quad's size in metres and _Soft how far in from its edges it fades to the room.
+// Things well in front of the ceiling (your raised hands, a tall lamp) hide the sky while the real room's depth is on
+// (RoomOcclusion.hlsl); the large depth bias keeps the real ceiling itself, which the sky lies on, from cutting into it.
 Shader "MusicInYourHands/Sky"
 {
     Properties
@@ -13,6 +15,7 @@ Shader "MusicInYourHands/Sky"
         _Soft ("Edge fade (m)", Float) = 3
         _Pulse ("Music 0-1", Float) = 0
         _Alpha ("Fade", Float) = 1
+        _EnvironmentDepthBias ("Real-room depth bias (share of the distance)", Float) = 0.4
     }
 
     SubShader
@@ -31,7 +34,9 @@ Shader "MusicInYourHands/Sky"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
+            #pragma multi_compile _ HARD_OCCLUSION SOFT_OCCLUSION
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "RoomOcclusion.hlsl"
 
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
@@ -43,6 +48,7 @@ Shader "MusicInYourHands/Sky"
                 float _Soft;
                 float _Pulse;
                 float _Alpha;
+                float _EnvironmentDepthBias;
             CBUFFER_END
 
             struct Attributes
@@ -57,6 +63,7 @@ Shader "MusicInYourHands/Sky"
                 float4 positionCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
                 float3 look : TEXCOORD1;
+                META_DEPTH_VERTEX_OUTPUT(2)
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -69,6 +76,7 @@ Shader "MusicInYourHands/Sky"
                 output.positionCS = TransformWorldToHClip(positionWS);
                 output.uv = input.uv;
                 output.look = positionWS - GetCameraPositionWS();
+                ROOM_OCCLUSION_WORLD(output, positionWS);
                 return output;
             }
 
@@ -114,6 +122,7 @@ Shader "MusicInYourHands/Sky"
                 float alpha = smoothstep(0, 1, saturate(min(edge.x, edge.y) / max(_Soft, 1e-3)));
                 // Low on the horizon the flat sky stretches; let the room show through instead.
                 alpha *= smoothstep(0.1, 0.3, look.y) * 0.97 * _Alpha;
+                alpha *= META_DEPTH_GET_OCCLUSION_VALUE(input, _EnvironmentDepthBias);
                 return half4(color, alpha);
             }
             ENDHLSL

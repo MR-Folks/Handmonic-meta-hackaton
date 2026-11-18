@@ -42,8 +42,11 @@ namespace MusicInYourHands.EditorTools
         public const string MainScenePath = Root + "/Scenes/Main.unity";
         const string ApplicationId = "com.musicinyourhands.app";
         // The OpenXR features the app turns on for Android. HandInteractionProfile (XR_EXT_hand_interaction) carries Meta's
-        // thumb microgestures: without it the runtime reports valid hands but never a tap or a swipe.
-        static readonly string[] OpenXRFeaturesToEnable = { "MetaQuestFeature", "MetaXRFeature", "HandInteractionProfile" };
+        // thumb microgestures: without it the runtime reports valid hands but never a tap or a swipe. ARSessionFeature and
+        // AROcclusionFeature ("Meta Quest: Session" and "Meta Quest: Occlusion", from Unity OpenXR: Meta) hand the room's
+        // depth maps to Meta's EnvironmentDepthManager, for the worlds hidden by the real room (see EnableRoomDepth).
+        static readonly string[] OpenXRFeaturesToEnable =
+            { "MetaQuestFeature", "MetaXRFeature", "HandInteractionProfile", "ARSessionFeature", "AROcclusionFeature" };
 
         [MenuItem("Music In Your Hands/Configure Project for Quest")]
         public static void Configure()
@@ -215,8 +218,8 @@ namespace MusicInYourHands.EditorTools
             var config = OVRProjectConfig.CachedProjectConfig;
             config.handTrackingSupport = OVRProjectConfig.HandTrackingSupport.ControllersAndHands;
             config.insightPassthroughSupport = OVRProjectConfig.FeatureSupport.Supported;
-            // The room scan (walls, tables, floor) the worlds place themselves on.
-            config.sceneSupport = OVRProjectConfig.FeatureSupport.Supported;
+            // The room scan (walls, tables, floor) the worlds place themselves on, and the room's depth (see EnableRoomDepth).
+            config.sceneSupport = OVRProjectConfig.FeatureSupport.Required;
             // Shadow play's arms follow the tracked body (see EnableBodyTracking).
             config.bodyTrackingSupport = OVRProjectConfig.FeatureSupport.Supported;
             OVRProjectConfig.CommitProjectConfig(config);
@@ -248,6 +251,32 @@ namespace MusicInYourHands.EditorTools
                 so.ApplyModifiedPropertiesWithoutUndo();
                 Debug.Log("[Setup] OVRManager no longer asks for body tracking at startup; BodyFeed asks when a world needs it.");
             }
+        }
+
+        /// <summary>
+        /// The real room's depth, for the worlds hidden by the real room (World.HiddenByRealRoom): a "RoomDepth" object
+        /// with Meta's EnvironmentDepthManager, saved switched off, and RoomDepthFeed, which switches it on only while
+        /// such a world is on. Meta's setup tool then asks for Scene support Required in Meta's project config, which
+        /// only puts the spatial data permission in the manifest, as Supported already did, so it is set here and
+        /// "Fix All" leaves it be. The rest the Depth API needs is already the project's: Vulkan, multiview (OpenXR's
+        /// single pass instanced), passthrough in the scene and Quest 3 / 3S among the target devices; the OpenXR
+        /// session and occlusion features are in <see cref="OpenXRFeaturesToEnable"/>. RoomScanFeed asks for the spatial
+        /// data permission at startup, and the depth manager waits for it.
+        /// </summary>
+        internal static void EnableRoomDepth()
+        {
+            if (Object.FindAnyObjectByType<RoomDepthFeed>(FindObjectsInactive.Include) == null)
+            {
+                var go = new GameObject("RoomDepth");
+                go.AddComponent<global::Meta.XR.EnvironmentDepth.EnvironmentDepthManager>().enabled = false;
+                go.AddComponent<RoomDepthFeed>();
+                Debug.Log("[Setup] Added RoomDepth: Meta's depth manager, on only while a world hidden by the real room is on.");
+            }
+            var config = OVRProjectConfig.CachedProjectConfig;
+            if (config.sceneSupport == OVRProjectConfig.FeatureSupport.Required) return;
+            config.sceneSupport = OVRProjectConfig.FeatureSupport.Required;
+            OVRProjectConfig.CommitProjectConfig(config);
+            Debug.Log("[Setup] Scene support is Required in Meta's project config, as the Depth API asks.");
         }
 #endif
 
@@ -572,8 +601,11 @@ namespace MusicInYourHands.EditorTools
             if (Object.FindAnyObjectByType<BodyFeed>(FindObjectsInactive.Include) == null)
                 new GameObject("Body", typeof(BodyFeed));
             EnableBodyTracking();
+            // The real room's depth, only while a world hidden by the real room is on.
+            EnableRoomDepth();
 #if UNITY_OPENXR
-            // The microgestures arrive through OpenXR's hand interaction profile, so make sure it is on.
+            // The microgestures arrive through OpenXR's hand interaction profile, and the room's depth through the
+            // OpenXR Meta session and occlusion features, so make sure they are on.
             EnableOpenXRFeatures();
 #endif
             if (Object.FindAnyObjectByType<RoomScanFeed>(FindObjectsInactive.Include) == null)

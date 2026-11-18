@@ -20,6 +20,7 @@ Shader "MusicInYourHands/SolarSystemBelt"
         _Alpha ("Fade (set by SolarSystem)", Float) = 1
         _SunPos ("Sun position (set by SolarSystem)", Vector) = (0, 0, 0, 0)
         _Wave ("Beat wave: seconds since, strength, speed, width (set by SolarSystem)", Vector) = (9, 0, 3.5, 0.3)
+        _EnvironmentDepthBias ("Real-room depth bias (share of the distance)", Float) = 0.03
     }
 
     SubShader
@@ -38,8 +39,10 @@ Shader "MusicInYourHands/SolarSystemBelt"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
+            #pragma multi_compile _ HARD_OCCLUSION SOFT_OCCLUSION
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "SolarSystemRoom.hlsl"
+            #include "RoomOcclusion.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _Color;
@@ -53,6 +56,7 @@ Shader "MusicInYourHands/SolarSystemBelt"
                 float _Alpha;
                 float4 _SunPos;
                 float4 _Wave;
+                float _EnvironmentDepthBias;
             CBUFFER_END
 
             struct Attributes
@@ -68,6 +72,7 @@ Shader "MusicInYourHands/SolarSystemBelt"
                 float4 positionCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
                 float4 color : COLOR;
+                META_DEPTH_VERTEX_OUTPUT(1)
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -79,7 +84,7 @@ Shader "MusicInYourHands/SolarSystemBelt"
 
                 float radius = max(input.positionOS.x, 1e-3);
                 float height = input.positionOS.y;
-                float angle = input.positionOS.z + _Orbit * _Omega * pow(_Reference / radius, 1.5);
+                float angle = input.positionOS.z + _Orbit * _Omega * pow(abs(_Reference / radius), 1.5);
                 float3 local = float3(cos(angle) * radius, height, sin(angle) * radius);
                 float3 positionWS = SolarClear(TransformObjectToWorld(local));
                 float scale = length(float3(UNITY_MATRIX_M[0].x, UNITY_MATRIX_M[1].x, UNITY_MATRIX_M[2].x));
@@ -91,6 +96,8 @@ Shader "MusicInYourHands/SolarSystemBelt"
                 float3 positionVS = TransformWorldToView(positionWS);
                 positionVS.xy += (input.uv * 2 - 1) * size;
                 output.positionCS = TransformWViewToHClip(positionVS);
+                // Tested against the room at its centre: an asteroid is only a few millimetres across.
+                ROOM_OCCLUSION_WORLD(output, positionWS);
                 output.uv = input.uv;
 
                 // Dimmer far off, gone right by your eyes, faded into the walls.
@@ -107,7 +114,8 @@ Shader "MusicInYourHands/SolarSystemBelt"
                 float d = length(input.uv * 2 - 1);
                 float core = saturate(1 - d);
                 float3 color = lerp(input.color.rgb, float3(1, 1, 1), pow(core, 6) * 0.5);
-                return half4(color, saturate(core * core * 1.4 * input.color.a));
+                float visible = META_DEPTH_GET_OCCLUSION_VALUE(input, _EnvironmentDepthBias);
+                return half4(color, saturate(core * core * 1.4 * input.color.a) * visible);
             }
             ENDHLSL
         }

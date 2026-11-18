@@ -19,6 +19,8 @@ namespace MusicInYourHands
     /// hit it and a ring of light spreads across the floor beneath it; a cymbal swings and its shine runs out across
     /// the metal. Between strikes the big drums breathe with the bass and the small ones and the cymbals with the
     /// higher sounds.
+    /// The harp and the kit stand in your room: real furniture in front of them hides them, and your real hands pass in
+    /// front of the strings and drums as you play.
     /// </summary>
     public class AirStrings : World
     {
@@ -31,6 +33,12 @@ namespace MusicInYourHands
         public override int MenuIcon => 3;
 
         public override string Hint => "Brush the strings, or play the drums and cymbals around you";
+
+        public override bool HiddenByRealRoom => true;
+
+        // The drums' rings of light lie flat on the real floor, so they are pulled this share of their distance towards
+        // you before they are tested against the room, and the floor itself doesn't cut into them.
+        const float FloorDepthBias = 0.1f;
 
         public override HandTheme Theme => new HandTheme
         {
@@ -228,15 +236,15 @@ namespace MusicInYourHands
             {
                 strings[i] = new HarpString
                 {
-                    Line = new LineStrip($"String {i}", transform, lineMaterial, points),
-                    Ends = new[] { Effects.MakeQuad($"Foot {i}", transform, glowMaterial), Effects.MakeQuad($"Head {i}", transform, glowMaterial) },
-                    Ripple = Effects.MakeQuad($"Pluck Ring {i}", transform, ringMaterial)
+                    Line = new LineStrip($"String {i}", transform, InRoom(lineMaterial), points),
+                    Ends = new[] { Effects.MakeQuad($"Foot {i}", transform, InRoom(glowMaterial)), Effects.MakeQuad($"Head {i}", transform, InRoom(glowMaterial)) },
+                    Ripple = Effects.MakeQuad($"Pluck Ring {i}", transform, InRoom(ringMaterial))
                 };
                 strings[i].Ripple.gameObject.SetActive(false);
             }
             voices = new AudioPool(transform, 8);
-            sparks = Effects.MakeSparkSystem("Sparks", transform, glowMaterial);
-            notes = Effects.MakeSparkSystem("Notes", transform, glowMaterial);
+            sparks = Effects.MakeSparkSystem("Sparks", transform, InRoom(glowMaterial));
+            notes = Effects.MakeSparkSystem("Notes", transform, InRoom(glowMaterial));
             var main = notes.main;
             main.gravityModifier = -0.02f;
             BuildKit();
@@ -539,7 +547,7 @@ namespace MusicInYourHands
                     Renderer = r,
                     Mesh = mesh,
                     Voice = voice,
-                    Wave = Effects.MakeQuad($"Drum Wave {i}", transform, ringMaterial)
+                    Wave = Effects.MakeQuad($"Drum Wave {i}", transform, InRoom(ringMaterial, FloorDepthBias))
                 };
                 pieces[i].Wave.gameObject.SetActive(false);
             }

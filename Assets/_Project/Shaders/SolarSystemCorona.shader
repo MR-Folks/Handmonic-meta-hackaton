@@ -2,7 +2,8 @@
 // edge of the disc and slow streamers reach out from it, turning as they go; a wide soft light spreads around the whole
 // sun; and on each beat a ring of light flares out from its surface (_Flare, _FlareAge). Warming the sun with a palm
 // (_Warm) makes the corona reach further and burn hotter. _Disc is the sun's radius as a share of the quad's half size:
-// inside it the glow only lifts the edge of the disc, so the boiling surface shows through in the middle.
+// inside it the glow only lifts the edge of the disc, so the boiling surface shows through in the middle. Real things
+// hide it behind them while the real room's depth is on (RoomOcclusion.hlsl).
 Shader "MusicInYourHands/SolarSystemCorona"
 {
     Properties
@@ -16,6 +17,7 @@ Shader "MusicInYourHands/SolarSystemCorona"
         _Warm ("Warmth 0-1 (set by SolarSystem)", Float) = 0
         _Clock ("Time (set by SolarSystem)", Float) = 0
         _Alpha ("Fade (set by SolarSystem)", Float) = 1
+        _EnvironmentDepthBias ("Real-room depth bias (share of the distance)", Float) = 0.03
     }
 
     SubShader
@@ -34,7 +36,9 @@ Shader "MusicInYourHands/SolarSystemCorona"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
+            #pragma multi_compile _ HARD_OCCLUSION SOFT_OCCLUSION
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "RoomOcclusion.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _Color;
@@ -46,6 +50,7 @@ Shader "MusicInYourHands/SolarSystemCorona"
                 float _Warm;
                 float _Clock;
                 float _Alpha;
+                float _EnvironmentDepthBias;
             CBUFFER_END
 
             struct Attributes
@@ -59,6 +64,7 @@ Shader "MusicInYourHands/SolarSystemCorona"
             {
                 float4 positionCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
+                META_DEPTH_VERTEX_OUTPUT(1)
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -69,6 +75,7 @@ Shader "MusicInYourHands/SolarSystemCorona"
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
                 output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
                 output.uv = input.uv;
+                META_DEPTH_INITIALIZE_VERTEX_OUTPUT(output, input.positionOS.xyz);
                 return output;
             }
 
@@ -123,7 +130,8 @@ Shader "MusicInYourHands/SolarSystemCorona"
                 float edge = smoothstep(1.0, 0.75, r);
                 float k = (shell * (0.75 + _Glow * 0.55) + wide * (0.5 + _Glow * 0.7) + ring * 0.9) * edge;
                 float3 color = lerp(_Color.rgb, _Hot.rgb, saturate(shell * (0.55 + _Warm * 0.45) + ring * 0.5));
-                return half4(color, saturate(k * _Alpha));
+                float visible = META_DEPTH_GET_OCCLUSION_VALUE(input, _EnvironmentDepthBias);
+                return half4(color, saturate(k * _Alpha) * visible);
             }
             ENDHLSL
         }

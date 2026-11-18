@@ -32,6 +32,8 @@ namespace MusicInYourHands
     /// and its word floats down in front of you to read up close. With a room scan the sky fills your ceiling; until
     /// then it opens a little above your head and fades out around you. Songs without lyrics spell out their title
     /// instead.
+    /// The planets, their orbits and the sun sit in your room: a sofa or a person in front of them hides them, and so do
+    /// your real hands as they pass in front; raise a hand to point at a star and it shows in front of the night sky.
     /// </summary>
     public class SolarSystem : World
     {
@@ -44,6 +46,13 @@ namespace MusicInYourHands
         public override int MenuIcon => 25;
 
         public override string Hint => "Pinch a planet to move it, hold a palm out to the sun, or point up at a star";
+
+        public override bool HiddenByRealRoom => true;
+
+        // The night sky lies on the real ceiling, so only things well in front of it (a raised hand, a tall lamp) hide it
+        // and its stars: they are pulled this share of their distance towards you before they are tested against the
+        // room. The same as the Sky shader's own depth bias.
+        const float SkyDepthBias = 0.4f;
 
         public override HandTheme Theme => new HandTheme
         {
@@ -435,7 +444,7 @@ namespace MusicInYourHands
             {
                 p.Renderer = MakeSphere(p.Name, system);
                 p.Body = p.Renderer.transform;
-                p.Halo = Effects.MakeQuad($"{p.Name} Glow", transform, glowMaterial);
+                p.Halo = Effects.MakeQuad($"{p.Name} Glow", transform, InRoom(glowMaterial));
                 Show(p.Halo, false);
                 p.Ring = MakeRing($"{p.Name} Orbit", ringMesh);
                 // Tipped about its line of nodes, so the planet's angle round its orbit is also its direction round you.
@@ -468,17 +477,18 @@ namespace MusicInYourHands
             {
                 var grip = grips[s];
                 string side = s == 0 ? "L" : "R";
-                grip.Reach = Effects.MakeQuad($"Reach {side}", transform, ringMaterial);
+                grip.Reach = Effects.MakeQuad($"Reach {side}", transform, InRoom(ringMaterial));
+                // The pinch's light is on your fingertips, so it stays in front of them.
                 grip.Nib = Effects.MakeQuad($"Pinch {side}", transform, glowMaterial);
                 grip.Preview = MakeRing($"New Orbit {side}", ringMesh);
-                grip.Drop = new LineStrip($"Drop {side}", transform, lineMaterial, DropPoints);
+                grip.Drop = new LineStrip($"Drop {side}", transform, InRoom(lineMaterial), DropPoints);
                 Show(grip.Reach, false);
                 Show(grip.Nib, false);
                 Show(grip.Preview, false);
                 grip.Drop.SetVisible(false);
             }
 
-            sparks = Effects.MakeSparkSystem("Sparks", transform, glowMaterial);
+            sparks = Effects.MakeSparkSystem("Sparks", transform, InRoom(glowMaterial));
             var main = sparks.main;
             main.maxParticles = 500;
             voices = new AudioPool(transform, 6);
@@ -1503,16 +1513,16 @@ namespace MusicInYourHands
         /// <summary>The sky over the ceiling, the stars and words of two constellations, the word you read and your pointing line.</summary>
         void BuildSky()
         {
-            starLettering = new Material(letteringMaterial) { name = "Star Lettering", mainTexture = TypeFace.Bold.Atlas };
+            starLettering = new Material(InRoom(letteringMaterial, SkyDepthBias)) { name = "Star Lettering", mainTexture = TypeFace.Bold.Atlas };
             // A firm dark edge keeps the pale words readable where the sky thins out over a bright ceiling.
             starLettering.SetFloat(RimId, 0.8f);
             for (int s = 0; s < StarSets; s++)
             {
-                var sky = new Constellation { Lines = new LineStrip($"Constellation {s}", transform, lineMaterial, starLinePath.Length) };
+                var sky = new Constellation { Lines = new LineStrip($"Constellation {s}", transform, InRoom(lineMaterial, SkyDepthBias), starLinePath.Length) };
                 sky.Lines.SetVisible(false);
                 for (int i = 0; i < StarsPerLine; i++)
                 {
-                    var star = new Star { Light = Effects.MakeQuad($"Star {s}.{i}", transform, glowMaterial) };
+                    var star = new Star { Light = Effects.MakeQuad($"Star {s}.{i}", transform, InRoom(glowMaterial, SkyDepthBias)) };
                     star.Label = Glyphs.MakeLetter($"Star Word {s}.{i}", transform, starLettering, out star.Mesh);
                     star.Light.gameObject.SetActive(false);
                     star.Label.gameObject.SetActive(false);
@@ -1527,6 +1537,7 @@ namespace MusicInYourHands
             }
             reading = Glyphs.MakeLetter("Reading", transform, starLettering, out readingMesh);
             reading.gameObject.SetActive(false);
+            // The pointing line leaves your fingertip, so it stays in front of your hand.
             pointer = new LineStrip("Pointing", transform, lineMaterial, 2);
             pointer.SetVisible(false);
         }

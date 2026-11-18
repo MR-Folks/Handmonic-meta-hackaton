@@ -1,5 +1,6 @@
 // A glowing ring on a quad, for the waves that leave the palms on each beat.
 // _Radius (0-1 of the quad) grows over the wave's life; a faint glow fills the inside behind the ring.
+// A world's own copy with _RoomOcclusion 1 hides behind real things while the real room's depth is on (RoomOcclusion.hlsl).
 Shader "MusicInYourHands/Ring"
 {
     Properties
@@ -9,6 +10,8 @@ Shader "MusicInYourHands/Ring"
         _Thickness ("Thickness 0-1", Float) = 0.02
         _Alpha ("Alpha", Float) = 1
         _InnerGlow ("Inner glow", Float) = 0.12
+        _RoomOcclusion ("Hidden by the real room 0-1 (a world's own copy)", Float) = 0
+        _EnvironmentDepthBias ("Real-room depth bias (share of the distance)", Float) = 0.03
     }
 
     SubShader
@@ -27,7 +30,9 @@ Shader "MusicInYourHands/Ring"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
+            #pragma multi_compile _ HARD_OCCLUSION SOFT_OCCLUSION
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "RoomOcclusion.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _Color;
@@ -35,6 +40,8 @@ Shader "MusicInYourHands/Ring"
                 float _Thickness;
                 float _Alpha;
                 float _InnerGlow;
+                float _RoomOcclusion;
+                float _EnvironmentDepthBias;
             CBUFFER_END
 
             struct Attributes
@@ -48,6 +55,7 @@ Shader "MusicInYourHands/Ring"
             {
                 float4 positionCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
+                META_DEPTH_VERTEX_OUTPUT(1)
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -58,6 +66,7 @@ Shader "MusicInYourHands/Ring"
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
                 output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
                 output.uv = input.uv;
+                META_DEPTH_INITIALIZE_VERTEX_OUTPUT(output, input.positionOS.xyz);
                 return output;
             }
 
@@ -70,6 +79,8 @@ Shader "MusicInYourHands/Ring"
                 float halo = exp(-pow((r - _Radius) / (t * 3), 2)) * 0.22;
                 float inside = saturate(1 - r / max(_Radius, 1e-3)) * _InnerGlow * step(r, _Radius);
                 float a = saturate((ring + halo + inside) * _Alpha * _Color.a);
+                float visible = META_DEPTH_GET_OCCLUSION_VALUE(input, _EnvironmentDepthBias);
+                a *= lerp(1, visible, _RoomOcclusion);
                 float3 color = lerp(_Color.rgb, 1, ring * 0.35);
                 return half4(color, a);
             }

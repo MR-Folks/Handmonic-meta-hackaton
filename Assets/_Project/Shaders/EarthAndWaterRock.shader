@@ -2,6 +2,7 @@
 // from above and from the viewer's side so its faces always read; glowing cracks run through it (_Glow, brighter on
 // the beat and while it moves) and a glowing seam marks where it comes out of the ground. Everything below _Ground
 // (world height: the floor, or the furniture it rises from) is cut away, so the rock seems to push up through it.
+// Real things hide it behind them while the real room's depth is on (RoomOcclusion.hlsl).
 Shader "MusicInYourHands/EarthAndWaterRock"
 {
     Properties
@@ -14,6 +15,7 @@ Shader "MusicInYourHands/EarthAndWaterRock"
         _Ground ("Ground height, world y (set by EarthAndWater)", Float) = 0
         _Seed ("Seed (set by EarthAndWater)", Float) = 0
         _Clock ("Time (set by EarthAndWater)", Float) = 0
+        _EnvironmentDepthBias ("Real-room depth bias (share of the distance)", Float) = 0.06
     }
 
     SubShader
@@ -31,7 +33,9 @@ Shader "MusicInYourHands/EarthAndWaterRock"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
+            #pragma multi_compile _ HARD_OCCLUSION SOFT_OCCLUSION
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "RoomOcclusion.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _Stone;
@@ -42,6 +46,7 @@ Shader "MusicInYourHands/EarthAndWaterRock"
                 float _Ground;
                 float _Seed;
                 float _Clock;
+                float _EnvironmentDepthBias;
             CBUFFER_END
 
             struct Attributes
@@ -122,7 +127,10 @@ Shader "MusicInYourHands/EarthAndWaterRock"
                 // Darker where it comes out of the ground, with a glowing seam right at the ground line.
                 color *= lerp(0.42, 1, saturate(above / 0.07));
                 color += _Crack.rgb * exp(-above / 0.01) * saturate(_Glow * 1.4);
-                return half4(color, 1);
+                // Opaque over passthrough: where something real is in front, colour and alpha fade out together.
+                half4 result = half4(color, 1);
+                META_DEPTH_OCCLUDE_OUTPUT_PREMULTIPLY_WORLDPOS(input.positionWS, result, _EnvironmentDepthBias);
+                return result;
             }
             ENDHLSL
         }

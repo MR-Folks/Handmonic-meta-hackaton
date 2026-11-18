@@ -1,7 +1,8 @@
 // Earth and water: the wobbling ball of water held between the palms. The vertex stage bends a sphere with three slow
 // waves that grow with the bass (_Bass) and a ripple that runs from top to bottom after each kick (_Wave: seconds since
 // it); the fragment stage shades it as clear water: a deep blue body, a bright rim, glints of light from above and a
-// web of caustics drifting inside it. Drawn see-through, after the hands' fill, without writing depth.
+// web of caustics drifting inside it. Drawn see-through, after the hands' fill, without writing depth. Real things
+// hide it behind them while the real room's depth is on (RoomOcclusion.hlsl): a finger in front of it cuts into it.
 Shader "MusicInYourHands/EarthAndWaterOrb"
 {
     Properties
@@ -13,6 +14,7 @@ Shader "MusicInYourHands/EarthAndWaterOrb"
         _Kick ("Beat 0-1 (set by EarthAndWater)", Float) = 0
         _Clock ("Time (set by EarthAndWater)", Float) = 0
         _Alpha ("Fade (set by EarthAndWater)", Float) = 1
+        _EnvironmentDepthBias ("Real-room depth bias (share of the distance)", Float) = 0.02
     }
 
     SubShader
@@ -31,7 +33,9 @@ Shader "MusicInYourHands/EarthAndWaterOrb"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
+            #pragma multi_compile _ HARD_OCCLUSION SOFT_OCCLUSION
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "RoomOcclusion.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _Deep;
@@ -41,6 +45,7 @@ Shader "MusicInYourHands/EarthAndWaterOrb"
                 float _Kick;
                 float _Clock;
                 float _Alpha;
+                float _EnvironmentDepthBias;
             CBUFFER_END
 
             struct Attributes
@@ -114,7 +119,8 @@ Shader "MusicInYourHands/EarthAndWaterOrb"
                 float3 color = lerp(_Deep.rgb, _Light.rgb, saturate(fresnel * 1.2 + caustic * 0.6 + depth * 0.15));
                 color += spec + spec2 + _Light.rgb * caustic * 0.35;
                 float alpha = _Deep.a + fresnel * 0.6 + caustic * 0.3 + spec + spec2 * 0.5;
-                return half4(color, saturate(alpha) * _Alpha);
+                float visible = META_DEPTH_GET_OCCLUSION_VALUE_WORLDPOS(input.positionWS, _EnvironmentDepthBias);
+                return half4(color, saturate(alpha) * _Alpha * visible);
             }
             ENDHLSL
         }
