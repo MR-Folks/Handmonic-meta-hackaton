@@ -345,7 +345,11 @@ namespace MusicInYourHands
         protected override void OnBeat(MusicFrame music)
         {
             Disturb(new Vector2(0.5f, 0.5f), 0.05f, -0.006f - music.Kick * 0.004f);
-            room?.Ripple(surface.position, RippleColor, 0.45f + music.Kick * 0.55f);
+            // A ring of light over the whole room on each beat: a quarter as bright with Less flashing, and never more
+            // than three a second.
+            if (room == null) return;
+            float ring = Flash(0.45f + music.Kick * 0.55f);
+            if (ring > 0f) room.Ripple(surface.position, RippleColor, ring);
         }
 
         /// <summary>
@@ -484,7 +488,9 @@ namespace MusicInYourHands
                     var spot = new Vector2(local.x / size.x + 0.5f, local.z / size.y + 0.5f);
                     bool inside = spot.x > 0f && spot.x < 1f && spot.y > 0f && spot.y < 1f;
                     float depth = -local.y;
-                    bool under = inside && depth > 0f && depth < 0.25f;
+                    // Once under, a finger stays under until it is a centimetre clear of the surface, so one resting on
+                    // the water doesn't break it again every time tracking wavers.
+                    bool under = inside && depth < 0.25f && depth > (wasUnder[side, k] ? -0.01f : 0f);
                     if (under)
                     {
                         Acted("dip");
@@ -495,10 +501,18 @@ namespace MusicInYourHands
                         Disturb(spot, radius, -Mathf.Min(0.004f, depth * 0.05f + speed * 0.004f) * dt * 30f);
                         if (!wasUnder[side, k])
                         {
+                            // The finger (or the whole hand, for the palm) lights up as it breaks the surface.
+                            Feedback(GestureKind.Touch, side == 0, point, k < 5 ? 0.6f : 1f, k == 5,
+                                k < 5 ? GestureFeedback.Of((HandRig.Finger)k) : Fingers.All);
                             Disturb(spot, radius * 1.5f, -0.006f);
                             Splash(SurfacePoint(spot), Effects.Blue, k < 5 ? 4 : 10, 0.25f);
-                            // A palm breaking the surface sends its own ring of light out over the room.
-                            if (k == 5) room?.Ripple(SurfacePoint(spot), Effects.Blue, 0.6f);
+                            // A palm breaking the surface sends its own ring of light out over the room (a flash: a
+                            // quarter as bright with Less flashing, and within the three a second).
+                            if (k == 5 && room != null)
+                            {
+                                float ring = Flash(0.6f);
+                                if (ring > 0f) room.Ripple(SurfacePoint(spot), Effects.Blue, ring);
+                            }
                         }
                     }
                     else if (wasUnder[side, k] && inside)
@@ -525,7 +539,9 @@ namespace MusicInYourHands
             {
                 var hand = rig?.Get(side == 0);
                 // A pinch at the open menu pours nothing, nor does one still held from it once it closes.
-                bool now = hand != null && hand.IsTracked && hand.Pinch > 0.8f && !hand.InSystemGesture && PinchFree(side == 0);
+                // Once pouring, it pours on until the pinch opens past 0.7, so a wavering pinch doesn't restart it.
+                bool now = hand != null && hand.IsTracked && hand.Pinch > (pouring[side] ? 0.7f : 0.8f) && !hand.InSystemGesture
+                    && PinchFree(side == 0);
                 if (!now)
                 {
                     if (pouring[side])
@@ -542,6 +558,8 @@ namespace MusicInYourHands
                 {
                     lastPourFrom[side] = pourFrom[side];
                     pourVelocity[side] = hand.Velocity;
+                    // The pinching fingers light up with a tick as the water starts to pour.
+                    Feedback(GestureKind.Pinch, side == 0, pourFrom[side]);
                 }
                 pouring[side] = true;
                 Acted("pour water");

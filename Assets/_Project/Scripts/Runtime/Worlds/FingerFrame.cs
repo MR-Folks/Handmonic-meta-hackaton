@@ -15,6 +15,8 @@ namespace MusicInYourHands
     /// with the music too. Pinch and the window holds while the next filter or world swirls in, its name showing under
     /// the window; pinch with both hands to skip one. Sparks drift out of the window on the beat, and the sung words
     /// float inside it.
+    /// With one hand up, spread its thumb and index in an "L" (the other fingers curled) and a small lens opens in the
+    /// crook of the L onto the same view; pinch that hand to change it.
     /// The filters see the room through the headset's passthrough camera (<see cref="ICameraFeed"/>), asked for the
     /// first time the window opens on a filter, never before. Without it (no permission, or a headset or system without
     /// camera access) the frame says so once and shows its worlds.
@@ -134,6 +136,7 @@ namespace MusicInYourHands
         static readonly int DepthCapId = Shader.PropertyToID("_DepthCap");
         static readonly int CenterId = Shader.PropertyToID("_Center");
         static readonly int BeatAgeId = Shader.PropertyToID("_BeatAge");
+        static readonly int BeatFlashId = Shader.PropertyToID("_BeatFlash");
         static readonly int BassId = Shader.PropertyToID("_Bass");
         static readonly int BeatsId = Shader.PropertyToID("_Beats");
         static readonly int SpinId = Shader.PropertyToID("_Spin");
@@ -176,6 +179,11 @@ namespace MusicInYourHands
         readonly Vector3[] found = new Vector3[4];
         readonly Vector3[] drawn = new Vector3[4];
         readonly Vector3[] tips = new Vector3[4];
+        readonly float[] lensAngles = new float[4];
+        // The hand holding the one-handed lens (0 left, 1 right), or -1 for the two-handed frame or none.
+        int lensSide = -1;
+        // When both hands last framed the window, so a hand that blinks out for a moment doesn't shrink it to a lens.
+        float framedTwo = -99f;
 
         Vector3 Center => (corners[0] + corners[1] + corners[2] + corners[3]) * 0.25f;
 
@@ -220,7 +228,8 @@ namespace MusicInYourHands
             window.gameObject.SetActive(false);
             sparks = Effects.MakeSparkSystem("Window Sparks", transform, glowMaterial);
             voices = new AudioPool(transform, 6);
-            caption = new TypeLabel("Caption", transform, 0.014f);
+            // The view's name, on a soft dark backing so it reads over whatever the window shows.
+            caption = new TypeLabel("Caption", transform, 0.018f) { Backing = 1f, IsCaption = true };
             caption.GameObject.SetActive(false);
         }
 
@@ -229,7 +238,7 @@ namespace MusicInYourHands
             open = 0f;
             mix = 1f;
             sounded = skipped = false;
-            seen = heldUntil = changedAt = -99f;
+            seen = heldUntil = changedAt = framedTwo = -99f;
             captionAge = 99f;
             cameraFade = 0f;
         }
@@ -267,6 +276,8 @@ namespace MusicInYourHands
         protected override void OnPinch(HandRig.Hand hand, bool left)
         {
             if (Clock - seen > 0.7f) return;
+            // The pinching fingers light up with a burst; the bells are the sound.
+            Feedback(GestureKind.Pinch, left, HandPinchPoint(hand), 1f, false);
             if (mix < 1f && !skipped && IsPinching(!left) && Clock - changedAt < skipWindow)
             {
                 Skip(Music);
@@ -276,6 +287,9 @@ namespace MusicInYourHands
             Change(Music);
             Acted("next view");
         }
+
+        /// <summary>Only a pinch at an open window changes the view, so OnPinch shows its own feedback.</summary>
+        protected override bool AutoPinchFeedback => false;
 
         /// <summary>On the beat, a few sparks in the view's colours drift out of the window's edge into the room.</summary>
         protected override void OnBeat(MusicFrame music)
@@ -315,7 +329,16 @@ namespace MusicInYourHands
 
         protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
         {
+            // Both hands frame; one hand alone may open its lens.
             bool framed = Frame(rig, view);
+            if (framed)
+            {
+                lensSide = -1;
+                framedTwo = Clock;
+            }
+            // Just after a two-hand frame the lens waits, and the window's grace holds it still instead.
+            else if (Clock - framedTwo > 0.3f) framed = Lens(rig, view);
+            if (!framed) lensSide = -1;
             if (framed)
             {
                 // Snap to the hands as the window opens; afterwards follow them closely but smoothly.
@@ -328,7 +351,17 @@ namespace MusicInYourHands
             // A short grace keeps the window from flickering when tracking hesitates for a frame or two.
             bool show = framed || Clock - seen < 0.15f || Clock < heldUntil;
             open = Mathf.MoveTowards(open, show ? 1f : 0f, dt * (show ? 5f : 3.5f));
-            if (open > 0.3f && !sounded) { Chord(music); sounded = true; }
+            if (open > 0.3f && !sounded)
+            {
+                Chord(music);
+                sounded = true;
+                // The thumbs and index fingers holding the frame (or the one hand's lens) light up as it opens.
+                if (!MenuOpen)
+                {
+                    if (lensSide != 1) GestureFeedback.Light(true, Fingers.Thumb | Fingers.Index, 0.8f);
+                    if (lensSide != 0) GestureFeedback.Light(false, Fingers.Thumb | Fingers.Index, 0.8f);
+                }
+            }
             if (open <= 0f) sounded = false;
 
             if (mix < 1f)
@@ -388,6 +421,82 @@ namespace MusicInYourHands
             }
             return true;
         }
+
+        /// <summary>
+        /// The one-handed lens, when only one hand is up: its thumb and index spread in an "L" (both out, at least 50
+        /// degrees apart, not pinching) with the other three fingers curled in. The lens fills the crook of the L, from
+        /// a little out of the palm to just past the two fingertips, pushed 2 cm back along your line of sight like the frame.
+        /// Once open it holds through a little wobble. Puts the corners in <see cref="found"/>.
+        /// </summary>
+        bool Lens(HandRig rig, Camera view)
+        {
+            if (rig == null || MenuOpen) return false;
+            var left = rig.Left;
+            var right = rig.Right;
+            var hand = left.IsTracked && !right.IsTracked ? left : right.IsTracked && !left.IsTracked ? right : null;
+            if (hand == null || hand.InSystemGesture) return false;
+            int side = hand == left ? 0 : 1;
+            bool was = lensSide == side;
+            var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
+            var thumb = Tip(hand, 0);
+            var index = Tip(hand, 1);
+            var toIndex = index - palm;
+            var toThumb = thumb - palm;
+            float curled = (Vector3.Distance(Tip(hand, 2), palm) + Vector3.Distance(Tip(hand, 3), palm) + Vector3.Distance(Tip(hand, 4), palm)) / 3f;
+            float spread = Vector3.Angle(toIndex, toThumb);
+            bool shaped = toIndex.magnitude > (was ? 0.065f : 0.075f) && toThumb.magnitude > (was ? 0.05f : 0.06f)
+                && curled < (was ? 0.085f : 0.075f) && spread > (was ? 40f : 50f) && hand.Pinch < (was ? 0.5f : 0.2f);
+            if (!shaped) return false;
+
+            // The crook of the L, a little out from the palm towards the two fingers, and its two arms.
+            var crook = palm + toIndex * 0.22f + toThumb * 0.22f;
+            var eye = view.transform.position;
+            var right3 = view.transform.right;
+            var up = view.transform.up;
+            // The arms reach a little past the fingertips, so the lens shows clear of the fingers.
+            index = crook + (index - crook) * 1.25f;
+            thumb = crook + (thumb - crook) * 1.25f;
+            tips[0] = crook;
+            tips[1] = index;
+            tips[2] = index + thumb - crook;
+            tips[3] = thumb;
+            // Anticlockwise from the bottom left as you see them, whichever hand and however it is turned.
+            var middle = (tips[0] + tips[1] + tips[2] + tips[3]) * 0.25f;
+            for (int i = 0; i < 4; i++)
+            {
+                var d = tips[i] - middle;
+                lensAngles[i] = Mathf.Atan2(Vector3.Dot(d, up), Vector3.Dot(d, right3));
+            }
+            for (int i = 1; i < 4; i++)
+                for (int j = i; j > 0 && lensAngles[j] < lensAngles[j - 1]; j--)
+                {
+                    (lensAngles[j], lensAngles[j - 1]) = (lensAngles[j - 1], lensAngles[j]);
+                    (tips[j], tips[j - 1]) = (tips[j - 1], tips[j]);
+                }
+            int first = 0;
+            float lowest = float.MaxValue;
+            for (int i = 0; i < 4; i++)
+            {
+                var d = tips[i] - middle;
+                float corner = Vector3.Dot(d, up) + Vector3.Dot(d, right3);
+                if (corner < lowest) { lowest = corner; first = i; }
+            }
+            var look = view.transform.forward;
+            const float behind = 0.02f;
+            for (int i = 0; i < 4; i++)
+            {
+                var d = tips[(first + i) % 4] - eye;
+                if (Vector3.Dot(d, look) < 0.05f) return false;
+                float distance = d.magnitude;
+                found[i] = eye + d * ((distance + behind) / distance);
+            }
+            lensSide = side;
+            return true;
+        }
+
+        /// <summary>For the editor checks: the hand whose lens is open (0 left, 1 right), or -1; and how open the window is.</summary>
+        public int LensSide => lensSide;
+        public float Openness => open;
 
         static Vector3 Tip(HandRig.Hand hand, int finger) =>
             hand.TipJoints[finger] != null ? hand.TipJoints[finger].position : hand.Tips[finger];
@@ -635,6 +744,8 @@ namespace MusicInYourHands
             block.SetFloat(DepthCapId, depthCap);
             block.SetVector(CenterId, Center);
             block.SetFloat(BeatAgeId, Mathf.Min(music.BeatAge, 10f));
+            // The filters' beat rings, tile pops and scan bands: a quarter as bright with Less flashing.
+            block.SetFloat(BeatFlashId, ComfortOptions.FlashScale);
             block.SetFloat(BassId, Mathf.Clamp01(bass));
             block.SetFloat(BeatsId, Beats % 1000);
             block.SetFloat(SpinId, spin % (Mathf.PI * 200f));
@@ -700,6 +811,9 @@ namespace MusicInYourHands
             var tint = Color.Lerp(Color.white, ScenePalette[Scene][0], 0.35f);
             caption.Color = new Color(tint.r, tint.g, tint.b, alpha);
         }
+
+        /// <summary>For previews and the caption checks: the name of the view showing comes up under the window.</summary>
+        public void PreviewCaption() => Say(SceneNames[Scene], 1.8f);
 
         /// <summary>For previews: opens the window at a place, as if framed by hands, on a given view.</summary>
         public void PreviewWindow(Vector3 at, Quaternion rotation, Vector2 windowSize, int world)

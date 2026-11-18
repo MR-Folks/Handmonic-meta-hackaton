@@ -746,6 +746,9 @@ namespace MusicInYourHands
                     float height = Vector2.Dot(n.Position - pool, upOnWall) / poolRadius * 0.5f + 0.5f;
                     var at = OnWall(n.Position, 0.02f);
                     int midi = Musical.Play(voices, music, 60 + Mathf.RoundToInt(Mathf.Clamp01(height) * 19f), at, 0.45f);
+                    // The hand whose shadow rang it lights up (an arm's shadow lights none); the note is the sound.
+                    for (int side = 0; side < 2; side++)
+                        if (InHandShadow(handShadows[side], n.Position)) GestureFeedback.Light(side == 0, Fingers.All, 0.7f);
                     n.Ring = 1f;
                     n.Rest = 0.35f;
                     Splash(n.Position, NoteColor(midi));

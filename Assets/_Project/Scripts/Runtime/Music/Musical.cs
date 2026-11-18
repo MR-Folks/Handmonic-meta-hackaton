@@ -28,10 +28,13 @@ namespace MusicInYourHands
             int sounding = -1;
             if (track != null && !track.IsEmpty)
             {
-                // Pitch classes sung from a beat and a half ago to half a second ahead.
+                // Pitch classes sung from a beat and a half ago to half a second ahead. (Indexed, not foreach: an
+                // enumerator through the list's interface would allocate on every touch.)
                 float now = music.SongTime;
-                foreach (var note in track.Notes)
+                var notes = track.Notes;
+                for (int i = 0; i < notes.Count; i++)
                 {
+                    var note = notes[i];
                     if (note.Time > now + 0.5f) break;
                     if (note.Time + note.Length < now - 1.5f) continue;
                     nearby[Mod12(note.Midi)] = true;
@@ -42,18 +45,13 @@ namespace MusicInYourHands
             // A touch close to the sung note simply joins it.
             if (sounding >= 0 && Mathf.Abs(Fold(sounding) - wanted) <= 2) return Fold(sounding);
             var allowed = any ? nearby : Scale(track);
-            int best = wanted, bestDistance = 99;
+            // The nearest allowed note, below before above at the same distance.
             for (int d = 0; d <= 6; d++)
             {
-                foreach (int candidate in new[] { wanted - d, wanted + d })
-                {
-                    if (!allowed[Mod12(candidate)] || d >= bestDistance) continue;
-                    best = candidate;
-                    bestDistance = d;
-                }
-                if (bestDistance < 99) break;
+                if (allowed[Mod12(wanted - d)]) return Fold(wanted - d);
+                if (allowed[Mod12(wanted + d)]) return Fold(wanted + d);
             }
-            return Fold(best);
+            return Fold(wanted);
         }
 
         /// <summary>

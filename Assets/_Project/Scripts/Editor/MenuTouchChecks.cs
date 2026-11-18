@@ -125,6 +125,18 @@ namespace MusicInYourHands.EditorTools
             Move(lyrics + toward * 0.01f, 6);
             bool twice = LyricsOption.On == before;
             Move(lyrics - toward * 0.1f, 6);
+            Run(0.7f);
+
+            // The Less flashing bubble, beside the "?" at the end of the honeycomb, turns the option on (and is lit while it is on).
+            var calm = Bubble("Bubble Less Flashing");
+            bool calmWas = ComfortOptions.LessFlashing;
+            ComfortOptions.LessFlashing = false;
+            Move(calm - toward * 0.1f, 8);
+            Move(calm + toward * 0.02f, 8);
+            Run(1.2f);
+            bool calmed = ComfortOptions.LessFlashing;
+            Move(calm - toward * 0.1f, 6);
+            ComfortOptions.LessFlashing = calmWas;
 
             // A hand farther away still points its ray and pinches: put the point between thumb and index on the line
             // from the shoulder through the bubble.
@@ -199,10 +211,10 @@ namespace MusicInYourHands.EditorTools
 
             menu.Close();
             LyricsOption.On = lyricsWere;
-            bool ok = !early && reached && ignored && cameBack && once && twice && pinched && steady && deckOpened && pageShown && added;
-            if (ok) Debug.Log($"[Check] The menu answers touch and pinch: a fingertip presses a bubble as it reaches it, once per tap and never from behind, a far hand still points and pinches, a closing pinch moves its cursor only {drift * 1000f:0.0} mm, the song bubble opens the cassette deck, and a touch presses the song page's buttons.");
+            bool ok = !early && reached && ignored && cameBack && once && twice && calmed && pinched && steady && deckOpened && pageShown && added;
+            if (ok) Debug.Log($"[Check] The menu answers touch and pinch: a fingertip presses a bubble as it reaches it, once per tap and never from behind, the Less flashing bubble switches the option, a far hand still points and pinches, a closing pinch moves its cursor only {drift * 1000f:0.0} mm, the song bubble opens the cassette deck, and a touch presses the song page's buttons.");
             else Debug.LogError($"[Check] Menu touch: pressed early {early}, pressed on arrival {reached}, ignored from behind {ignored}, " +
-                                $"pressed after coming back out {cameBack}, held press counted once {once}, second tap {twice}, " +
+                                $"pressed after coming back out {cameBack}, held press counted once {once}, second tap {twice}, less flashing switched {calmed}, " +
                                 $"pinch from afar {pinched}, cursor steady through a closing pinch {steady} ({drift * 1000f:0.0} mm, chose world {manager.Current}), " +
                                 $"song bubble opened the deck {deckOpened}, song page opened {pageShown}, page's Add button touched {added}.");
             return ok;

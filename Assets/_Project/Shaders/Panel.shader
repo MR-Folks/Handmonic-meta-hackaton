@@ -1,5 +1,6 @@
 // Flat glass for the menu's pages: a rounded rectangle with a fine edge line, sharp at any size because its shape is
-// worked out in metres. _Size is the quad's size in metres; _Hover lightens it under a pointer.
+// worked out in metres. _Size is the quad's size in metres; _Hover lightens it under a pointer. _Soft feathers the edge
+// (metres) for a soft backing behind a caption.
 Shader "MusicInYourHands/Panel"
 {
     Properties
@@ -10,6 +11,7 @@ Shader "MusicInYourHands/Panel"
         _Radius ("Corner radius (m)", Float) = 0.015
         _Hover ("Hover 0-1", Float) = 0
         _Alpha ("Fade", Float) = 1
+        _Soft ("Soft edge (m)", Float) = 0
     }
 
     SubShader
@@ -37,6 +39,7 @@ Shader "MusicInYourHands/Panel"
                 float _Radius;
                 float _Hover;
                 float _Alpha;
+                float _Soft;
             CBUFFER_END
 
             struct Attributes
@@ -70,7 +73,8 @@ Shader "MusicInYourHands/Panel"
                 float2 corner = abs((input.uv - 0.5) * _Size.xy) - (half_size - _Radius);
                 float distance = length(max(corner, 0)) + min(max(corner.x, corner.y), 0) - _Radius;
                 float soft = max(fwidth(distance), 1e-5);
-                float inside = smoothstep(soft, -soft, distance);
+                float feather = max(soft, _Soft);
+                float inside = smoothstep(feather, -feather, distance);
                 float line_ = saturate(1 - abs(distance + 0.0007) / (0.0007 + soft));
 
                 float3 color = lerp(_Color.rgb, 1, _Hover * 0.16);

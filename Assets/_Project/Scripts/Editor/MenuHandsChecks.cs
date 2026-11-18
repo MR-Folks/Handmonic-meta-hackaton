@@ -137,6 +137,7 @@ namespace MusicInYourHands.EditorTools
             }
             var failures = new List<string>();
             var acting = new List<string>();
+            var lighting = new List<string>();
             int count = 0;
             Application.logMessageReceived += Collect;
             try
@@ -145,10 +146,16 @@ namespace MusicInYourHands.EditorTools
                 {
                     count++;
                     int errorsBefore = errors.Count;
+                    int litBefore = GestureFeedback.Lit;
                     var (open, openLast) = PlayWithHands(type, saved, rig, camera, menu, true);
+                    int litOpen = GestureFeedback.Lit - litBefore;
+                    litBefore = GestureFeedback.Lit;
                     var (closed, _) = PlayWithHands(type, saved, rig, camera, menu, false);
+                    if (GestureFeedback.Lit > litBefore) lighting.Add(type.Name);
                     if (open > 0)
                         failures.Add($"{type.Name} acted for the hands {open} times while the menu was open (last: {openLast}). Gate that with MenuOpen, or PinchFree for its own pinches.");
+                    if (litOpen > 0)
+                        failures.Add($"{type.Name} lit the fingers {litOpen} times while the menu was open. Use World.Feedback (quiet while the menu is open), or gate GestureFeedback with MenuOpen.");
                     if (errors.Count > errorsBefore)
                         failures.Add($"{type.Name} logged errors while the hands played with it: {string.Join(" | ", errors.Skip(errorsBefore).Take(3))}");
                     if (!CallsActed(type)) continue;
@@ -165,8 +172,8 @@ namespace MusicInYourHands.EditorTools
             foreach (var failure in failures) Debug.LogError($"[Check] {failure}");
             if (failures.Count == 0)
                 Debug.Log($"[Check] With the menu open none of the {count} worlds acted for hands holding, pinching, making fists, sweeping, pushing, " +
-                          $"dipping, pointing up, catching and touching what it shows for {HandsSeconds:0.#} s, and none logged an error; with it closed, " +
-                          $"{acting.Count} did ({string.Join(", ", acting)}).");
+                          $"dipping, pointing up, catching and touching what it shows for {HandsSeconds:0.#} s, none lit a finger and none logged an error; " +
+                          $"with it closed, {acting.Count} did ({string.Join(", ", acting)}), and {lighting.Count} lit the fingers ({string.Join(", ", lighting)}).");
             return failures.Count == 0;
         }
 

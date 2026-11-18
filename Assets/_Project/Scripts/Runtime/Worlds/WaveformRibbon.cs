@@ -9,6 +9,8 @@ namespace MusicInYourHands
     /// a palette, and the inside of the silk moves on to a new look every few beats (see the Silk shader). Pull apart and
     /// it tightens; bring your hands together and it billows. Move your hands and the silk leaves fading copies of itself in the air.
     /// Each beat tugs your visible hands a little towards each other, as if the ribbon pulled back. Let go and it fades away.
+    /// With one hand, pinch and the ribbon's far end stays pinned in the air where you pinched (a small light marks it);
+    /// pull your hand away to draw the ribbon out from it. Pinch with the other hand too and it takes that end over.
     /// </summary>
     public class WaveformRibbon : World
     {
@@ -151,6 +153,19 @@ namespace MusicInYourHands
         float hold, ribbonLength, look;
         int beats, lookTarget;
         bool held;
+        // Each hand's pinch (left, right); which hand holds the ribbon alone (-1 none) and the end it pinned in the air.
+        readonly bool[] pinching = new bool[2];
+        int pinned = -1, heldMode = -1;
+        Vector3 pin, easeFromA, easeFromB;
+        float ease = 1f;
+
+        /// <summary>For the editor checks: whether the ribbon is held, with one hand pinning it, and how long it is (m).</summary>
+        public bool Held => held;
+        public bool Pinned => pinned >= 0;
+        public float Length => (lastB - lastA).magnitude;
+
+        bool Pinches(HandRig.Hand hand, bool left, bool was) =>
+            hand.IsTracked && hand.Pinch > (was ? releasePinch : grabPinch) && !hand.InSystemGesture && PinchFree(left);
         // Whether the ribbon is drawn this frame (set in OnStep), for the sung words' fade.
         bool showing;
 
@@ -178,6 +193,9 @@ namespace MusicInYourHands
         protected override void OnExit()
         {
             held = false;
+            pinching[0] = pinching[1] = false;
+            pinned = heldMode = -1;
+            ease = 1f;
             hold = 0f;
             if (HandRig.Instance != null)
             {
@@ -222,12 +240,41 @@ namespace MusicInYourHands
             var left = rig.Left;
             var right = rig.Right;
             bool tracked = left.IsTracked && right.IsTracked;
-            float need = held ? releasePinch : grabPinch;
-            // A pinch at the open menu chooses there: the ribbon lets go, and a pinch still held from the menu once it
-            // closes doesn't take it up again.
-            held = tracked && left.Pinch > need && right.Pinch > need && !left.InSystemGesture && !right.InSystemGesture
-                && PinchFree(true) && PinchFree(false);
-            if (held) Acted("hold ribbon");
+            // Each hand's pinch, with its own grab and let-go strengths. A pinch at the open menu chooses there: the
+            // ribbon lets go, and a pinch still held from the menu once it closes doesn't take it up again.
+            bool pinchLeft = Pinches(left, true, pinching[0]), pinchRight = Pinches(right, false, pinching[1]);
+            bool two = pinchLeft && pinchRight, one = pinchLeft != pinchRight;
+            int side = one ? (pinchLeft ? 0 : 1) : -1;
+            // One hand alone pins the far end where it pinched, or, letting go of a two-handed ribbon, where the other
+            // hand let go.
+            if (one && pinned != side)
+            {
+                bool fromTwo = pinching[0] && pinching[1];
+                pin = fromTwo ? (side == 0 ? lastB : lastA) : PinchPoint(rig.Get(side == 0));
+                pinned = side;
+            }
+            if (!one) pinned = -1;
+            // Each pinch lights up with a tick as it takes the ribbon, and with a softer tock as it lets go.
+            for (int s = 0; s < 2; s++)
+            {
+                bool now = s == 0 ? pinchLeft : pinchRight;
+                if (now == pinching[s] || MenuOpen || !rig.Get(s == 0).IsTracked) continue;
+                Feedback(now ? GestureKind.Pinch : GestureKind.Release, s == 0, PinchPoint(rig.Get(s == 0)), now ? 1f : 0.7f);
+            }
+            int mode = two ? 2 : one ? side : -1;
+            if (mode != heldMode)
+            {
+                // The ends glide to where they now belong instead of jumping (a pin taken over by the other hand); a
+                // ribbon taken up afresh starts right at the fingers.
+                easeFromA = lastA;
+                easeFromB = lastB;
+                ease = held ? 0f : 1f;
+            }
+            heldMode = mode;
+            pinching[0] = pinchLeft;
+            pinching[1] = pinchRight;
+            held = two || one;
+            if (held) Acted(two ? "hold ribbon" : "pin ribbon");
             hold =Mathf.MoveTowards(hold, held ? 1f : 0f, dt * (held ? 6f : 2.5f));
 
             // The silk's inside moves on every few beats (OnBeat), taking two seconds over each change.
@@ -237,15 +284,20 @@ namespace MusicInYourHands
             colorA = PaletteColor(colorStep);
             colorB = PaletteColor(colorStep + ColorSpread);
 
-            if (tracked)
+            if (held)
             {
-                var a = PinchPoint(left);
-                var b = PinchPoint(right);
-                if (held || hold <= 0f)
-                {
-                    lastA = a;
-                    lastB = b;
-                }
+                // Left end, right end: the two pinches, or one pinch and its pin.
+                var a = two || side == 0 ? PinchPoint(left) : pin;
+                var b = two || side == 1 ? PinchPoint(right) : pin;
+                ease = Mathf.Min(1f, ease + dt / 0.18f);
+                float k = Mathf.SmoothStep(0f, 1f, ease);
+                lastA = Vector3.Lerp(easeFromA, a, k);
+                lastB = Vector3.Lerp(easeFromB, b, k);
+            }
+            else if (tracked && hold <= 0f)
+            {
+                lastA = PinchPoint(left);
+                lastB = PinchPoint(right);
             }
 
             UpdateGrips(rig, music, view);
@@ -256,11 +308,12 @@ namespace MusicInYourHands
             if (showing) DrawRibbon(music, view, dt);
             UpdateGhosts(music, dt);
 
-            // Fake resistance: on each beat the ribbon tugs the visible hands towards each other.
+            // Fake resistance: on each beat the ribbon tugs the visible hands towards each other (or the one hand
+            // towards its pin).
             var pull = (lastB - lastA).sqrMagnitude > 1e-6f ? (lastB - lastA).normalized : Vector3.zero;
             float amount = held ? tug * music.Kick : 0f;
-            Effects.OffsetHand(left, pull * amount);
-            Effects.OffsetHand(right, -pull * amount);
+            Effects.OffsetHand(left, pinned == 1 ? Vector3.zero : pull * amount);
+            Effects.OffsetHand(right, pinned == 0 ? Vector3.zero : -pull * amount);
             Sing(music, view);
         }
 
@@ -295,7 +348,13 @@ namespace MusicInYourHands
             var mid = (a + b) * 0.5f;
             var along = b - a;
             float length = along.magnitude;
-            if (length < 1e-4f) return;
+            // A ribbon just pinned to its own start has no length yet: nothing to draw (and no silk left from before).
+            if (length < 0.01f)
+            {
+                foreach (var s in strands) s.SetVisible(false);
+                silk.SetVisible(false);
+                return;
+            }
             ribbonLength = length;
             var dir = along / length;
             var side = Vector3.Cross(dir, view.transform.position - mid);
@@ -391,13 +450,15 @@ namespace MusicInYourHands
             {
                 var hand = i == 0 ? rig.Left : rig.Right;
                 var grip = grips[i];
-                bool show = hand.IsTracked;
+                // The other hand's light marks the pinned end while one hand holds the ribbon alone.
+                bool atPin = held && pinned >= 0 && i != pinned;
+                bool show = hand.IsTracked || atPin;
                 if (grip.gameObject.activeSelf != show) grip.gameObject.SetActive(show);
                 if (!show) continue;
                 // A soft light between thumb and index: dim as a hint when open, bright while holding the ribbon.
-                grip.transform.position = PinchPoint(hand);
+                grip.transform.position = atPin ? pin : PinchPoint(hand);
                 Effects.Face(grip.transform, view);
-                float strength = Mathf.Lerp(0.25f + hand.Pinch * 0.35f, 1.2f + music.Kick * 0.8f, hold);
+                float strength = Mathf.Lerp(atPin ? 1f : 0.25f + hand.Pinch * 0.35f, 1.2f + music.Kick * 0.8f, hold);
                 grip.transform.localScale = Vector3.one * (0.03f + 0.02f * hold + music.Kick * 0.012f * hold);
                 block.Clear();
                 block.SetColor(ColorId, i == 0 ? colorA : colorB);

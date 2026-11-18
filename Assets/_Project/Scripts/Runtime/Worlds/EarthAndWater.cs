@@ -5,9 +5,9 @@ namespace MusicInYourHands
 {
     /// <summary>
     /// The Earth and water world: your bare hands command earth and water, one at a time. Now and then the music hands
-    /// over from one to the other by itself, at the start of a sung line; clench both fists for a moment to switch over
-    /// yourself. Each change bursts out in the new element's colours, dresses your hands for it, and a short caption
-    /// names it and says what to do.
+    /// over from one to the other by itself, at the start of a sung line; clench both fists for a moment, or hold one
+    /// fist a little longer, to switch over yourself. Each change bursts out in the new element's colours, dresses your hands for it, and a caption names it
+    /// in one word.
     /// <list type="bullet">
     /// <item><b>Earth</b>: rocks push up out of the floor around you (or out of your table). Lift your palms, palms up, to
     /// raise the rocks in front of that hand; push down, palms down, to sink them. They rumble and shake on the beat, the
@@ -39,12 +39,6 @@ namespace MusicInYourHands
         public override HandTheme Theme => Themes[current];
 
         static readonly string[] Names = { "Water", "Earth" };
-
-        static readonly string[] HowTo =
-        {
-            "Sweep your hands; palms facing make an orb",
-            "Lift palms up to raise rocks, push down to sink"
-        };
 
         // Each element's colours: its main colour, a second one and a bright one, for bursts, words and lights.
         static readonly Color[] MainColors = { new Color(0.25f, 0.66f, 1f), new Color(0.78f, 0.56f, 0.3f) };
@@ -89,6 +83,8 @@ namespace MusicInYourHands
         [SerializeField] int beatsAfterPick = 64;
         [Tooltip("Seconds both fists stay clenched to change the element.")]
         [SerializeField] float fistSeconds = 0.35f;
+        [Tooltip("Seconds one fist alone stays clenched to change the element.")]
+        [SerializeField] float oneFistSeconds = 0.6f;
 
         [Header("Water")]
         [Tooltip("Width of the stream where it leaves the hand (m).")]
@@ -146,6 +142,9 @@ namespace MusicInYourHands
         HandTheme themeFrom = Themes[Water];
         float fistTime;
         bool fistArmed = true;
+        // One fist alone: how long each hand has held it, and whether each may change the element again yet.
+        readonly float[] oneFistTime = new float[2];
+        readonly bool[] oneArmed = { true, true };
 
         MaterialPropertyBlock block;
         AudioPool voices;
@@ -164,11 +163,11 @@ namespace MusicInYourHands
 
         // Changing element: the burst, the glow gathering between clenched fists, the caption.
         Renderer flash, ring, charge;
-        float flashAge = 9f;
+        float flashAge = 9f, flashStrength;
         Vector3 flashAt;
         Color flashColor;
         Transform captionRoot;
-        TypeLabel captionTitle, captionLine;
+        TypeLabel captionTitle;
         float captionAge = 99f;
         bool captionDue = true, captionPlaced;
         Color captionColor;
@@ -246,8 +245,8 @@ namespace MusicInYourHands
             Show(charge, false);
             captionRoot = new GameObject("Caption").transform;
             captionRoot.SetParent(transform, false);
-            captionTitle = new TypeLabel("Caption Title", captionRoot, 0.026f);
-            captionLine = new TypeLabel("Caption Line", captionRoot, 0.017f);
+            // One word, on a soft dark backing so it reads over a bright room.
+            captionTitle = new TypeLabel("Caption Title", captionRoot, 0.03f) { Backing = 1f, IsCaption = true };
             captionRoot.gameObject.SetActive(false);
 
             path = new Vector3[StreamPoints];
@@ -368,6 +367,8 @@ namespace MusicInYourHands
             themeFrom = Themes[current];
             fistTime = 0f;
             fistArmed = true;
+            oneFistTime[0] = oneFistTime[1] = 0f;
+            oneArmed[0] = oneArmed[1] = true;
             captionDue = true;
             captionAge = 99f;
             flashAge = 9f;
@@ -475,24 +476,69 @@ namespace MusicInYourHands
         // ---- Changing element ----
 
         /// <summary>True while you are in the middle of something with the element; it waits for you, up to a point.</summary>
-        bool Busy => (Clock - lastAction < 2.5f || fistTime > 0f) && beatsSince < waitBeats * 2;
+        bool Busy => (Clock - lastAction < 2.5f || fistTime > 0f || oneFistTime[0] > 0f || oneFistTime[1] > 0f) && beatsSince < waitBeats * 2;
 
         /// <summary>The element that isn't in charge: the one every change brings, by itself or by your fists.</summary>
         int Other => 1 - current;
 
-        /// <summary>Both fists clenched for a moment call up the other element; open a hand before the next change.</summary>
+        /// <summary>
+        /// Both fists clenched for a moment call up the other element, and so does one fist held a little longer (the
+        /// other hand open, or out of view). The fists glow brighter as it builds. A hand that changed it must open
+        /// before the next change.
+        /// </summary>
         void Fists(float dt)
         {
             bool both = tracked[0] && tracked[1] && !gesture[0] && !gesture[1] && !MenuOpen;
             bool clenched = both && fist[0] > 0.8f && fist[1] > 0.8f;
-            if (!tracked[0] || !tracked[1] || fist[0] < 0.5f || fist[1] < 0.5f) fistArmed = true;
+            for (int s = 0; s < 2; s++)
+                if (!tracked[s] || fist[s] < 0.5f) oneArmed[s] = true;
+            // A fist still closed from the last change keeps both paths waiting until it opens.
+            bool spent = (tracked[0] && !oneArmed[0]) || (tracked[1] && !oneArmed[1]);
+            if ((!tracked[0] || !tracked[1] || fist[0] < 0.5f || fist[1] < 0.5f) && !spent) fistArmed = true;
             fistTime = clenched && fistArmed ? fistTime + dt : Mathf.MoveTowards(fistTime, 0f, dt * 3f);
+            OneFist(clenched, dt);
+            // The fists glow brighter as the change builds.
+            if (clenched && fistArmed)
+            {
+                FeedbackHold(true, fistTime / fistSeconds);
+                FeedbackHold(false, fistTime / fistSeconds);
+            }
             if (fistTime < fistSeconds) return;
             fistTime = 0f;
             fistArmed = false;
-            Change(Other, true, (palm[0] + palm[1]) * 0.5f);
+            oneArmed[0] = oneArmed[1] = false;
+            oneFistTime[0] = oneFistTime[1] = 0f;
+            var middle = (palm[0] + palm[1]) * 0.5f;
+            Change(Other, true, middle);
+            // Both fists light up, with a burst between them; the element's chord is the sound.
+            Feedback(GestureKind.Fist, true, middle, 1f, false);
+            GestureFeedback.Light(false, Fingers.All);
             Acted("change element");
         }
+
+        /// <summary>One fist alone, held for oneFistSeconds, calls up the other element (both fists together go faster, above).</summary>
+        void OneFist(bool clenched, float dt)
+        {
+            for (int s = 0; s < 2; s++)
+            {
+                bool closed = !clenched && tracked[s] && !gesture[s] && !MenuOpen && fist[s] > 0.8f && oneArmed[s];
+                oneFistTime[s] = closed ? oneFistTime[s] + dt : Mathf.MoveTowards(oneFistTime[s], 0f, dt * 3f);
+                if (closed) FeedbackHold(s == 0, oneFistTime[s] / oneFistSeconds);
+                if (oneFistTime[s] < oneFistSeconds) continue;
+                oneFistTime[s] = 0f;
+                oneArmed[s] = false;
+                fistArmed = false;
+                var hand = Rig != null ? Rig.Get(s == 0) : null;
+                var at = hand != null ? HandFistPoint(hand) : palm[s];
+                Change(Other, true, at);
+                // The fist lights up with a burst; the element's chord is the sound.
+                Feedback(GestureKind.Fist, s == 0, at, 1f, false);
+                Acted("change element with one fist");
+            }
+        }
+
+        /// <summary>For the editor checks: the element in charge now (0 water, 1 earth).</summary>
+        public int Element => current;
 
         void ChangeByItself() => Change(Other, false, BurstPoint());
 
@@ -536,6 +582,8 @@ namespace MusicInYourHands
             flashAge = 0f;
             flashAt = at;
             flashColor = MainColors[e];
+            // A flash of the element's colour (World.Flash: at most three a second, a quarter with Less flashing).
+            flashStrength = Flash(1f);
             switch (e)
             {
                 case Water:
@@ -575,7 +623,7 @@ namespace MusicInYourHands
                 Effects.Face(flash.transform, view);
                 block.Clear();
                 block.SetColor(ColorId, flashColor);
-                block.SetFloat(IntensityId, (1f - u) * (1f - u) * 0.75f);
+                block.SetFloat(IntensityId, (1f - u) * (1f - u) * 0.75f * flashStrength);
                 flash.SetPropertyBlock(block);
                 ring.transform.position = flashAt;
                 ring.transform.localScale = Vector3.one * 0.6f;
@@ -584,16 +632,26 @@ namespace MusicInYourHands
                 block.SetColor(ColorId, Color.Lerp(flashColor, Color.white, 0.2f));
                 block.SetFloat(RadiusId, 0.1f + Mathf.Sqrt(u) * 0.8f);
                 block.SetFloat(ThicknessId, 0.025f + u * 0.02f);
-                block.SetFloat(AlphaId, (1f - u) * 0.8f);
+                // The ring calms with the flash (Less flashing), but stays to show where the change came from.
+                block.SetFloat(AlphaId, (1f - u) * 0.8f * Mathf.Max(0.35f, flashStrength));
                 ring.SetPropertyBlock(block);
             }
 
+            // The other element gathers between the clenched fists, or over one fist held alone.
             float gathered = fistTime / fistSeconds;
+            var middle = (palm[0] + palm[1]) * 0.5f;
             bool gathering = gathered > 0.01f && tracked[0] && tracked[1];
+            for (int s = 0; s < 2 && !gathering; s++)
+            {
+                float one = oneFistTime[s] / oneFistSeconds;
+                if (one <= 0.01f || !tracked[s]) continue;
+                gathered = one;
+                middle = palm[s] + normal[s] * 0.06f;
+                gathering = true;
+            }
             Show(charge, gathering);
             if (!gathering) return;
             int next = Other;
-            var middle = (palm[0] + palm[1]) * 0.5f;
             charge.transform.position = middle;
             charge.transform.localScale = Vector3.one * (0.05f + 0.13f * gathered);
             Effects.Face(charge.transform, view);
@@ -611,7 +669,6 @@ namespace MusicInYourHands
         void ShowCaption(int e)
         {
             captionTitle.Text = Names[e];
-            captionLine.Text = HowTo[e];
             captionColor = Color.Lerp(Color.white, MainColors[e], 0.55f);
             // The world's own hint shows for its first few seconds: wait for it to go.
             captionAge = Mathf.Min(0f, Clock - 4.8f);
@@ -634,10 +691,8 @@ namespace MusicInYourHands
             captionRoot.SetPositionAndRotation(Vector3.Lerp(captionRoot.position, target, follow), Quaternion.Slerp(captionRoot.rotation, rotation, follow));
             captionPlaced = true;
             float alpha = Mathf.Clamp01(Mathf.Min(captionAge / 0.3f, (3.2f - captionAge) / 0.7f));
-            captionTitle.Transform.localPosition = new Vector3(0f, 0.026f, 0f);
-            captionLine.Transform.localPosition = new Vector3(0f, -0.008f, 0f);
+            captionTitle.Transform.localPosition = new Vector3(0f, 0.012f, 0f);
             captionTitle.Color = new Color(captionColor.r, captionColor.g, captionColor.b, alpha);
-            captionLine.Color = new Color(1f, 1f, 1f, alpha * 0.92f);
         }
 
         /// <summary>The hands take on the element's look, blending over from the last one, and its effect inputs.</summary>
@@ -695,6 +750,9 @@ namespace MusicInYourHands
             {
                 orbSounded = true;
                 Musical.Play(voices, music, 64, orbCentre, 0.25f, pluck: true);
+                // Both hands light up as the ball forms between them; the pluck is the sound.
+                Feedback(GestureKind.Touch, true, orbCentre, 0.8f, false, Fingers.All);
+                GestureFeedback.Light(false, Fingers.All, 0.8f);
             }
             if (orbLevel <= 0f) orbSounded = false;
             DrawOrb(music, p, dt);
@@ -910,12 +968,14 @@ namespace MusicInYourHands
                 foreach (var r in rocks) r.Target = Mathf.Max(r.Target, previewLift * (0.75f + 0.25f * r.Seed));
                 previewLift = -1f;
             }
-            for (int s = 0; s < 2 && active && p > 0.5f && !MenuOpen; s++)
+            for (int s = 0; s < 2; s++)
             {
-                if (!tracked[s] || fist[s] > 0.6f || gesture[s]) continue;
+                bool lifting = active && p > 0.5f && !MenuOpen && tracked[s] && fist[s] <= 0.6f && !gesture[s];
                 float vy = velocity[s].y;
                 float ny = normal[s].y;
-                float lift = ny > 0.4f && vy > 0.07f ? vy : ny < -0.4f && vy < -0.07f ? vy : 0f;
+                float lift = !lifting ? 0f : ny > 0.4f && vy > 0.07f ? vy : ny < -0.4f && vy < -0.07f ? vy : 0f;
+                // The hand lights up as it starts to lift or sink the rocks; their rumble is the sound.
+                FeedbackOnStart(s, lift != 0f, GestureKind.Touch, s == 0, palm[s], 0.7f, false, Fingers.All, 0.8f);
                 if (lift == 0f) continue;
                 lastAction = Clock;
                 Acted("move rocks");
@@ -1293,6 +1353,17 @@ namespace MusicInYourHands
             HandSkin.Theme = Themes[current];
             if (act && current == Earth) previewLift = 0.95f;
         }
+
+        /// <summary>For previews and the caption checks: the element's caption shows at once, as after a change.</summary>
+        public void PreviewCaption()
+        {
+            Build();
+            ShowCaption(current);
+            captionAge = 0.5f;
+        }
+
+        /// <summary>The caption showing now, or an empty string (for the editor checks).</summary>
+        public string Caption => captionRoot != null && captionRoot.gameObject.activeSelf ? captionTitle.Text : "";
 
         // ---- Meshes and sounds, made once ----
 

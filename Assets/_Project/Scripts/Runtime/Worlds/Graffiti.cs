@@ -216,6 +216,8 @@ namespace MusicInYourHands
 
             bool pinching = aimHand != null && (aimHand == rig.Right ? rightPinch : leftPinch);
             if (pinching) Acted("spray");
+            // The spraying fingers light up as the can starts; its hiss is the sound.
+            FeedbackOnStart(0, pinching, GestureKind.Pinch, aimHand == rig.Left, pinching ? HandPinchPoint(aimHand) : nozzle, 1f, false);
             HandSkin.FocusStrength = pinching ? 1f : 0.35f;
             Spray(pinching, nozzle, hit, normal, dt);
             DrawReticle(aimHand != null, hit, normal, pinching, music);

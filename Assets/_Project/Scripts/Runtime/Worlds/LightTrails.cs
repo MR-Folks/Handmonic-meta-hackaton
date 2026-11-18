@@ -7,7 +7,7 @@ namespace MusicInYourHands
     /// The Light trails world: draw the song in the air. Pinch and move, and a ribbon of light follows your fingers,
     /// lying flat in the plane of your hand like a brush stroke, its colour following the song as it plays. Everything
     /// you have drawn stays hanging in the room and swells on every beat, so the sculpture breathes with the music.
-    /// Old strokes fade after a while; hold both fists closed for a moment to clear it all.
+    /// Old strokes fade after a while; hold a fist (or both) closed for a moment to clear it all.
     /// </summary>
     public class LightTrails : World
     {
@@ -65,6 +65,10 @@ namespace MusicInYourHands
         Renderer[] nibs;
         MaterialPropertyBlock block;
         float clearHold, clearFade = 1f;
+        // A fist that cleared must open before it clears again.
+        bool clearArmed = true;
+        // Seconds a fist stays closed to clear.
+        const float ClearSeconds = 0.8f;
 
         protected override int SungWordCount => 6;
 
@@ -167,8 +171,10 @@ namespace MusicInYourHands
         /// <summary>While a hand pinches, its stroke grows from the pinch point; a small light marks the nib.</summary>
         void Draw(HandRig.Hand hand, int side, Color color, MusicFrame music, Camera view, float dt)
         {
-            // A pinch at the open menu chooses there; it doesn't draw.
-            bool pinching = hand.IsTracked && hand.Pinch > 0.8f && !hand.InSystemGesture && PinchFree(side == 0);
+            // A pinch at the open menu chooses there; it doesn't draw. A stroke holds on until the pinch opens past 0.7,
+            // so a pinch wavering round 0.8 doesn't break it into new strokes (each with its own tick).
+            bool pinching = hand.IsTracked && hand.Pinch > (drawing[side] != null ? 0.7f : 0.8f) && !hand.InSystemGesture
+                && PinchFree(side == 0);
             var nib = nibs[side];
             if (nib.gameObject.activeSelf != hand.IsTracked) nib.gameObject.SetActive(hand.IsTracked);
             if (!hand.IsTracked) { drawing[side] = null; return; }
@@ -194,6 +200,8 @@ namespace MusicInYourHands
             if (stroke == null || stroke.Centres.Count >= pointsPerStroke)
             {
                 var previous = stroke;
+                // A new stroke starts: the pinching fingers light up with a tick.
+                if (previous == null) Feedback(GestureKind.Pinch, side == 0, point, 1f);
                 stroke = Begin();
                 drawing[side] = stroke;
                 // Continue seamlessly from a full stroke.
@@ -278,19 +286,59 @@ namespace MusicInYourHands
             s.Mesh.bounds = bounds;
         }
 
-        /// <summary>Both hands held as fists for a moment clears the sculpture, with a quick fade.</summary>
+        /// <summary>
+        /// A fist held closed for a moment, with either hand or both, clears the sculpture with a quick fade; the fist
+        /// glows brighter as it builds. A hand still pinching (drawing) is never a fist here, and a fist that cleared
+        /// must open before it clears again.
+        /// </summary>
         void ClearWithFists(HandRig rig, float dt)
         {
+            bool left = Fisted(rig.Left), right = Fisted(rig.Right);
+            if (!left && !right) clearArmed = true;
+            // One fist alone must be closed tight, past the loosely curled hand that thumb taps and swipes are made with.
+            if (left != right)
+            {
+                left = left && rig.Left.Fist > OneFist;
+                right = right && rig.Right.Fist > OneFist;
+            }
             // Fists made at the open menu clear nothing.
-            bool fists = !MenuOpen && rig.Left.IsTracked && rig.Right.IsTracked && rig.Left.Fist > 0.7f && rig.Right.Fist > 0.7f;
+            bool fists = !MenuOpen && (left || right) && clearArmed;
             clearHold = fists ? clearHold + dt : 0f;
-            if (clearHold > 0.8f && clearFade >= 1f)
+            if (fists && clearFade >= 1f)
+            {
+                if (left) FeedbackHold(true, clearHold / ClearSeconds);
+                if (right) FeedbackHold(false, clearHold / ClearSeconds);
+            }
+            if (clearHold > ClearSeconds && clearFade >= 1f)
             {
                 clearFade = 0.999f;
+                clearArmed = false;
                 drawing[0] = drawing[1] = null;
+                // The fist lights up with a low thump as the sculpture fades (one thump for two fists).
+                if (left) Feedback(GestureKind.Fist, true, HandFistPoint(rig.Left));
+                if (right) Feedback(GestureKind.Fist, false, HandFistPoint(rig.Right), 1f, !left);
                 Acted("clear");
             }
         }
+
+        // How closed one fist on its own must be to clear (MusicGestures still takes taps from a hand curled to 0.8).
+        const float OneFist = 0.85f;
+
+        static bool Fisted(HandRig.Hand hand) => hand.IsTracked && !hand.InSystemGesture && hand.Fist > 0.7f && hand.Pinch < 0.6f;
+
+        /// <summary>For the editor checks: how many strokes hang in the room now (fading ones included).</summary>
+        public int StrokeCount
+        {
+            get
+            {
+                int n = 0;
+                foreach (var s in strokes) if (s.Age >= 0f) n++;
+                return n;
+            }
+        }
+
+        /// <summary>For the editor checks: whether the sculpture is fading away after a clear.</summary>
+        public bool Clearing => clearFade < 1f;
 
         static void Retire(Stroke s)
         {

@@ -112,6 +112,16 @@ namespace MusicInYourHands
         /// <summary>Pinch strength (0-1) that starts a pinch, and the strength it must drop below to let go.</summary>
         protected virtual Vector2 PinchThresholds => new Vector2(0.8f, 0.6f);
 
+        /// <summary>
+        /// Whether World shows the gesture feedback (<see cref="Feedback"/>) for each pinch it sends to OnPinch, and each
+        /// let-go it sends to OnRelease, in a world that overrides them. A world whose pinch only sometimes does
+        /// something turns this off and calls Feedback itself where it acts.
+        /// </summary>
+        protected virtual bool AutoPinchFeedback => true;
+
+        /// <summary>Whether that automatic pinch feedback plays its tick and tock: off for a world with its own sound for a pinch.</summary>
+        protected virtual bool PinchFeedbackSound => true;
+
         // ---- What a world can read ----
 
         public bool IsBuilt { get; private set; }
@@ -188,6 +198,105 @@ namespace MusicInYourHands
 #endif
         }
 
+        // ---- Feedback for the hands ----
+
+        /// <summary>
+        /// The feedback for a gesture that did something here (see <see cref="GestureFeedback"/>): the fingers that made
+        /// it light up, a few sparks burst from <paramref name="at"/> and a short sound plays there. Pass
+        /// <paramref name="sound"/> false where the world already sounds for the same moment. Nothing while the menu is open.
+        /// </summary>
+        protected void Feedback(GestureKind kind, bool left, Vector3 at, float strength = 1f, bool sound = true, Fingers fingers = Fingers.None)
+        {
+            if (MenuOpen) return;
+            GestureFeedback.Show(kind, left, at, strength, sound, fingers);
+        }
+
+        /// <summary>
+        /// Feedback for something that goes on for a while (a fingertip in a word, a palm over a flower): call it every
+        /// frame with whether it is happening, and it shows once as it starts, at most once every
+        /// <paramref name="rest"/> seconds. <paramref name="key"/> (0-15) keeps each thing apart (say, one per hand).
+        /// </summary>
+        protected void FeedbackOnStart(int key, bool on, GestureKind kind, bool left, Vector3 at, float strength = 1f, bool sound = true,
+            Fingers fingers = Fingers.None, float rest = 0.4f)
+        {
+            if (key < 0 || key >= feedbackOn.Length) return;
+            bool was = feedbackOn[key];
+            feedbackOn[key] = on;
+            if (!on || was || Clock - feedbackAt[key] < rest || MenuOpen) return;
+            feedbackAt[key] = Clock;
+            Feedback(kind, left, at, strength, sound, fingers);
+        }
+
+        /// <summary>
+        /// A hand's fingers glowing steadily while something builds under them (a fist held to switch), brighter as
+        /// <paramref name="progress"/> (0-1) fills. Call it each frame while it builds; it fades once the calls stop.
+        /// </summary>
+        protected void FeedbackHold(bool left, float progress, Fingers fingers = Fingers.All)
+        {
+            if (MenuOpen || progress <= 0f) return;
+            GestureFeedback.Hold(left, fingers, 0.15f + 0.75f * Mathf.Clamp01(progress));
+        }
+
+        // ---- Flashes ----
+
+        /// <summary>The most flashes a world may make in any one second, Less flashing or not.</summary>
+        public const int MostFlashesPerSecond = 3;
+
+        /// <summary>
+        /// Starts a flash: anything that suddenly brightens a lot of what you see, such as the room lighting up, a flare
+        /// or a burst of light. Returns the strength to flash with: <paramref name="strength"/>, a quarter of it with
+        /// Less flashing on (ComfortOptions), and 0 when this world has already flashed three times in the last second,
+        /// so no world ever flashes faster than that. Call it once as each flash starts and draw the flash at what it
+        /// returns (skip it at 0).
+        /// </summary>
+        protected float Flash(float strength = 1f)
+        {
+            // The oldest of the last three flashes this world made: a fourth must come more than a second after it.
+            if (Clock - flashTimes[nextFlash] <= 1f)
+            {
+#if UNITY_EDITOR
+                FlashesHeld++;
+#endif
+                return 0f;
+            }
+            flashTimes[nextFlash] = Clock;
+            nextFlash = (nextFlash + 1) % MostFlashesPerSecond;
+            float shown = strength * ComfortOptions.FlashScale;
+#if UNITY_EDITOR
+            FlashLog.Add(new Vector2(Clock, shown));
+            if (FlashLog.Count > 512) FlashLog.RemoveAt(0);
+#endif
+            return shown;
+        }
+
+        /// <summary>
+        /// Flash for a light that is already showing at <paramref name="showing"/>: only a flash brighter than that
+        /// counts towards the three a second (and is returned); one no brighter can't be seen, so it returns 0 and
+        /// leaves the allowance for the next flash.
+        /// </summary>
+        protected float Flash(float strength, float showing) =>
+            strength * ComfortOptions.FlashScale > showing ? Flash(strength) : 0f;
+
+#if UNITY_EDITOR
+        /// <summary>For the editor checks: each flash the world made (its time on Clock and the strength it showed), and how many it held back.</summary>
+        public readonly List<Vector2> FlashLog = new List<Vector2>();
+        public int FlashesHeld { get; private set; }
+#endif
+
+        /// <summary>A fingertip as drawn (the joint the visible hand uses, when there is one).</summary>
+        protected static Vector3 HandTip(HandRig.Hand hand, int finger) =>
+            hand.TipJoints[finger] != null ? hand.TipJoints[finger].position : hand.Tips[finger];
+
+        /// <summary>Where a hand's thumb and index meet.</summary>
+        protected static Vector3 HandPinchPoint(HandRig.Hand hand) => (HandTip(hand, 0) + HandTip(hand, 1)) * 0.5f;
+
+        /// <summary>The middle of a closed fist: between the palm and the curled fingertips.</summary>
+        protected static Vector3 HandFistPoint(HandRig.Hand hand)
+        {
+            var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
+            return (palm * 2f + HandTip(hand, 1) + HandTip(hand, 2) + HandTip(hand, 3) + HandTip(hand, 4)) / 6f;
+        }
+
         // ---- The machinery ----
 
         bool beatPending;
@@ -198,6 +307,14 @@ namespace MusicInYourHands
         readonly bool[] pinching = new bool[2];
         // Set while the menu is open: the hand must open its pinch (or be lost) before its pinches are the world's again.
         readonly bool[] waitOpen = new bool[2];
+        // Whether this world's own class overrides OnPinch and OnRelease (worked out once, in Build).
+        bool hooksPinch, hooksRelease;
+        // FeedbackOnStart: whether each thing was happening last frame, and when it last showed.
+        readonly bool[] feedbackOn = new bool[16];
+        // When this world's last three flashes started (on Clock), and which of them is the oldest.
+        readonly float[] flashTimes = { -9f, -9f, -9f };
+        int nextFlash;
+        readonly float[] feedbackAt = { -9f, -9f, -9f, -9f, -9f, -9f, -9f, -9f, -9f, -9f, -9f, -9f, -9f, -9f, -9f, -9f };
 
         // Re-anchoring: worlds placed in the room move to you when you sit down, stand up, walk elsewhere or
         // recenter, instead of staying where you were when the world started.
@@ -216,6 +333,9 @@ namespace MusicInYourHands
         {
             if (IsBuilt) return;
             IsBuilt = true;
+            const System.Reflection.BindingFlags Hook = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            hooksPinch = GetType().GetMethod(nameof(OnPinch), Hook)?.DeclaringType != typeof(World);
+            hooksRelease = GetType().GetMethod(nameof(OnRelease), Hook)?.DeclaringType != typeof(World);
             if (SungWordCount > 0)
             {
                 var lettering = letteringMaterial != null ? letteringMaterial : FallbackLettering();
@@ -233,6 +353,9 @@ namespace MusicInYourHands
         {
             Build();
             if (view == null) return;
+            // With Less flashing the beat's kick reaches the world at a quarter, so everything that brightens (and
+            // swells) on it does so far less.
+            music.Kick *= ComfortOptions.FlashScale;
             Rig = rig;
             Music = music;
             View = view;
@@ -264,6 +387,8 @@ namespace MusicInYourHands
             HandSkin.Theme = Theme;
             HandSkin.FocusStrength = 0f;
             HandSkin.Charge[0] = HandSkin.Charge[1] = 0f;
+            GestureFeedback.UseMaterial(glowMaterial);
+            for (int i = 0; i < feedbackOn.Length; i++) feedbackOn[i] = false;
             Build();
             placed = false;
             FadeIn = 0f;
@@ -363,6 +488,8 @@ namespace MusicInYourHands
         /// OnPinch and OnRelease, with hysteresis so a pinch held near the threshold doesn't flicker, and none for a hand
         /// in Meta's menu gesture. While the world menu is open the pinches are the menu's: a pinch held as it opens is
         /// let go (OnRelease), and one still held as it closes counts only once the hand has opened and pinched again.
+        /// In a world that overrides OnPinch (or OnRelease) each one also gets its gesture feedback, unless the world
+        /// shows its own (AutoPinchFeedback).
         /// </summary>
         void DispatchPinches(HandRig rig)
         {
@@ -379,8 +506,18 @@ namespace MusicInYourHands
                 bool now = tracked && !hand.InSystemGesture && !waitOpen[s]
                     && hand.Pinch >= (was ? PinchThresholds.y : PinchThresholds.x);
                 pinching[s] = now;
-                if (now && !was) OnPinch(hand, s == 0);
-                else if (!now && was) OnRelease(hand, s == 0);
+                if (now && !was)
+                {
+                    OnPinch(hand, s == 0);
+                    if (hooksPinch && AutoPinchFeedback) Feedback(GestureKind.Pinch, s == 0, HandPinchPoint(hand), 1f, PinchFeedbackSound);
+                }
+                else if (!now && was)
+                {
+                    OnRelease(hand, s == 0);
+                    // A pinch let go by the hand itself; not one lost from view, nor one the opening menu took over.
+                    if ((hooksRelease || hooksPinch) && AutoPinchFeedback && tracked && !menu)
+                        Feedback(GestureKind.Release, s == 0, HandPinchPoint(hand), 0.7f, PinchFeedbackSound);
+                }
             }
         }
 

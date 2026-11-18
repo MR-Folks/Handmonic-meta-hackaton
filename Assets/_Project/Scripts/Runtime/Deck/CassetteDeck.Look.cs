@@ -40,7 +40,7 @@ namespace MusicInYourHands
 
         const string BlankTitle = "+  Add a song";
         // The front cassette's words lie on a plate over the middle of the turntable, about 70 cm from your eyes.
-        const float TitleHeight = 0.021f, InfoHeight = 0.0135f, HintHeight = 0.012f, StatusHeight = 0.011f;
+        const float TitleHeight = 0.021f, InfoHeight = 0.0135f, HintHeight = 0.012f, StatusHeight = 0.014f;
         /// <summary>How wide the words over the turntable may be (m), so the plate stays clear of the cassettes round it.</summary>
         const float PlateWidth = 0.18f;
         const string NoPicker = "The file picker opens on the headset";
@@ -106,8 +106,11 @@ namespace MusicInYourHands
             radioPlate = Effects.MakeQuad("Radio Plate", onTable, DeckParts.Material("Plate"));
             title = Caption("Front Title", TitleHeight);
             info = Caption("Front Info", InfoHeight);
+            // A soft dark halo round the front cassette's title and what it is, on top of their plate.
+            title.Halo = info.Halo = 0.8f;
             hint = Caption("Hint", HintHeight);
             status = Caption("Radio Status", StatusHeight);
+            title.IsCaption = status.IsCaption = true;
             tooltip = Caption("Key Name", 0.0095f);
             listLabel = Caption("Song List Label", 0.0105f);
             listLabel.Text = "Song list";

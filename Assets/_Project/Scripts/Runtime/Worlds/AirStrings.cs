@@ -398,8 +398,11 @@ namespace MusicInYourHands
                         if (hadSide[finger, i] && near && Mathf.Sign(sideOf) != Mathf.Sign(lastSide[finger, i]) && s.Cooldown <= 0f)
                         {
                             float speed = dt > 0f ? Mathf.Abs(sideOf - lastSide[finger, i]) / dt : 0f;
-                            Pluck(s, i, closest, along, Mathf.Clamp01(0.35f + speed * 0.6f));
+                            float strength = Mathf.Clamp01(0.35f + speed * 0.6f);
+                            Pluck(s, i, closest, along, strength);
                             shiver[side] = 1f;
+                            // The plucking finger lights up; the string is the sound.
+                            Feedback(GestureKind.Touch, side == 0, tip, strength, false, GestureFeedback.Of((HandRig.Finger)f));
                             Acted("pluck");
                         }
                         lastSide[finger, i] = sideOf;
@@ -840,10 +843,14 @@ namespace MusicInYourHands
                             float speed = (lastHeight[i, slot] - height) / dt;
                             if (speed > strikeSpeed)
                             {
-                                Sound(p, across, Mathf.Clamp01((speed - strikeSpeed) / Mathf.Max(fullStrikeSpeed - strikeSpeed, 0.1f)));
+                                float hit = Mathf.Clamp01((speed - strikeSpeed) / Mathf.Max(fullStrikeSpeed - strikeSpeed, 0.1f));
+                                Sound(p, across, hit);
                                 p.Wait[side] = strikeRest;
                                 p.Armed[side] = false;
                                 shiver[side] = 1f;
+                                // A palm lights the whole hand, a fingertip its finger; the drum is the sound.
+                                Feedback(GestureKind.Touch, side == 0, handPoints[k], 0.5f + 0.5f * hit, false,
+                                    k == 0 ? Fingers.All : GestureFeedback.Of((HandRig.Finger)(k - 1)));
                                 Acted(p.Spec.IsCymbal ? "cymbal" : "drum");
                             }
                         }

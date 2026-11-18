@@ -1,6 +1,9 @@
 // The player's hand, in the concept page's style: a dark see-through fill, a glowing outline and a soft rim,
 // all pulsing towards pink on the beat. The forearm fades out from the wrist.
 // Pass 1 fills the hand and writes depth; pass 2 draws an inverted hull that only survives around the silhouette.
+// A gesture lights the fingers that made it (GestureFeedback through HandSkin): each vertex knows how much it belongs
+// to each finger (UV2 thumb, index, middle, ring; UV3 little, then how far along the finger), so a lit finger glows
+// brightest at its tip, its outline swells, and the finger beside it stays dark.
 Shader "MusicInYourHands/Hand"
 {
     Properties
@@ -25,6 +28,10 @@ Shader "MusicInYourHands/Hand"
         _FocusPos ("Focus point (set by the world)", Vector) = (0, 0, 0, 0)
         _FocusStrength ("Focus strength (set by the world)", Float) = 0
         _Charge ("Charge 0-1 (set by the world)", Float) = 0
+        _FingerGlow ("Lit fingers: thumb, index, middle, ring 0-1 (set by HandSkin)", Vector) = (0, 0, 0, 0)
+        _FingerGlowLittle ("Lit little finger 0-1 (set by HandSkin)", Float) = 0
+        _FingerColor ("Lit finger colour (set by HandSkin)", Color) = (1, 0.8, 0.9, 1)
+        _PulseScale ("How strongly the beat pulse shows: 1, or a quarter with Less flashing (set by HandSkin)", Float) = 1
     }
 
     SubShader
@@ -55,6 +62,10 @@ Shader "MusicInYourHands/Hand"
             float4 _FocusPos;
             float _FocusStrength;
             float _Charge;
+            float4 _FingerGlow;
+            float _FingerGlowLittle;
+            float4 _FingerColor;
+            float _PulseScale;
         CBUFFER_END
 
         float Hash(float3 p)
@@ -93,7 +104,7 @@ Shader "MusicInYourHands/Hand"
                 float scan = pow(saturate(sin(along * 1300 - t * 20) * 0.5 + 0.5), 24);
                 float front = _BeatAge * 0.5;
                 float sweep = exp(-pow((along - front) / 0.022, 2)) * exp(-_BeatAge * 2.2);
-                float k = scan * sweep * 1.6;
+                float k = scan * sweep * 1.6 * _PulseScale;
                 return float4(c * k, k * 0.5);
             }
             if (_Pattern < 3.5)
@@ -192,6 +203,10 @@ Shader "MusicInYourHands/Hand"
         {
             float4 positionOS : POSITION;
             float3 normalOS : NORMAL;
+            // How much the vertex belongs to the thumb, index, middle and ring finger; to the little finger, and how far
+            // along its finger it is (0 knuckle, 1 tip). Zero on a mesh without them: then no finger ever lights.
+            float4 fingers : TEXCOORD2;
+            float2 little : TEXCOORD3;
             UNITY_VERTEX_INPUT_INSTANCE_ID
         };
 
@@ -200,8 +215,16 @@ Shader "MusicInYourHands/Hand"
             float4 positionCS : SV_POSITION;
             float3 positionWS : TEXCOORD0;
             float3 normalWS : TEXCOORD1;
+            float fingerGlow : TEXCOORD2;
             UNITY_VERTEX_OUTPUT_STEREO
         };
+
+        // How brightly a vertex is lit by the lit fingers: its finger's light, fuller towards the tip.
+        float FingerGlow(Attributes input)
+        {
+            float g = dot(input.fingers, _FingerGlow) + input.little.x * _FingerGlowLittle;
+            return saturate(g) * lerp(0.3, 1, saturate(input.little.y));
+        }
 
         // 0 behind the wrist, 1 from a few centimetres towards the fingers. Without wrist data, no fade.
         float WristFade(float3 positionWS)
@@ -219,18 +242,20 @@ Shader "MusicInYourHands/Hand"
             float front = _BeatAge * _PulseSpeed;
             float band = exp(-pow((along - front) / max(_PulseWidth, 1e-4), 2));
             float travelled = saturate(front / max(_PulseLength, 1e-3));
-            return band * (1 - travelled * travelled);
+            return band * (1 - travelled * travelled) * _PulseScale;
         }
 
-        Varyings Build(Attributes input, float extrude)
+        Varyings Build(Attributes input, float extrude, float litExtrude)
         {
             Varyings output = (Varyings)0;
             UNITY_SETUP_INSTANCE_ID(input);
             UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
+            float glow = FingerGlow(input);
             float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
-            float3 positionWS = TransformObjectToWorld(input.positionOS.xyz) + normalWS * extrude;
+            float3 positionWS = TransformObjectToWorld(input.positionOS.xyz) + normalWS * (extrude + glow * litExtrude);
             output.positionWS = positionWS;
             output.normalWS = normalWS;
+            output.fingerGlow = glow;
             output.positionCS = TransformWorldToHClip(positionWS);
             return output;
         }
@@ -251,7 +276,7 @@ Shader "MusicInYourHands/Hand"
             #pragma fragment frag
             #pragma multi_compile_instancing
 
-            Varyings vert(Attributes input) { return Build(input, 0); }
+            Varyings vert(Attributes input) { return Build(input, 0, 0); }
 
             half4 frag(Varyings input) : SV_Target
             {
@@ -266,6 +291,13 @@ Shader "MusicInYourHands/Hand"
                 float4 effect = HandEffect(input.positionWS, n, v);
                 color += effect.rgb;
                 float alpha = max(lerp(_FillColor.a, 1, saturate(rim)), pulse * 0.85);
+                // A lit finger: its own light, a glowing edge that runs white-hot towards the tip, and nearly opaque.
+                float lit = input.fingerGlow;
+                float edgeLit = saturate(rim * 1.4 + 0.25);
+                color = lerp(color, _FingerColor.rgb, lit * 0.9);
+                color += lerp(_FingerColor.rgb, 1, 0.5) * lit * edgeLit * 0.9;
+                color = lerp(color, 1, lit * lit * edgeLit * 0.3);
+                alpha = max(alpha, lit * 0.95);
                 alpha = saturate(alpha + effect.a) * WristFade(input.positionWS);
                 return half4(color, alpha);
             }
@@ -286,7 +318,8 @@ Shader "MusicInYourHands/Hand"
             #pragma fragment frag
             #pragma multi_compile_instancing
 
-            Varyings vert(Attributes input) { return Build(input, _OutlineWidth * (1 + _Kick * 0.7)); }
+            // A lit finger's outline swells by up to 2.5 mm, a bright halo round it.
+            Varyings vert(Attributes input) { return Build(input, _OutlineWidth * (1 + _Kick * 0.7), 0.0025); }
 
             half4 frag(Varyings input) : SV_Target
             {
@@ -294,7 +327,9 @@ Shader "MusicInYourHands/Hand"
                 float pulse = BeatPulse(input.positionWS) * step(_Pattern, 0.5);
                 float3 color = lerp(_EdgeColor.rgb, _GlowColor.rgb, saturate(_Kick * 0.8 + pulse));
                 color = lerp(color, 1, pulse * 0.4);
-                return half4(color, _EdgeColor.a * WristFade(input.positionWS));
+                float lit = input.fingerGlow;
+                color = lerp(color, lerp(_FingerColor.rgb, 1, 0.3), lit);
+                return half4(color, max(_EdgeColor.a, lit) * WristFade(input.positionWS));
             }
             ENDHLSL
         }

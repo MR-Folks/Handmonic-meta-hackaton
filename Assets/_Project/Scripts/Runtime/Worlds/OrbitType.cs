@@ -254,6 +254,7 @@ namespace MusicInYourHands
             var front = head + forward * distance + Vector3.up * height;
             bool fistPull = false;
             Vector3 pullTo = Vector3.zero;
+            for (int side = 0; side < 2; side++) pulling[side] = pushing[side] = false;
             if (rig != null)
             {
                 for (int side = 0; side < 2; side++)
@@ -262,7 +263,7 @@ namespace MusicInYourHands
                     // While the menu is open the hands are choosing there: no fist pulls, no finger pushes (PushFrom).
                     if (!hand.IsTracked || hand.Fist < 0.6f || MenuOpen) continue;
                     var palm = hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position;
-                    if (Vector3.Distance(palm, front) < pullRadius) { fistPull = true; pullTo = palm; }
+                    if (Vector3.Distance(palm, front) < pullRadius) { fistPull = true; pullTo = palm; pulling[side] = true; }
                 }
                 if (fistPull) Acted("fist pull");
             }
@@ -316,7 +317,24 @@ namespace MusicInYourHands
                 block.SetFloat(AlphaId, l.Alpha * FadeIn);
                 l.Renderer.SetPropertyBlock(block);
             }
+
+            // Feedback as each hand starts to pull the word with a fist, push letters with a fingertip or spin a ring.
+            if (rig == null) return;
+            for (int side = 0; side < 2; side++)
+            {
+                var hand = rig.Get(side == 0);
+                FeedbackOnStart(side, pulling[side], GestureKind.Fist, side == 0, HandFistPoint(hand), 0.8f);
+                FeedbackOnStart(2 + side, pushing[side], GestureKind.Touch, side == 0, touchAt[side], 0.7f, true,
+                    GestureFeedback.Of((HandRig.Finger)touchFinger[side]), 0.6f);
+                FeedbackOnStart(4 + side, spinning[side], GestureKind.Touch, side == 0, spinAt[side], 0.7f, true,
+                    GestureFeedback.Of((HandRig.Finger)spinFinger[side]), 0.6f);
+            }
         }
+
+        // What each hand does to the letters this frame, for the feedback.
+        readonly bool[] pulling = new bool[2], pushing = new bool[2], spinning = new bool[2];
+        readonly Vector3[] touchAt = new Vector3[2], spinAt = new Vector3[2];
+        readonly int[] touchFinger = new int[2], spinFinger = new int[2];
 
         /// <summary>Fingertips and palms close to a letter push it away; it springs back when they leave.</summary>
         Vector3 PushFrom(HandRig rig, Vector3 at, float size)
@@ -337,6 +355,12 @@ namespace MusicInYourHands
                     float reach = pushRadius * (size / letterHeight * 0.6f + 0.4f);
                     if (d >= reach || d < 1e-4f) continue;
                     push += away / d * (reach - d) * 1.1f;
+                    if (k < 5)
+                    {
+                        pushing[side] = true;
+                        touchAt[side] = point;
+                        touchFinger[side] = k;
+                    }
                     Acted("push letter");
                 }
             }
@@ -358,6 +382,7 @@ namespace MusicInYourHands
                 ringTouch[r] = Mathf.MoveTowards(ringTouch[r], 0f, dt * 2f);
                 ringSpinVelocity[r] *= Mathf.Exp(-dt * 0.8f);
             }
+            spinning[0] = spinning[1] = false;
             if (rig != null && dt > 0f)
             {
                 for (int side = 0; side < 2; side++)
@@ -381,6 +406,9 @@ namespace MusicInYourHands
                             float push = Vector3.Dot(move, tangent) / ringRadii[r];
                             ringSpinVelocity[r] = Mathf.Lerp(ringSpinVelocity[r], Mathf.Clamp(push, -6f, 6f), 0.5f);
                             ringTouch[r] = 1f;
+                            spinning[side] = true;
+                            spinAt[side] = tip;
+                            spinFinger[side] = k;
                             Acted("spin ring");
                         }
                     }
