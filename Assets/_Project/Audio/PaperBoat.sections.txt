@@ -1,0 +1,10 @@
+# Paper Boat: where each section starts (m:ss.xx) and what it is. Journey mode changes world at each one.
+# Written by Tools/song_sections.py; edit the song there.
+bpm 144
+beats 3
+key G major
+0:00.00 intro
+0:05.00 verse
+0:25.00 chorus
+0:45.00 outro
+0:52.50 end

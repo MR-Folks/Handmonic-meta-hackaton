@@ -20,8 +20,11 @@ namespace MusicInYourHands
 
         void Start()
         {
-            if (ReadIntent("world", out int world) && WorldManager.Instance != null) WorldManager.Instance.Switch(world);
+            bool asked = ReadIntent("world", out int world);
             touring = ReadFlag("tour");
+            // A world asked for, or the tour, holds its worlds: Journey mode would bring in worlds of its own.
+            if ((asked || touring) && JourneyMode.Instance != null) JourneyMode.Instance.Stop();
+            if (asked && WorldManager.Instance != null) WorldManager.Instance.Switch(world);
             if (touring) Next();
         }
 

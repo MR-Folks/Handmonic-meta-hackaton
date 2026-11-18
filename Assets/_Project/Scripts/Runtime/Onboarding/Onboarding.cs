@@ -20,9 +20,11 @@ namespace MusicInYourHands
     /// launches start as before. The menu's "?" bubble (Replay) shows the lessons again: the menu closes and the ghost
     /// shows how to open it; "--ez onboarding true" on the adb launch starts the whole first launch again.
     /// Every world also gets a ghost demo of its own gesture for its first ten seconds, beside its text hint (see
-    /// <see cref="GhostMotions.WorldTable"/>), never while the menu is open. The onboarding is made at run time
-    /// (nothing in the scene) and reads the menu only through WorldMenu.ToggleRequested, WorldMenu.IsOpen and
-    /// WorldManager.WorldChanged, and the thumb gestures through MusicGestures.Used.
+    /// <see cref="GhostMotions.WorldTable"/>), never while the menu is open; on a journey, only the first time it comes in.
+    /// With Journey mode on, the opening world plays the opening song's first section and the journey goes on from it
+    /// (JourneyMode.OpenWith). The onboarding is made at run time (nothing in the scene) and reads the menu only through
+    /// WorldMenu.ToggleRequested, WorldMenu.IsOpen and WorldManager.WorldChanged, and the thumb gestures through
+    /// MusicGestures.Used.
     /// </summary>
     [DefaultExecutionOrder(190)]
     public partial class Onboarding : MonoBehaviour
@@ -223,12 +225,20 @@ namespace MusicInYourHands
         void StartOpening(WorldManager worlds, MusicBus bus)
         {
             manager = worlds;
+            SongAsset song = null;
+            if (bus != null)
+                foreach (var s in bus.Songs)
+                    if (s != null && string.Equals(s.title, openingSong, StringComparison.OrdinalIgnoreCase)) song = s;
             if (worlds != null && !worldAsked)
             {
                 for (int i = 0; i < worlds.Worlds.Count; i++)
                 {
                     var world = worlds.Worlds[i];
                     if (world == null || world.GetType().Name != openingWorld) continue;
+                    // With Journey mode on, the opening world plays the opening song's first section and the journey goes
+                    // on from it, rather than taking the opening switch for the player choosing a world.
+                    var journey = JourneyMode.Instance;
+                    if (journey != null && journey.IsActive) journey.OpenWith(i, song != null ? song : bus != null ? bus.CurrentSong : null);
                     worlds.Switch(i);
                     break;
                 }
@@ -236,9 +246,6 @@ namespace MusicInYourHands
             }
             if (bus != null)
             {
-                SongAsset song = null;
-                foreach (var s in bus.Songs)
-                    if (s != null && string.Equals(s.title, openingSong, StringComparison.OrdinalIgnoreCase)) song = s;
                 if (song != null && song != bus.CurrentSong) bus.Play(song);
                 else if (song == null) Debug.LogWarning($"[Onboarding] No song called \"{openingSong}\"; opening with the current one.");
             }
@@ -415,13 +422,18 @@ namespace MusicInYourHands
 
         bool Tried(int index) => index >= 0 && index < tried.Length && tried[index];
 
-        /// <summary>Starts a world's ghost demo.</summary>
+        /// <summary>
+        /// Starts a world's ghost demo. On a journey (JourneyMode) a world's demo shows only the first time it comes in
+        /// this session: the worlds change every section, and a song shouldn't be half ghost hands.
+        /// </summary>
         void StartHint(int index)
         {
+            var journey = JourneyMode.Instance;
+            bool again = journey != null && journey.IsActive && Tried(index);
             if (index >= 0) MarkTried(index);
             worldClock = 0f;
             hintMotion = GhostMotion.None;
-            if (manager == null || index < 0 || index >= manager.Worlds.Count) return;
+            if (again || manager == null || index < 0 || index >= manager.Worlds.Count) return;
             hintMotion = GhostMotions.ForWorld(manager.Worlds[index]);
             hintSidePending = true;
         }

@@ -13,9 +13,10 @@ namespace MusicInYourHands
     /// listening to the room, turns the lyrics on and off and opens the cassette deck (CassetteDeck), where you choose a
     /// song by putting its cassette in a radio; the menu steps aside for it. The deck's song list button brings the menu
     /// back with the song page (SongLibrary) in the honeycomb's place, and the page's Back button returns to the deck.
-    /// After the last world the honeycomb has two more cells, just above the end of the song row: Less flashing, which
-    /// turns that option on and off (ComfortOptions), and a "?" bubble ("Show me how"), which closes the menu and starts
-    /// the onboarding's lessons again. Bubbles near where you look are a little larger.
+    /// After the last world the honeycomb has three more cells, just above the end of the song row: Journey, which turns
+    /// Journey mode on and off (the worlds follow the song's sections, JourneyMode), Less flashing, which turns that
+    /// option on and off (ComfortOptions), and a "?" bubble ("Show me how"), which closes the menu and starts the
+    /// onboarding's lessons again. Picking a world turns the journey off. Bubbles near where you look are a little larger.
     /// The menu opens half a metre along your gaze, within reach, so you can touch a bubble or button with your index
     /// fingertip, or point at it from farther away and pinch. It stays put while you look round it, but once you have
     /// looked well away for a moment it glides back in front of you, up or down as well as sideways, and never away from
@@ -99,13 +100,15 @@ namespace MusicInYourHands
         const int Library = -6;
         const int LessFlashingToggle = -7;
         const int Help = -8;
+        const int JourneyToggle = -9;
         /// <summary>The bubbles of the song row under the honeycomb.</summary>
         const int SongRow = 6;
-        /// <summary>The honeycomb's cells after the last world: Less flashing, then the "?".</summary>
-        const int AfterWorlds = 2;
-        /// <summary>The bubbles that aren't worlds: the song row, and Less flashing and the "?" at the end of the honeycomb.</summary>
+        /// <summary>The honeycomb's cells after the last world: Journey, Less flashing, then the "?".</summary>
+        const int AfterWorlds = 3;
+        /// <summary>The bubbles that aren't worlds: the song row, and Journey, Less flashing and the "?" at the end of the honeycomb.</summary>
         public const int ExtraBubbles = SongRow + AfterWorlds;
         const string HelpName = "Show me how";
+        static readonly Color JourneyColor = new Color(1f, 0.8f, 0.55f);
         static readonly Color ListenColor = new Color(0.98f, 0.62f, 0.5f);
         static readonly Color SongColor = new Color(0.72f, 0.7f, 1f);
         static readonly Color LyricsColor = new Color(0.55f, 0.85f, 1f);
@@ -499,7 +502,8 @@ namespace MusicInYourHands
                 Effects.Face(b.Renderer.transform, view);
 
                 bool selected = b.World == ListenToggle ? bus != null && bus.IsListening
-                    : b.World == LyricsToggle ? LyricsOption.On : b.World == LessFlashingToggle ? ComfortOptions.LessFlashing : b.World == manager.Current;
+                    : b.World == LyricsToggle ? LyricsOption.On : b.World == LessFlashingToggle ? ComfortOptions.LessFlashing
+                    : b.World == JourneyToggle ? JourneyMode.Instance != null && JourneyMode.Instance.IsActive : b.World == manager.Current;
                 block.Clear();
                 block.SetColor(ColorId, BubbleColor(b, manager));
                 block.SetFloat(IconId, b.World >= 0 ? manager.Worlds[b.World].MenuIcon : Icon(b.World));
@@ -576,7 +580,7 @@ namespace MusicInYourHands
         static float Icon(int bubble) => bubble switch
         {
             ListenToggle => 7f, NextSong => 14f, PreviousSong => 15f, LyricsToggle => 23f, Library => 24f, LessFlashingToggle => 18f,
-            Help => 31f, _ => 6f
+            Help => 31f, JourneyToggle => 22f, _ => 6f
         };
 
         static bool IsSongStep(Bubble b) => b.World == PreviousSong || b.World == NextSong;
@@ -584,7 +588,7 @@ namespace MusicInYourHands
         Color BubbleColor(Bubble b, WorldManager manager) =>
             b.World >= 0 ? manager.Worlds[b.World].Color : b.World == ListenToggle ? ListenColor : IsSongStep(b) ? SongColor
             : b.World == LyricsToggle ? LyricsColor : b.World == Library ? AddColor : b.World == LessFlashingToggle ? CalmColor
-            : b.World == Help ? HelpColor : new Color(0.85f, 0.85f, 1f);
+            : b.World == Help ? HelpColor : b.World == JourneyToggle ? JourneyColor : new Color(0.85f, 0.85f, 1f);
 
         string BubbleName(Bubble b, WorldManager manager, MusicBus bus) =>
             b.World >= 0 ? manager.Worlds[b.World].DisplayName
@@ -594,6 +598,7 @@ namespace MusicInYourHands
             : b.World == LessFlashingToggle ? ComfortOptions.LessFlashing ? "Less flashing: on" : "Less flashing: off"
             : b.World == Library ? "Choose a song on the cassette deck"
             : b.World == Help ? HelpName
+            : b.World == JourneyToggle ? JourneyMode.Instance != null && JourneyMode.Instance.IsActive ? "Stop the journey" : "Journey: worlds follow the song"
             : bus == null ? "Music" : bus.IsPlaying ? $"Pause {bus.Title}" : $"Play {bus.Title}";
 
         static string SongStepName(MusicBus bus, int step)
@@ -848,17 +853,21 @@ namespace MusicInYourHands
             cooldown = 0.6f;
             b.Pop = 1f;
             float note = b.World >= 0 ? Synth.Pentatonic[6 + b.World % 5]
-                : Synth.Pentatonic[b.World == ListenToggle ? 4 : IsSongStep(b) ? 3 : b.World == LyricsToggle || b.World == Library || b.World == LessFlashingToggle ? 2 : 5];
+                : Synth.Pentatonic[b.World == ListenToggle ? 4 : IsSongStep(b) ? 3
+                    : b.World == LyricsToggle || b.World == Library || b.World == LessFlashingToggle || b.World == JourneyToggle ? 2 : 5];
             var at = b.Renderer.transform.position;
             voices.Play(Synth.Pop(), at, 0.45f);
             voices.Play(Synth.Chime(note), at, 0.5f);
             if (b.World >= 0)
             {
+                // Picking a world, even the one playing, is choosing: the journey turns off.
+                JourneyMode.Instance?.WorldPicked();
                 manager.Switch(b.World);
                 closeAt = openTime + 0.35f;
             }
             else if (b.World == LyricsToggle) LyricsOption.On = !LyricsOption.On;
             else if (b.World == LessFlashingToggle) ComfortOptions.LessFlashing = !ComfortOptions.LessFlashing;
+            else if (b.World == JourneyToggle) JourneyMode.Instance?.Toggle();
             else if (b.World == Library)
             {
                 // The menu steps aside as the cassette deck rises.
@@ -934,12 +943,12 @@ namespace MusicInYourHands
         }
 
         /// <summary>
-        /// Lays the worlds out as one honeycomb in menu order, row by row, Less flashing and the "?" in the two cells after the
-        /// last world, with the song row under it, the caption over it and the two hint lines under the song row. It tries
+        /// Lays the worlds out as one honeycomb in menu order, row by row, Journey, Less flashing and the "?" in the three cells
+        /// after the last world, with the song row under it, the caption over it and the two hint lines under the song row. It tries
         /// every number of rows and keeps the one that fits AimArea best at the menu's distance (the narrower and lower, the
         /// better, both counted against the area), so the honeycomb shrinks and stays centred as worlds are removed. The
         /// middle of the menu is halfway between the top of the caption and the foot of the second hint line. Fills
-        /// <paramref name="slots"/> (worlds, the song row, then Less flashing and the "?") and places the text.
+        /// <paramref name="slots"/> (worlds, the song row, then Journey, Less flashing and the "?") and places the text.
         /// </summary>
         void LayOut(int count, Vector2[] slots)
         {
@@ -957,7 +966,7 @@ namespace MusicInYourHands
             float aimWidth = 2f * viewDistance * Mathf.Tan(AimArea.x * 0.5f * Mathf.Deg2Rad);
             float aimHeight = 2f * viewDistance * Mathf.Tan(AimArea.y * 0.5f * Mathf.Deg2Rad);
 
-            // The honeycomb's cells: the worlds, then Less flashing and the "?".
+            // The honeycomb's cells: the worlds, then Journey, Less flashing and the "?".
             int cells = count + AfterWorlds;
             var lengths = new int[cells];
             var centres = new float[lengths.Length];
@@ -986,7 +995,7 @@ namespace MusicInYourHands
             float songY = bestRows > 0 ? -(bestRows - 1) * rowStep - songBelow : 0f;
             // Centre it all on the menu's middle, from the top of the caption to the foot of the second hint line.
             float shift = -(top + songY - underSongs) * 0.5f;
-            // The worlds, then Less flashing and the "?" in the last two cells (their slots follow the song row's).
+            // The worlds, then Journey, Less flashing and the "?" in the last three cells (their slots follow the song row's).
             int next = 0;
             for (int r = 0; r < bestRows; r++)
                 for (int i = 0; i < rowLengths[r]; i++, next++)
@@ -1044,12 +1053,13 @@ namespace MusicInYourHands
             for (int i = 0; i < bubbles.Length; i++)
             {
                 int world = i < count ? i : i == count ? NowPlaying : i < count + SongRow ? ListenToggle - (i - count - 1)
-                    : i == count + SongRow ? LessFlashingToggle : Help;
+                    : i == count + SongRow ? JourneyToggle : i == count + SongRow + 1 ? LessFlashingToggle : Help;
                 var slot = slots[i];
                 string objectName = world >= 0 ? $"Bubble {world}" : world == ListenToggle ? "Bubble Listen"
                     : world == PreviousSong ? "Bubble Previous Song" : world == NextSong ? "Bubble Next Song"
                     : world == LyricsToggle ? "Bubble Lyrics" : world == Library ? "Bubble Library"
-                    : world == LessFlashingToggle ? "Bubble Less Flashing" : world == Help ? "Bubble Help" : "Bubble Now Playing";
+                    : world == LessFlashingToggle ? "Bubble Less Flashing" : world == Help ? "Bubble Help"
+                    : world == JourneyToggle ? "Bubble Journey" : "Bubble Now Playing";
                 var r = Effects.MakeQuad(objectName, root, bubbleMaterial);
                 float delay = 0.04f + slot.magnitude * 0.6f;
                 bubbles[i] = new Bubble { Renderer = r, World = world, Slot = slot, Delay = delay };

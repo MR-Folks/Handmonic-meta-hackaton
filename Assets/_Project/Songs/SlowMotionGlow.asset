@@ -18,3 +18,4 @@ MonoBehaviour:
   lyrics: {fileID: 4606409926849070353, guid: 77d9f0e428d0433bb0f70e0b065338b8, type: 3}
   notes: {fileID: 0}
   lyricsOffset: 0
+  sections: {fileID: 4900000, guid: 685f6c643deb78e4cac64da03a8296f7, type: 3}

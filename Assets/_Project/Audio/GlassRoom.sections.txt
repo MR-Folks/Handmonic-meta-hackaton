@@ -1,0 +1,10 @@
+# Glass Room: where each section starts (m:ss.xx) and what it is. Journey mode changes world at each one.
+# Written by Tools/song_sections.py; edit the song there.
+bpm 96
+beats 4
+key A minor
+0:00.00 intro
+0:05.00 verse
+0:25.00 chorus
+0:45.00 outro
+0:51.00 end

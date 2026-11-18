@@ -2603,6 +2603,136 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1741974302
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1741974304}
+  - component: {fileID: 1741974303}
+  m_Layer: 0
+  m_Name: Journey
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1741974303
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1741974302}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81df72c6ebddb8345a1a4361af38edee, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.JourneyMode
+  bubbleMaterial: {fileID: 2100000, guid: fa89d5024587b4c8e83405b9bccf5a04, type: 2}
+  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
+  waveMaterial: {fileID: 2100000, guid: a061ce50dba658242818161d09bb774f, type: 2}
+  startOn: 1
+  journeySet:
+  - Role: 6
+    Worlds:
+    - SolarSystem
+    - BubbleNotes
+    - Lightning
+  - Role: 3
+    Worlds:
+    - BubbleNotes
+    - FlowerDance
+    - SolarSystem
+    - Lightning
+  - Role: 4
+    Worlds:
+    - HeartbeatOrb
+    - FingerFrame
+    - Lightning
+    - ShadowPlay
+  - Role: 5
+    Worlds:
+    - ShadowPlay
+    - Lightning
+    - AirStrings
+    - FingerFrame
+  - Role: 0
+    Worlds:
+    - SoundPool
+    - FlowerDance
+    - AirStrings
+  - Role: 1
+    Worlds:
+    - SoundPool
+    - AirStrings
+    - FlowerDance
+    - Lightning
+  - Role: 2
+    Worlds:
+    - AirStrings
+    - SoundPool
+    - Lightning
+  - Role: 7
+    Worlds:
+    - AirStrings
+    - FlowerDance
+    - SoundPool
+    - Lightning
+    - ShadowPlay
+    - LivingSkin
+  variety: 2
+  shortestSection: 7
+  newSongResumes: 0
+  waveLead: 0.3
+  buildUp: 1
+  beatWindow: {x: 0.35, y: 0.6}
+  settle: 0.5
+  volume: 0.35
+  wave:
+    speed: 2.2
+    width: 0.28
+    strength: 0.6
+    curtainHeight: 1.2
+    life: 2.6
+    bloomBoost: 1.35
+    bloomMotes: 220
+    standInRoom: {x: 2.2, y: 2.4}
+  map:
+    distance: 0.85
+    down: 24
+    curve: 2
+    spread: {x: 3.6, y: 26}
+    dotSize: {x: 0.017, y: 0.03}
+    showSeconds: 4.5
+    captionSeconds: 3
+  choiceSeconds: 10
+  loadPatience: 20
+  card:
+    distance: 0.42
+    drop: 0.13
+    bubbleSize: 0.08
+    spacing: 0.17
+    pinchThresholds: {x: 0.85, y: 0.5}
+--- !u!4 &1741974304
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1741974302}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1788851834
 GameObject:
   m_ObjectHideFlags: 0
@@ -3034,3 +3164,4 @@ SceneRoots:
   - {fileID: 1919429420}
   - {fileID: 64110408}
   - {fileID: 9738883}
+  - {fileID: 1741974304}

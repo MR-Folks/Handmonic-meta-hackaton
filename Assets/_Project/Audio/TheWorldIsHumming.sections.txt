@@ -1,0 +1,13 @@
+# The World Is Humming: where each section starts (m:ss.xx) and what it is. Journey mode changes world at each one.
+# Written by Tools/song_sections.py; edit the song there.
+bpm 92
+beats 4
+key D major
+0:00.00 intro
+0:20.89 verse 1
+0:41.76 chorus
+1:02.63 interlude
+1:15.68 verse 2
+1:39.16 final chorus
+2:00.03 outro
+2:17.00 end

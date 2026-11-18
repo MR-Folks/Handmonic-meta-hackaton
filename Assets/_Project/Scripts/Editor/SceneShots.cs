@@ -102,6 +102,7 @@ namespace MusicInYourHands.EditorTools
             // Every other world (a new one, say) gets a default shot, w-<class>.png: palms to the face, from head height.
             foreach (var type in WorldCatalog.Types())
                 if (!ShotTypes.Contains(type)) Shot(type, $"w-{type.Name}", HandPose.PalmsToFace, 8f);
+            JourneyShots();
             Room.Clear();
             Debug.Log($"[Shots] Saved screenshots to {ShotFolder}.");
             return true;

@@ -1,0 +1,13 @@
+# Slow Motion Glow: where each section starts (m:ss.xx) and what it is. Journey mode changes world at each one.
+# Written by Tools/song_sections.py; edit the song there.
+bpm 80
+beats 4
+key C major
+0:00.00 intro
+0:22.50 verse 1
+0:40.51 hook
+0:55.51 interlude
+1:22.50 verse 2
+1:40.50 final hook
+1:55.50 outro
+2:11.50 end

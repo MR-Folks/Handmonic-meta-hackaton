@@ -1,0 +1,10 @@
+# Rainy Window: where each section starts (m:ss.xx) and what it is. Journey mode changes world at each one.
+# Written by Tools/song_sections.py; edit the song there.
+bpm 80
+beats 4
+key C major
+0:00.00 intro
+0:06.00 verse
+0:30.00 chorus
+0:54.00 outro
+1:03.00 end
