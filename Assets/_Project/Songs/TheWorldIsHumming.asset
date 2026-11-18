@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: TheWorldIsHumming
   m_EditorClassIdentifier: Assembly-CSharp::MusicInYourHands.SongAsset
   title: The World Is Humming
-  artist: Music In Your Hands
+  artist: Handmonic
   clip: {fileID: 8300000, guid: bf50a09a220d4a719da363b771932d8f, type: 3}
   lyrics: {fileID: 4606409926849070353, guid: 8b152aded58444a793dcdffb35340fef, type: 3}
   notes: {fileID: 0}

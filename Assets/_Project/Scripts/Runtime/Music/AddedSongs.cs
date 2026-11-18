@@ -17,7 +17,7 @@ namespace MusicInYourHands
     {
         const string HowToName = "How to add songs.txt";
         const string HowTo =
-            "Put songs in this folder to play them in Music In Your Hands.\n\n" +
+            "Put songs in this folder to play them in Handmonic.\n\n" +
             "- The song: an .mp3, .ogg or .wav file.\n" +
             "- Its lyrics (optional): an .lrc file with the same name, like \"Artist - Title.mp3\" and \"Artist - Title.lrc\".\n" +
             "  The lines show at the times in the .lrc, and the words too when it has a time for each word.\n" +

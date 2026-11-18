@@ -121,7 +121,7 @@ namespace MusicInYourHands.EditorTools
 
             var android = NamedBuildTarget.Android;
             PlayerSettings.companyName = "MR Folks";
-            PlayerSettings.productName = "Music In Your Hands";
+            PlayerSettings.productName = "Handmonic";
             PlayerSettings.SetApplicationIdentifier(android, ApplicationId);
             PlayerSettings.SetScriptingBackend(android, ScriptingImplementation.IL2CPP);
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
@@ -314,7 +314,7 @@ namespace MusicInYourHands.EditorTools
                     AssetDatabase.CreateAsset(song, path);
                 }
                 song.title = title;
-                song.artist = "Music In Your Hands demo";
+                song.artist = "Handmonic demo";
                 song.clip = AssetDatabase.LoadAssetAtPath<AudioClip>($"{Root}/Audio/{file}.wav")
                     ?? AssetDatabase.LoadAssetAtPath<AudioClip>($"{Root}/Audio/{file}.mp3");
                 song.lyrics = AssetDatabase.LoadAssetAtPath<TextAsset>($"{Root}/Audio/{file}.lrc");

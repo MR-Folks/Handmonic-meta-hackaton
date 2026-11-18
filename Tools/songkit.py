@@ -80,7 +80,7 @@ def reverb(x, seconds, wet, seed=3):
 
 
 class Song:
-    def __init__(self, title, bpm, bars, beats_per_bar=4, tail=1.5, seed=7, artist="Music In Your Hands demo"):
+    def __init__(self, title, bpm, bars, beats_per_bar=4, tail=1.5, seed=7, artist="Handmonic demo"):
         self.title, self.artist = title, artist
         self.beat = 60 / bpm
         self.beats_per_bar = beats_per_bar

@@ -355,6 +355,7 @@ namespace MusicInYourHands.EditorTools
             }
             Play(ChorusStart + 0.09f + extra);
             File.WriteAllBytes($"{ShotFolder}/{name}.png", Render(camera, 1600, 900).EncodeToPNG());
+            if (MediaClipFrames > 0) CaptureMedia(name, camera, Play, () => clock.Time);
             if (closeUp == null) return;
 
             camera.fieldOfView = 34f;

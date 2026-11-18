@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: GlassRoom
   m_EditorClassIdentifier: Assembly-CSharp::MusicInYourHands.SongAsset
   title: Glass Room
-  artist: Music In Your Hands demo
+  artist: Handmonic demo
   clip: {fileID: 8300000, guid: 3ebe1221bcff94cf78939b3f55ee7649, type: 3}
   lyrics: {fileID: 4606409926849070353, guid: 914473e6ec649489ba34beb84213aa8b, type: 3}
   notes: {fileID: 4606409926849070353, guid: 34f385b6457d84a42b67c894053396fc, type: 3}

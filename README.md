@@ -42,6 +42,12 @@ The project is already set up for Quest, using the same setup as autism-keyboard
 3. Open `Assets/_Project/Scenes/Main.unity`. It has an `OVRCameraRig` with passthrough and Meta's hand prefabs, `MusicBus` playing the demo song, `HandRig`, and two debug views.
 4. **Music In Your Hands > Build APK for Quest** writes `Builds/MusicInYourHands.apk`. Install it with Meta Quest Developer Hub or `adb install -r Builds/MusicInYourHands.apk`, then launch it from **Library > Unknown sources**.
 
+### Release build (Meta Horizon Store and the competition)
+Meta's upload check refuses the debug key, so uploads are signed with the team's release keystore. The keystore and its settings never go into git: a committed `androidUseCustomKeystore` would break everyone else's debug builds.
+1. Once, ever: `powershell -ExecutionPolicy Bypass -File Tools\release\new-keystore.ps1` creates `%USERPROFILE%\keystores\musicinyourhands-release.keystore`; keytool asks for the password. Back up the file and the password. Every later upload must use the same key.
+2. Close any Unity editor on this project, then run `powershell -ExecutionPolicy Bypass -File Tools\release\build-release.ps1`. It asks for the password and writes `Builds/MusicInYourHands-release.apk`. Its version code comes from the build time, so each build is higher than the last; it prints the signer and the package line.
+3. Upload that APK to a release channel on the [Developer Dashboard](https://developer.meta.com/manage/) (the competition's is named **Competition**), add yourself as a tester, and install it from the channel on the headset. A copy installed from Unknown sources is signed with a different key: uninstall it first, after `adb pull`ing any songs in `Android/data/com.musicinyourhands.app/files/Songs`.
+
 If settings drift, run **Music In Your Hands > Configure Project for Quest**. It reapplies everything and runs Meta's Project Setup Tool "Fix All". **Rebuild Main Scene** recreates the scene from scratch.
 
 ## In the headset

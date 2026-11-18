@@ -25,7 +25,7 @@ import uuid
 API = "https://api.elevenlabs.io/v1"
 MODEL = "music_v2_5"
 OUTPUT_FORMAT = "mp3_44100_192"
-ARTIST = "Music In Your Hands"
+ARTIST = "Handmonic"
 
 
 def chunk(section, duration_s, styles, lines=(), negative=()):
