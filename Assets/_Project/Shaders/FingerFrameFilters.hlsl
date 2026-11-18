@@ -24,6 +24,7 @@ float _SurfaceCount;
 float _DepthCap;        // the farthest a room point may be (m)
 float4 _Center;         // the window's middle (world)
 float _BeatAge;         // seconds since the last beat
+float _BeatFlash;       // how strongly the beat flashes in the filters: 1, or a quarter with Less flashing
 float _Bass;            // the bass, smoothed, 0-1
 float _Beats;           // beats so far
 float _Spin;            // the kaleidoscope's turn (radians)
@@ -152,7 +153,7 @@ float BeatRing(float2 window, float speed, float width)
 {
     float r = length((window - 0.5) * float2(1.3, 1));
     float d = (r - _BeatAge * speed) / width;
-    return exp(-d * d) * exp(-_BeatAge * 2.2);
+    return exp(-d * d) * exp(-_BeatAge * 2.2) * _BeatFlash;
 }
 
 // Coordinates along the room surface (m), for patterns that stay put on the room.
@@ -250,7 +251,7 @@ float3 BassTiles(Lens l)
     float box = length(max(abs(f) - 0.3, 0)) - 0.13;
     float tile = smoothstep(aa, -aa, box);
     g *= 0.92 + (f.y - f.x) * 0.2;
-    float pop = step(0.9, Hash2(cell + _Beats * 17.17)) * exp(-_BeatAge * 3);
+    float pop = step(0.9, Hash2(cell + _Beats * 17.17)) * exp(-_BeatAge * 3) * _BeatFlash;
     g = saturate(g + pop * 0.35 * (g + 0.3));
     float3 color = lerp(float3(0.03, 0.03, 0.04), g, tile);
     return color * color;
@@ -268,7 +269,7 @@ float3 NightVision(Lens l)
     v += (Hash2(floor(l.uv * _CamTexel.zw) + frac(floor(_Clock * 24) * 0.618) * 400) - 0.5) * (0.07 + _High.y * 0.05);
     v *= 0.9 + 0.1 * sin(l.window.y * 300);
     float band = l.window.y - (1.1 - _BeatAge * 1.4);
-    v += exp(-band * band * 60) * exp(-_BeatAge * 1.2) * 0.16;
+    v += exp(-band * band * 60) * exp(-_BeatAge * 1.2) * 0.16 * _BeatFlash;
     float2 q = (l.window - 0.5) * float2(1.6, 2);
     v = saturate(v) * smoothstep(1.25, 0.55, length(q));
     return float3(0.18, 1.0, 0.24) * pow(v, 1.6) + float3(0.6, 1, 0.65) * pow(v, 8) * 0.3;

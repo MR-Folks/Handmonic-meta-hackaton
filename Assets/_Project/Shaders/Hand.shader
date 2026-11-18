@@ -31,6 +31,7 @@ Shader "MusicInYourHands/Hand"
         _FingerGlow ("Lit fingers: thumb, index, middle, ring 0-1 (set by HandSkin)", Vector) = (0, 0, 0, 0)
         _FingerGlowLittle ("Lit little finger 0-1 (set by HandSkin)", Float) = 0
         _FingerColor ("Lit finger colour (set by HandSkin)", Color) = (1, 0.8, 0.9, 1)
+        _PulseScale ("How strongly the beat pulse shows: 1, or a quarter with Less flashing (set by HandSkin)", Float) = 1
     }
 
     SubShader
@@ -64,6 +65,7 @@ Shader "MusicInYourHands/Hand"
             float4 _FingerGlow;
             float _FingerGlowLittle;
             float4 _FingerColor;
+            float _PulseScale;
         CBUFFER_END
 
         float Hash(float3 p)
@@ -102,7 +104,7 @@ Shader "MusicInYourHands/Hand"
                 float scan = pow(saturate(sin(along * 1300 - t * 20) * 0.5 + 0.5), 24);
                 float front = _BeatAge * 0.5;
                 float sweep = exp(-pow((along - front) / 0.022, 2)) * exp(-_BeatAge * 2.2);
-                float k = scan * sweep * 1.6;
+                float k = scan * sweep * 1.6 * _PulseScale;
                 return float4(c * k, k * 0.5);
             }
             if (_Pattern < 3.5)
@@ -240,7 +242,7 @@ Shader "MusicInYourHands/Hand"
             float front = _BeatAge * _PulseSpeed;
             float band = exp(-pow((along - front) / max(_PulseWidth, 1e-4), 2));
             float travelled = saturate(front / max(_PulseLength, 1e-3));
-            return band * (1 - travelled * travelled);
+            return band * (1 - travelled * travelled) * _PulseScale;
         }
 
         Varyings Build(Attributes input, float extrude, float litExtrude)

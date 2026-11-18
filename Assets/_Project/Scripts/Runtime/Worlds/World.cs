@@ -237,6 +237,52 @@ namespace MusicInYourHands
             GestureFeedback.Hold(left, fingers, 0.15f + 0.75f * Mathf.Clamp01(progress));
         }
 
+        // ---- Flashes ----
+
+        /// <summary>The most flashes a world may make in any one second, Less flashing or not.</summary>
+        public const int MostFlashesPerSecond = 3;
+
+        /// <summary>
+        /// Starts a flash: anything that suddenly brightens a lot of what you see, such as the room lighting up, a flare
+        /// or a burst of light. Returns the strength to flash with: <paramref name="strength"/>, a quarter of it with
+        /// Less flashing on (ComfortOptions), and 0 when this world has already flashed three times in the last second,
+        /// so no world ever flashes faster than that. Call it once as each flash starts and draw the flash at what it
+        /// returns (skip it at 0).
+        /// </summary>
+        protected float Flash(float strength = 1f)
+        {
+            // The oldest of the last three flashes this world made: a fourth must come more than a second after it.
+            if (Clock - flashTimes[nextFlash] <= 1f)
+            {
+#if UNITY_EDITOR
+                FlashesHeld++;
+#endif
+                return 0f;
+            }
+            flashTimes[nextFlash] = Clock;
+            nextFlash = (nextFlash + 1) % MostFlashesPerSecond;
+            float shown = strength * ComfortOptions.FlashScale;
+#if UNITY_EDITOR
+            FlashLog.Add(new Vector2(Clock, shown));
+            if (FlashLog.Count > 512) FlashLog.RemoveAt(0);
+#endif
+            return shown;
+        }
+
+        /// <summary>
+        /// Flash for a light that is already showing at <paramref name="showing"/>: only a flash brighter than that
+        /// counts towards the three a second (and is returned); one no brighter can't be seen, so it returns 0 and
+        /// leaves the allowance for the next flash.
+        /// </summary>
+        protected float Flash(float strength, float showing) =>
+            strength * ComfortOptions.FlashScale > showing ? Flash(strength) : 0f;
+
+#if UNITY_EDITOR
+        /// <summary>For the editor checks: each flash the world made (its time on Clock and the strength it showed), and how many it held back.</summary>
+        public readonly List<Vector2> FlashLog = new List<Vector2>();
+        public int FlashesHeld { get; private set; }
+#endif
+
         /// <summary>A fingertip as drawn (the joint the visible hand uses, when there is one).</summary>
         protected static Vector3 HandTip(HandRig.Hand hand, int finger) =>
             hand.TipJoints[finger] != null ? hand.TipJoints[finger].position : hand.Tips[finger];
@@ -265,6 +311,9 @@ namespace MusicInYourHands
         bool hooksPinch, hooksRelease;
         // FeedbackOnStart: whether each thing was happening last frame, and when it last showed.
         readonly bool[] feedbackOn = new bool[16];
+        // When this world's last three flashes started (on Clock), and which of them is the oldest.
+        readonly float[] flashTimes = { -9f, -9f, -9f };
+        int nextFlash;
         readonly float[] feedbackAt = { -9f, -9f, -9f, -9f, -9f, -9f, -9f, -9f, -9f, -9f, -9f, -9f, -9f, -9f, -9f, -9f };
 
         // Re-anchoring: worlds placed in the room move to you when you sit down, stand up, walk elsewhere or
@@ -304,6 +353,9 @@ namespace MusicInYourHands
         {
             Build();
             if (view == null) return;
+            // With Less flashing the beat's kick reaches the world at a quarter, so everything that brightens (and
+            // swells) on it does so far less.
+            music.Kick *= ComfortOptions.FlashScale;
             Rig = rig;
             Music = music;
             View = view;

@@ -345,7 +345,11 @@ namespace MusicInYourHands
         protected override void OnBeat(MusicFrame music)
         {
             Disturb(new Vector2(0.5f, 0.5f), 0.05f, -0.006f - music.Kick * 0.004f);
-            room?.Ripple(surface.position, RippleColor, 0.45f + music.Kick * 0.55f);
+            // A ring of light over the whole room on each beat: a quarter as bright with Less flashing, and never more
+            // than three a second.
+            if (room == null) return;
+            float ring = Flash(0.45f + music.Kick * 0.55f);
+            if (ring > 0f) room.Ripple(surface.position, RippleColor, ring);
         }
 
         /// <summary>
@@ -502,8 +506,13 @@ namespace MusicInYourHands
                                 k < 5 ? GestureFeedback.Of((HandRig.Finger)k) : Fingers.All);
                             Disturb(spot, radius * 1.5f, -0.006f);
                             Splash(SurfacePoint(spot), Effects.Blue, k < 5 ? 4 : 10, 0.25f);
-                            // A palm breaking the surface sends its own ring of light out over the room.
-                            if (k == 5) room?.Ripple(SurfacePoint(spot), Effects.Blue, 0.6f);
+                            // A palm breaking the surface sends its own ring of light out over the room (a flash: a
+                            // quarter as bright with Less flashing, and within the three a second).
+                            if (k == 5 && room != null)
+                            {
+                                float ring = Flash(0.6f);
+                                if (ring > 0f) room.Ripple(SurfacePoint(spot), Effects.Blue, ring);
+                            }
                         }
                     }
                     else if (wasUnder[side, k] && inside)

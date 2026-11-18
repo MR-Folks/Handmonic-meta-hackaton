@@ -136,6 +136,8 @@ namespace MusicInYourHands
             public float Size;
             public Color Color;
             public bool ByHand;
+            // How strongly its flash of light shows (World.Flash).
+            public float Strength;
         }
 
         sealed class Fish
@@ -192,7 +194,7 @@ namespace MusicInYourHands
         readonly float[] shoalSway = new float[Shoals];
         readonly float[] wallReach = new float[WallDirections];
         Vector3 fishCentre, waveOrigin;
-        float fishFloor, fishCeiling, surge, menuRoom, waveTime = -10f;
+        float fishFloor, fishCeiling, surge, menuRoom, waveTime = -10f, waveStrength;
         bool fishPlaced;
         // The hands, for the fish: whether each is held out to them, for how long it has been (or since it stopped),
         // closed, pointing, and where its palm and pointing fingertip are.
@@ -422,10 +424,17 @@ namespace MusicInYourHands
         protected override void OnBeat(MusicFrame music)
         {
             surge = 1f;
-            waveTime = Clock;
-            int side = calling[0] ? 0 : calling[1] ? 1 : -1;
-            // From a hand the fish are circling, otherwise from around you.
-            waveOrigin = side >= 0 ? palms[side] : fishCentre + Vector3.down * 0.3f;
+            // The beat's wave of light through the fish is a flash (World.Flash): at most three a second, a quarter with
+            // Less flashing.
+            float strength = Flash(1f);
+            if (strength > 0f)
+            {
+                waveTime = Clock;
+                waveStrength = strength;
+                int side = calling[0] ? 0 : calling[1] ? 1 : -1;
+                // From a hand the fish are circling, otherwise from around you.
+                waveOrigin = side >= 0 ? palms[side] : fishCentre + Vector3.down * 0.3f;
+            }
             for (int s = 0; s < 2; s++)
             {
                 if (streamLevel[s] < 0.3f) continue;
@@ -655,7 +664,8 @@ namespace MusicInYourHands
             pop.Ring.transform.position = b.Position;
             pop.Ring.gameObject.SetActive(true);
             pop.Flash.transform.position = b.Position;
-            pop.Flash.gameObject.SetActive(byHand);
+            pop.Strength = byHand ? Flash(1f) : 0f;
+            pop.Flash.gameObject.SetActive(pop.Strength > 0f);
             pop.ByHand = byHand;
 
             int count = byHand ? 22 : 6;
@@ -705,7 +715,7 @@ namespace MusicInYourHands
                 Effects.Face(p.Flash.transform, view);
                 block.Clear();
                 block.SetColor(ColorId, Color.Lerp(Color.white, p.Color, 0.4f));
-                block.SetFloat(IntensityId, flash * 1.4f);
+                block.SetFloat(IntensityId, flash * 1.4f * p.Strength);
                 p.Flash.SetPropertyBlock(block);
             }
         }
@@ -1046,7 +1056,7 @@ namespace MusicInYourHands
             var rotation = Quaternion.LookRotation(f.Heading, Vector3.up) * Quaternion.Euler(0f, 0f, f.Bank);
             fishMatrices[i] = Matrix4x4.TRS(f.Position, rotation, Vector3.one * (f.Size * grow));
             float front = Vector3.Distance(f.Position, waveOrigin) - waveAge * waveSpeed;
-            float flash = Mathf.Exp(-front * front / 0.02f) * Mathf.Exp(-waveAge * 1.1f);
+            float flash = Mathf.Exp(-front * front / 0.02f) * Mathf.Exp(-waveAge * 1.1f) * waveStrength;
             float glow = 0.15f + music.Band(f.Voice + 2) * 0.8f + music.Kick * 0.15f + f.Gathered * 0.35f + flash * 0.6f;
             var c = VoiceColors[f.Voice].linear;
             fishTints[i] = new Vector4(c.r, c.g, c.b, glow);

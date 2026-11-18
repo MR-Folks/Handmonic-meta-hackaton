@@ -15,6 +15,8 @@ namespace MusicInYourHands
     {
         public bool Lyric;
         public int Built, Placed, Steps, BeatsSeen;
+        /// <summary>The kick OnStep last saw (World passes a quarter of it with Less flashing).</summary>
+        public float Kick;
         public readonly List<int> Notes = new List<int>();
         public readonly List<string> Words = new List<string>();
         public readonly List<string> Hands = new List<string>();
@@ -43,7 +45,11 @@ namespace MusicInYourHands
 
         protected override void OnPinch(HandRig.Hand hand, bool left) => Hands.Add(left ? "pinch L" : "pinch R");
         protected override void OnRelease(HandRig.Hand hand, bool left) => Hands.Add(left ? "release L" : "release R");
-        protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt) => Steps++;
+        protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
+        {
+            Steps++;
+            Kick = music.Kick;
+        }
     }
 }
 #endif

@@ -9,6 +9,9 @@ namespace MusicInYourHands
     /// from your pinch to where you point, ringing a note where it lands; keep pinching and it strikes again on every
     /// beat. All the while it rains or it snows, one at a time, with the sung words falling among the drops or flakes;
     /// hold a fist for a couple of seconds to turn the rain to snow or the snow to rain (see Lightning.Weather.cs).
+    /// The room never flashes more than three times a second (World.Flash). With Less flashing (ComfortOptions) the
+    /// flash becomes a gentle glow that rises and settles slowly, the bolts are dimmer and hold still instead of
+    /// flickering, and the thunder stays.
     /// </summary>
     public partial class Lightning : World
     {
@@ -82,7 +85,7 @@ namespace MusicInYourHands
             public Vector3 From, To;
             public float Life, Max, Width, Jag, Rejag, Brightness;
             public Color Color;
-            public bool Active, Snow;
+            public bool Active, Snow, Reflashed;
         }
 
         sealed class Mark
@@ -105,6 +108,11 @@ namespace MusicInYourHands
         ParticleSystem sparks;
         AudioPool voices;
         float flash, cooldown;
+        // What the room shows of the flash: the flash itself, or with Less flashing a gentle glow that follows it slowly.
+        float roomLight;
+
+        /// <summary>For the editor checks: how strongly the lightning lights the room now (0-1).</summary>
+        public float RoomLight => roomLight;
         int nextMark;
 
         // The sung words fall with the weather (OnWord in Lightning.Weather.cs).
@@ -159,7 +167,7 @@ namespace MusicInYourHands
 
         protected override void OnEnter()
         {
-            flash = 0f;
+            flash = roomLight = 0f;
             wasFist[0] = wasFist[1] = false;
             EnterWeather();
         }
@@ -225,7 +233,11 @@ namespace MusicInYourHands
 
             UpdateBolts(view, dt);
             UpdateMarks(music, view, dt);
-            flash = Mathf.Max(0f, flash - dt * 3f);
+            // With Less flashing a flash also dies away more slowly, so the glow that follows it swells and settles softly.
+            flash = Mathf.Max(0f, flash - dt * (ComfortOptions.LessFlashing ? 1.2f : 3f));
+            roomLight = ComfortOptions.LessFlashing
+                ? Mathf.MoveTowards(roomLight, flash, dt * (flash > roomLight ? 1.5f : 0.8f))
+                : flash;
             StepWeather(rig, music, view, dt);
             DrawVeil(view, music);
         }
@@ -313,7 +325,7 @@ namespace MusicInYourHands
                 float length = Random.Range(0.3f, 0.8f);
                 Spawn(from, from + branch * length, 4, length * 0.35f, 0.018f, 0.45f, StrikeTint,1.4f, rejag: 0.15f);
             }
-            flash = 1f;
+            flash = Mathf.Max(flash, Flash(1f, flash));
             AddMark(ground + Vector3.up * 0.005f, Vector3.up, 1.1f, StrikeTint,2.5f);
             Burst(ground + Vector3.up * 0.05f, 60, StrikeTint,1.2f);
             WeatherImpact(ground, Vector3.up, 0.5f, true);
@@ -363,7 +375,7 @@ namespace MusicInYourHands
             if (hit) AddMark(to + normal * 0.005f, normal, 0.25f, ZapTint,1.2f);
             if (hit && normal.y > 0.7f) WeatherImpact(to, normal, 0.14f, false);
             Burst(to + normal * 0.03f, 18, ZapTint,0.5f);
-            flash = Mathf.Max(flash, 0.25f);
+            flash = Mathf.Max(flash, Flash(0.25f, flash));
             voices.Play(ZapSound(), to, 0.5f);
             // Higher on the wall, higher the note.
             int wanted = 57 + Mathf.RoundToInt(Mathf.Clamp01((to.y - floor) / 2.4f) * 22f);
@@ -388,6 +400,7 @@ namespace MusicInYourHands
             pick.Brightness = brightness;
             pick.Rejag = rejag;
             pick.Active = true;
+            pick.Reflashed = false;
             pick.Snow = snowing && snowLine != null;
             pick.Line.Renderer.sharedMaterial = pick.Snow ? snowLine : lineMaterial;
             pick.Count = Jagged(from, to, pick.Depth, jag, pick.Points);
@@ -429,19 +442,26 @@ namespace MusicInYourHands
         void UpdateBolts(Camera view, float dt)
         {
             var eye = view.transform.position;
+            bool calm = ComfortOptions.LessFlashing;
             foreach (var b in bolts)
             {
                 if (!b.Active) continue;
                 b.Life -= dt;
                 if (b.Life <= 0f) { b.Active = false; b.Line.SetVisible(false); continue; }
-                // Long bolts flicker: they re-draw their path a few times and flash again.
-                if (b.Rejag > 0f && Random.value < dt / b.Rejag)
+                // Long bolts flicker: they re-draw their path a few times and flash again once (not with Less flashing,
+                // when they hold still), leaving room in the three flashes a second for the next strike.
+                if (!calm && b.Rejag > 0f && Random.value < dt / b.Rejag)
                 {
                     b.Count = Jagged(b.From, b.To, b.Depth, b.Jag, b.Points);
-                    if (b.Width > 0.03f) flash = Mathf.Max(flash, 0.6f);
+                    if (b.Width > 0.03f && !b.Reflashed)
+                    {
+                        float again = Flash(0.6f, flash);
+                        b.Reflashed = again > 0f;
+                        flash = Mathf.Max(flash, again);
+                    }
                 }
                 float t = b.Life / b.Max;
-                float flicker = Random.Range(0.75f, 1f);
+                float flicker = calm ? 0.45f : Random.Range(0.75f, 1f);
                 b.Line.SetVisible(true);
                 b.Line.Set(b.Points, b.Count, b.Width * (0.6f + 0.4f * t), b.Color, eye, false);
                 block.Clear();
@@ -488,7 +508,8 @@ namespace MusicInYourHands
                 m.Glow.transform.localScale = Vector3.one * m.Size * 0.9f;
                 block.Clear();
                 block.SetColor(ColorId, m.Color);
-                block.SetFloat(IntensityId, Mathf.Exp(-m.Age * 4f) * 2f + (1f - t) * 0.25f);
+                // A strike's mark burns bright for a moment, far less so with Less flashing.
+                block.SetFloat(IntensityId, Mathf.Exp(-m.Age * 4f) * 2f * ComfortOptions.FlashScale + (1f - t) * 0.25f);
                 m.Glow.SetPropertyBlock(block);
             }
         }
@@ -516,7 +537,7 @@ namespace MusicInYourHands
             veil.transform.localScale = Vector3.one * 0.5f;
             // The dark breathes a little with the bass, like a storm rolling.
             veilInstance.SetFloat(DarkId, darkness * (0.92f + 0.08f * music.Band(0)));
-            veilInstance.SetFloat(FlashId, flash);
+            veilInstance.SetFloat(FlashId, roomLight);
         }
 
         /// <summary>For previews: on the next step, a strike from the left fist and a zap from the right pinch.</summary>

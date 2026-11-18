@@ -60,7 +60,7 @@ namespace MusicInYourHands
         readonly Vector3[] obstacles = new Vector3[12];
         readonly float[] radii = new float[12];
         Vector3 centre;
-        float surge, flashTime = -10f;
+        float surge, flashTime = -10f, flashStrength;
 
         protected override float FadeInSeconds => 1f / 1.2f;
 
@@ -128,7 +128,11 @@ namespace MusicInYourHands
         protected override void OnBeat(MusicFrame music)
         {
             surge = 1f;
+            // The flash through the school is a flash (World.Flash): at most three a second, a quarter with Less flashing.
+            float strength = Flash(1f);
+            if (strength <= 0f) return;
             flashTime = Now;
+            flashStrength = strength;
         }
 
         /// <summary>
@@ -314,7 +318,7 @@ namespace MusicInYourHands
                 var flat = new Vector3(position[i].x - centre.x, 0f, position[i].z - centre.z);
                 float angle = Mathf.Atan2(flat.z, flat.x) + Mathf.PI;
                 float front = Mathf.Repeat(angle - age * 5f, Mathf.PI * 2f);
-                float flash = Mathf.Exp(-front * front * 6f) * Mathf.Exp(-age * 1.5f);
+                float flash = Mathf.Exp(-front * front * 6f) * Mathf.Exp(-age * 1.5f) * flashStrength;
                 var c = Color.Lerp(Shades[shade[i]], Color.white, flash * 0.7f);
                 c.a = Mathf.Clamp01((0.75f + flash * 0.4f + music.Band(1 + shade[i] % 5) * 0.25f) * FadeIn);
                 float wiggle = 1f + Mathf.Sin(t * 14f + phase[i]) * 0.12f;

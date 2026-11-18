@@ -258,8 +258,8 @@ namespace MusicInYourHands
             StepGround(dt);
             StepCaption(view, dt);
             DrawWeather(view);
-            if (weatherInstance != null) weatherInstance.SetFloat(FlashId, flash);
-            if (groundInstance != null) groundInstance.SetFloat(FlashId, flash);
+            if (weatherInstance != null) weatherInstance.SetFloat(FlashId, roomLight);
+            if (groundInstance != null) groundInstance.SetFloat(FlashId, roomLight);
         }
 
         /// <summary>
@@ -591,7 +591,7 @@ namespace MusicInYourHands
                     w.Position += (w.Velocity + sway) * dt;
                     w.Rotation = Quaternion.Slerp(w.Rotation, snowing ? Swaying(w, eye) : WordLayer.Facing(w.Position, eye), ease);
                     w.Color = Color.Lerp(w.Color, snowing ? SnowWordColor : RainWordColor, ease);
-                    w.Halo = 0.3f + flash * 0.5f;
+                    w.Halo = 0.3f + roomLight * 0.5f;
                     if (CatchWord(w, before, music)) continue;
                     float ground = Room.GroundBelow(w.Position, floorY);
                     if (w.Position.y <= ground + 0.006f) LandWord(w, ground, music);
@@ -604,7 +604,7 @@ namespace MusicInYourHands
                     w.Rotation = Quaternion.Slerp(w.Rotation, lying, 1f - Mathf.Exp(-9f * dt));
                     w.Size = Mathf.MoveTowards(w.Size, 1.35f, dt * 1.2f);
                     w.Color = Color.Lerp(w.Color, snowing ? SnowLyingColor : RainWordColor, ease);
-                    w.Halo = (snowing ? 0f : 0.22f) + flash * 0.4f;
+                    w.Halo = (snowing ? 0f : 0.22f) + roomLight * 0.4f;
                     w.Alpha = Mathf.Clamp01((w.Life - w.Age) / 2f);
                 }
                 else
@@ -624,7 +624,7 @@ namespace MusicInYourHands
                     var along = Vector3.ProjectOnPlane(w.Position - eye, n);
                     w.Rotation = Quaternion.Slerp(w.Rotation, Quaternion.LookRotation(-n, along.sqrMagnitude > 1e-6f ? along.normalized : flatForward), ease);
                     w.Size = Mathf.MoveTowards(w.Size, 0.75f, dt * 2f);
-                    w.Halo = 0.35f + flash * 0.4f;
+                    w.Halo = 0.35f + roomLight * 0.4f;
                     // It melts (or soaks) away in your hand.
                     w.Alpha = Mathf.Clamp01((w.Life - w.Age) / 1.2f);
                 }
@@ -931,7 +931,7 @@ namespace MusicInYourHands
                     startLifetime = Random.Range(0.6f, 1.3f)
                 }, 1);
             }
-            flash = Mathf.Max(flash, 0.15f);
+            flash = Mathf.Max(flash, Flash(0.15f, flash));
             ShowCaption(snowing ? "Snow" : "Rain", at, colour);
             voices.Play(Gust(), at, 0.5f);
             Musical.Play(voices, music, snowing ? 79 : 67, at, 0.3f);

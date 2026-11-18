@@ -639,8 +639,11 @@ namespace MusicInYourHands
         /// <summary>Each beat flares the sun and sends a wave of light out from it across the orbits.</summary>
         protected override void OnBeat(MusicFrame music)
         {
+            // The beat's flare is a flash (World.Flash): at most three a second, a quarter with Less flashing.
+            float strength = Flash(Mathf.Clamp01(0.55f + music.Kick * 0.45f));
+            if (strength <= 0f) return;
             flareAge = 0f;
-            flare = Mathf.Clamp01(0.55f + music.Kick * 0.45f);
+            flare = strength;
         }
 
         /// <summary>A melody note makes a planet twinkle: high notes the inner planets, low notes the outer ones.</summary>
@@ -651,7 +654,8 @@ namespace MusicInYourHands
             while (midi > 80) midi -= 12;
             int i = Mathf.Clamp(7 - Mathf.RoundToInt((midi - 60) * 7f / 16f), 0, planets.Length - 1);
             var p = planets[i];
-            p.Twinkle = 1f;
+            // A melody note's twinkle, a quarter as bright with Less flashing.
+            p.Twinkle = ComfortOptions.FlashScale;
             if (p.Shown < 0.1f) return;
             float far = View != null ? Vector3.Distance(p.World, View.transform.position) : 1f;
             Burst(p.World, Color.Lerp(p.Air, Color.white, 0.5f), 7, 0.05f + far * 0.02f, 0.008f + far * 0.005f);
@@ -978,7 +982,7 @@ namespace MusicInYourHands
             p.Angle = Mathf.Repeat(Mathf.Atan2(flat.z, flat.x), Mathf.PI * 2f);
             p.From = p.Local;
             p.Settle = 0f;
-            p.Flash = 1.6f;
+            p.Flash = 1.6f * ComfortOptions.FlashScale;
             // A trail of sparks along the new orbit, ahead of and behind the planet, a few centimetres apart.
             float spacing = 0.025f / p.Orbit;
             for (int i = 0; i < 28; i++)
@@ -1027,8 +1031,12 @@ namespace MusicInYourHands
             if (warmth > 0.97f && !burst)
             {
                 burst = true;
-                flareAge = 0f;
-                flare = 1.6f;
+                float strength = Flash(1.6f);
+                if (strength > 0f)
+                {
+                    flareAge = 0f;
+                    flare = strength;
+                }
                 Burst(at, SunGold, 40, 0.35f, 0.02f);
                 Musical.Play(voices, music, 76, at, 0.4f);
                 // The warming palm lights up as the sun bursts; its note is the sound.

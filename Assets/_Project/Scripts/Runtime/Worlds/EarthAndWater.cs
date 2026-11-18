@@ -163,7 +163,7 @@ namespace MusicInYourHands
 
         // Changing element: the burst, the glow gathering between clenched fists, the caption.
         Renderer flash, ring, charge;
-        float flashAge = 9f;
+        float flashAge = 9f, flashStrength;
         Vector3 flashAt;
         Color flashColor;
         Transform captionRoot;
@@ -582,6 +582,8 @@ namespace MusicInYourHands
             flashAge = 0f;
             flashAt = at;
             flashColor = MainColors[e];
+            // A flash of the element's colour (World.Flash: at most three a second, a quarter with Less flashing).
+            flashStrength = Flash(1f);
             switch (e)
             {
                 case Water:
@@ -621,7 +623,7 @@ namespace MusicInYourHands
                 Effects.Face(flash.transform, view);
                 block.Clear();
                 block.SetColor(ColorId, flashColor);
-                block.SetFloat(IntensityId, (1f - u) * (1f - u) * 0.75f);
+                block.SetFloat(IntensityId, (1f - u) * (1f - u) * 0.75f * flashStrength);
                 flash.SetPropertyBlock(block);
                 ring.transform.position = flashAt;
                 ring.transform.localScale = Vector3.one * 0.6f;
@@ -630,7 +632,8 @@ namespace MusicInYourHands
                 block.SetColor(ColorId, Color.Lerp(flashColor, Color.white, 0.2f));
                 block.SetFloat(RadiusId, 0.1f + Mathf.Sqrt(u) * 0.8f);
                 block.SetFloat(ThicknessId, 0.025f + u * 0.02f);
-                block.SetFloat(AlphaId, (1f - u) * 0.8f);
+                // The ring calms with the flash (Less flashing), but stays to show where the change came from.
+                block.SetFloat(AlphaId, (1f - u) * 0.8f * Mathf.Max(0.35f, flashStrength));
                 ring.SetPropertyBlock(block);
             }
 

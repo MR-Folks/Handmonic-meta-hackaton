@@ -52,6 +52,7 @@ namespace MusicInYourHands.EditorTools
             ok &= CheckGestureFeedback();
             ok &= CheckCaptionSizes();
             ok &= CheckOneHanded();
+            ok &= CheckFlashes();
             ok &= CheckShadowArms();
             ok &= CheckRibbonPreview();
             ok &= CheckStringsPreview();

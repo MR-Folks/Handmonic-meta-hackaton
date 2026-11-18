@@ -47,6 +47,7 @@ namespace MusicInYourHands
         static readonly int FingerGlowId = Shader.PropertyToID("_FingerGlow");
         static readonly int FingerGlowLittleId = Shader.PropertyToID("_FingerGlowLittle");
         static readonly int FingerColorId = Shader.PropertyToID("_FingerColor");
+        static readonly int PulseScale = Shader.PropertyToID("_PulseScale");
 
         MaterialPropertyBlock block;
         float energy;
@@ -96,7 +97,9 @@ namespace MusicInYourHands
                 block.SetVector(HandForward, (knuckle.position - wrist.position).normalized);
             }
             var bus = MusicBus.Instance;
-            block.SetFloat(Kick, bus != null ? bus.Kick : 0f);
+            // With Less flashing the beat brightens the hands, and runs its pulse along them, at a quarter.
+            block.SetFloat(Kick, bus != null ? bus.Kick * ComfortOptions.FlashScale : 0f);
+            block.SetFloat(PulseScale, ComfortOptions.FlashScale);
             block.SetFloat(BeatAge, bus != null ? bus.TimeSinceBeat : 10f);
             block.SetFloat(Energy, energy);
 

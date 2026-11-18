@@ -136,6 +136,7 @@ namespace MusicInYourHands
         static readonly int DepthCapId = Shader.PropertyToID("_DepthCap");
         static readonly int CenterId = Shader.PropertyToID("_Center");
         static readonly int BeatAgeId = Shader.PropertyToID("_BeatAge");
+        static readonly int BeatFlashId = Shader.PropertyToID("_BeatFlash");
         static readonly int BassId = Shader.PropertyToID("_Bass");
         static readonly int BeatsId = Shader.PropertyToID("_Beats");
         static readonly int SpinId = Shader.PropertyToID("_Spin");
@@ -743,6 +744,8 @@ namespace MusicInYourHands
             block.SetFloat(DepthCapId, depthCap);
             block.SetVector(CenterId, Center);
             block.SetFloat(BeatAgeId, Mathf.Min(music.BeatAge, 10f));
+            // The filters' beat rings, tile pops and scan bands: a quarter as bright with Less flashing.
+            block.SetFloat(BeatFlashId, ComfortOptions.FlashScale);
             block.SetFloat(BassId, Mathf.Clamp01(bass));
             block.SetFloat(BeatsId, Beats % 1000);
             block.SetFloat(SpinId, spin % (Mathf.PI * 200f));

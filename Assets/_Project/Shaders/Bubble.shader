@@ -278,15 +278,13 @@ Shader "MusicInYourHands/Bubble"
                 }
                 else if (icon < 18.5)
                 {
-                    // Neon sign: a framed sign, its words flickering on.
-                    float2 q = abs(p) - float2(0.55, 0.32);
-                    e = Line(abs(length(max(q, 0)) + min(max(q.x, q.y), 0) - 0.06), 0.03) * 0.8;
-                    [unroll] for (int k = 0; k < 3; k++)
-                    {
-                        float x = -0.32 + k * 0.32;
-                        float on = step(0.3, frac(t * 0.6 + k * 0.33)) * (0.75 + 0.25 * step(0.5, frac(t * 13 + k)));
-                        e += Line(Segment(p, float2(x - 0.1, -0.02), float2(x + 0.1, 0.02)), 0.045) * on;
-                    }
+                    // Less flashing (the menu's comfort switch; free since Neon sign left): a crescent moon in a soft,
+                    // steady glow that breathes slowly, two small stars beside it. Nothing in it flickers.
+                    float2 c = p - float2(-0.06, 0.02);
+                    float moon = smoothstep(0.03, 0, length(c) - 0.42) * smoothstep(-0.03, 0, length(c - float2(0.22, 0.13)) - 0.36);
+                    float halo = exp(-dot(c, c) * 3.2) * (0.2 + 0.05 * sin(t * 0.7));
+                    float2 s1 = p - float2(0.46, -0.28), s2 = p - float2(0.52, 0.36);
+                    e = moon + halo + exp(-dot(s1, s1) * 600) * 0.7 + exp(-dot(s2, s2) * 900) * 0.5;
                 }
                 else if (icon < 19.5)
                 {

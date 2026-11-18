@@ -189,7 +189,11 @@ namespace MusicInYourHands
             // While the menu is open the palms are choosing there: no waves burst out among its bubbles and on across the
             // room. The fingertip lights, trails and sparks go on.
             if (MenuOpen) return;
-            float strength = 0.6f + 0.4f * music.Kick;
+            // A wave of light out of each palm and across the room: a quarter as bright with Less flashing, and never more
+            // than three a second.
+            if (!Rig.Left.IsTracked && !Rig.Right.IsTracked) return;
+            float strength = Flash(0.6f + 0.4f * music.Kick);
+            if (strength <= 0f) return;
             if (Rig.Left.IsTracked) SpawnWave(Rig.Left, View, strength);
             if (Rig.Right.IsTracked) SpawnWave(Rig.Right, View, strength);
             if (Rig.Left.IsTracked || Rig.Right.IsTracked) Acted("palm wave");
