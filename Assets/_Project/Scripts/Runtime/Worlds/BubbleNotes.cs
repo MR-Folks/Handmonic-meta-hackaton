@@ -615,8 +615,9 @@ namespace MusicInYourHands
                     if (d < b.Radius * 0.95f && b.Age > 0.25f)
                     {
                         // A soft pop at once, under the bubble's note (which may wait a moment to land on the beat).
-                        popVoices.Play(Synth.Pop(), tip, 0.25f);
-                        Musical.Play(voices, frame, b.Midi, tip, 0.4f);
+                        // Both sound from where the bubble was.
+                        popVoices.Play(Synth.Pop(), b.Position, 0.25f);
+                        Musical.Play(voices, frame, b.Midi, b.Position, 0.4f);
                         Burst(b, true);
                         Acted("pop");
                         return true;

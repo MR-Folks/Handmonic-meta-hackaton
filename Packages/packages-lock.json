@@ -12,6 +12,13 @@
       },
       "url": "https://npm.developer.oculus.com"
     },
+    "com.meta.xr.sdk.audio": {
+      "version": "209.0.0",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {},
+      "url": "https://npm.developer.oculus.com"
+    },
     "com.meta.xr.sdk.core": {
       "version": "207.0.1",
       "depth": 0,

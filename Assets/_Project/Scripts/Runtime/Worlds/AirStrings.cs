@@ -525,11 +525,9 @@ namespace MusicInYourHands
                 // Each piece has its own voice, so its sound rings on from where it stands while others are struck.
                 var voice = go.AddComponent<AudioSource>();
                 voice.playOnAwake = false;
-                voice.spatialBlend = 1f;
-                voice.minDistance = 0.4f;
-                voice.maxDistance = 6f;
-                voice.rolloffMode = AudioRolloffMode.Logarithmic;
-                voice.dopplerLevel = 0f;
+                // Full level out to 1 m, so every piece of the ring (the furthest about 1 m from your eyes) plays as
+                // loud as the nearest one.
+                SpatialAudio.Spatialize(voice, near: 1f);
                 go.SetActive(false);
                 pieces[i] = new Piece
                 {
@@ -863,7 +861,9 @@ namespace MusicInYourHands
             p.Glow = 1f;
             var local = p.Root.InverseTransformDirection(across) / Mathf.Max(p.Spec.Radius, 1e-3f);
             p.Hit = new Vector4(local.x, local.z, 0f, loud);
-            if (p.Sound != null && p.Voice.isActiveAndEnabled) p.Voice.PlayOneShot(p.Sound, 0.4f + 0.6f * strength);
+            // A drum sounds strongly even from a light tap; a cymbal keeps its wider range from a touch to a crash.
+            float level = p.Spec.IsCymbal ? 0.4f + 0.6f * strength : 0.75f + 0.25f * strength;
+            if (p.Sound != null && p.Voice.isActiveAndEnabled) p.Voice.PlayOneShot(p.Sound, level);
 
             if (p.Spec.IsCymbal)
             {
@@ -1064,7 +1064,7 @@ namespace MusicInYourHands
                 fade[m] = Mathf.Exp(-decay * (1f + m * 0.6f) / rate);
             }
             float thumpPitch = Mathf.Max(pitch * 0.75f, 60f), thumpPhase = 0f, thump = 0.45f;
-            float thumpFade = Mathf.Exp(-16f / rate), slapFade = Mathf.Exp(-60f / rate), slap = 0.8f;
+            float thumpFade = Mathf.Exp(-16f / rate), slapFade = Mathf.Exp(-60f / rate), slap = 1.2f;
             float low = 0f, lower = 0f;
             for (int i = 0; i < length; i++)
             {
@@ -1088,10 +1088,20 @@ namespace MusicInYourHands
                 thump *= thumpFade;
                 slap *= slapFade;
             }
+            // The headset's speakers give little of a big drum's low boom, so round the peaks off and lift the rest: the
+            // drum carries more body and slap at the same peak level, and sounds clearly louder.
+            Normalize(data, 1f);
+            Saturate(data, 2.2f);
             Echo(data, rate, 0.26f);
-            Normalize(data, 0.85f);
+            Normalize(data, 0.95f);
             FadeEnd(data, rate);
             return data;
+        }
+
+        /// <summary>A soft clip (tanh) with <paramref name="drive"/>: peaks rounded off, quieter parts lifted.</summary>
+        static void Saturate(float[] data, float drive)
+        {
+            for (int i = 0; i < data.Length; i++) data[i] = (float)System.Math.Tanh(data[i] * drive);
         }
 
         /// <summary>

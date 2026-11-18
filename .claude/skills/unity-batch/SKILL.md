@@ -21,9 +21,10 @@ $null = $p.Handle; $p.WaitForExit(); "exit $($p.ExitCode)"
 | Method | What it does | Success looks like |
 |---|---|---|
 | `MusicInYourHands.EditorTools.ProjectSetup.UpdateWorldsBatch` | Finds every `World` class, adds new ones to `Main.unity` in menu order, fills their materials, saves the scene | `[Setup] …` lines, exit 0 |
-| `MusicInYourHands.EditorTools.EditorChecks.RunBatch` | All editor checks: every world named, unique `MenuOrder`, real materials, in the scene; hooks fire; menu touch; Audius stream stall | Ends with `[Check] All checks passed.` |
+| `MusicInYourHands.EditorTools.EditorChecks.RunBatch` | All editor checks: every world named, unique `MenuOrder`, real materials, in the scene; hooks fire; menu touch; Audius stream stall; spatial audio (plugin, mixer, every world sound spatialized) | Ends with `[Check] All checks passed.` |
 | `MusicInYourHands.EditorTools.EditorChecks.CaptureShotsBatch` | Renders previews to `Logs/shots/` (1600x900, staged room, hands at chest height, just past the demo song's chorus) | `[Shots] Saved screenshots to Logs/shots.` |
 | `MusicInYourHands.EditorTools.QuestBuild.BuildApk` | Builds `Builds/MusicInYourHands.apk` | `[Build] Succeeded` |
+| `MusicInYourHands.EditorTools.SpatialAudioSetup.RunBatch` | Spatial audio's project settings: Meta XR Audio as spatializer and ambisonic decoder, stereo, Best latency buffer, Shoebox Room acoustics (also part of project setup) | `[Setup] Spatial audio: …` |
 
 - Set `$env:SHOTS` before starting Unity to render only some shots; every world without a custom shot gets
   `w-<Class>.png` (for example `SHOTS=w-FlowerDance`). Clear it afterwards.

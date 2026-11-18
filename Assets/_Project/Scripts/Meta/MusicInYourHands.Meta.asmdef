@@ -4,7 +4,8 @@
     "references": [
         "MusicInYourHands.Runtime",
         "Oculus.VR",
-        "meta.xr.mrutilitykit"
+        "meta.xr.mrutilitykit",
+        "Meta.XR.Audio"
     ],
     "defineConstraints": [
         "META_XR_CORE"
@@ -14,6 +15,11 @@
             "name": "com.meta.xr.sdk.core",
             "expression": "1.0.0",
             "define": "META_XR_CORE"
+        },
+        {
+            "name": "com.meta.xr.sdk.audio",
+            "expression": "1.0.0",
+            "define": "META_XR_AUDIO"
         }
     ],
     "autoReferenced": true

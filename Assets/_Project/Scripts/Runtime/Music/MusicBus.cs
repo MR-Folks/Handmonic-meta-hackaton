@@ -153,6 +153,9 @@ namespace MusicInYourHands
             Instance = this;
             source = GetComponent<AudioSource>();
             source.playOnAwake = false;
+            // The song is a plain stereo bed: not spatialized and not in the room's reverb (that is for SpatialAudio's sounds).
+            source.spatialBlend = 0f;
+            source.spatialize = false;
             for (int i = 0; i < BandCount; i++) bandPeak[i] = 0.0001f;
         }
 
