@@ -267,6 +267,8 @@ namespace MusicInYourHands
         protected override void OnPinch(HandRig.Hand hand, bool left)
         {
             if (Clock - seen > 0.7f) return;
+            // The pinching fingers light up with a burst; the bells are the sound.
+            Feedback(GestureKind.Pinch, left, HandPinchPoint(hand), 1f, false);
             if (mix < 1f && !skipped && IsPinching(!left) && Clock - changedAt < skipWindow)
             {
                 Skip(Music);
@@ -276,6 +278,9 @@ namespace MusicInYourHands
             Change(Music);
             Acted("next view");
         }
+
+        /// <summary>Only a pinch at an open window changes the view, so OnPinch shows its own feedback.</summary>
+        protected override bool AutoPinchFeedback => false;
 
         /// <summary>On the beat, a few sparks in the view's colours drift out of the window's edge into the room.</summary>
         protected override void OnBeat(MusicFrame music)
@@ -328,7 +333,17 @@ namespace MusicInYourHands
             // A short grace keeps the window from flickering when tracking hesitates for a frame or two.
             bool show = framed || Clock - seen < 0.15f || Clock < heldUntil;
             open = Mathf.MoveTowards(open, show ? 1f : 0f, dt * (show ? 5f : 3.5f));
-            if (open > 0.3f && !sounded) { Chord(music); sounded = true; }
+            if (open > 0.3f && !sounded)
+            {
+                Chord(music);
+                sounded = true;
+                // The thumbs and index fingers holding the frame light up as it opens.
+                if (!MenuOpen)
+                {
+                    GestureFeedback.Light(true, Fingers.Thumb | Fingers.Index, 0.8f);
+                    GestureFeedback.Light(false, Fingers.Thumb | Fingers.Index, 0.8f);
+                }
+            }
             if (open <= 0f) sounded = false;
 
             if (mix < 1f)

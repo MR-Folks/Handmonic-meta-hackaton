@@ -487,10 +487,20 @@ namespace MusicInYourHands
             bool clenched = both && fist[0] > 0.8f && fist[1] > 0.8f;
             if (!tracked[0] || !tracked[1] || fist[0] < 0.5f || fist[1] < 0.5f) fistArmed = true;
             fistTime = clenched && fistArmed ? fistTime + dt : Mathf.MoveTowards(fistTime, 0f, dt * 3f);
+            // The fists glow brighter as the change builds.
+            if (clenched && fistArmed)
+            {
+                FeedbackHold(true, fistTime / fistSeconds);
+                FeedbackHold(false, fistTime / fistSeconds);
+            }
             if (fistTime < fistSeconds) return;
             fistTime = 0f;
             fistArmed = false;
-            Change(Other, true, (palm[0] + palm[1]) * 0.5f);
+            var middle = (palm[0] + palm[1]) * 0.5f;
+            Change(Other, true, middle);
+            // Both fists light up, with a burst between them; the element's chord is the sound.
+            Feedback(GestureKind.Fist, true, middle, 1f, false);
+            GestureFeedback.Light(false, Fingers.All);
             Acted("change element");
         }
 
@@ -695,6 +705,9 @@ namespace MusicInYourHands
             {
                 orbSounded = true;
                 Musical.Play(voices, music, 64, orbCentre, 0.25f, pluck: true);
+                // Both hands light up as the ball forms between them; the pluck is the sound.
+                Feedback(GestureKind.Touch, true, orbCentre, 0.8f, false, Fingers.All);
+                GestureFeedback.Light(false, Fingers.All, 0.8f);
             }
             if (orbLevel <= 0f) orbSounded = false;
             DrawOrb(music, p, dt);
@@ -910,12 +923,14 @@ namespace MusicInYourHands
                 foreach (var r in rocks) r.Target = Mathf.Max(r.Target, previewLift * (0.75f + 0.25f * r.Seed));
                 previewLift = -1f;
             }
-            for (int s = 0; s < 2 && active && p > 0.5f && !MenuOpen; s++)
+            for (int s = 0; s < 2; s++)
             {
-                if (!tracked[s] || fist[s] > 0.6f || gesture[s]) continue;
+                bool lifting = active && p > 0.5f && !MenuOpen && tracked[s] && fist[s] <= 0.6f && !gesture[s];
                 float vy = velocity[s].y;
                 float ny = normal[s].y;
-                float lift = ny > 0.4f && vy > 0.07f ? vy : ny < -0.4f && vy < -0.07f ? vy : 0f;
+                float lift = !lifting ? 0f : ny > 0.4f && vy > 0.07f ? vy : ny < -0.4f && vy < -0.07f ? vy : 0f;
+                // The hand lights up as it starts to lift or sink the rocks; their rumble is the sound.
+                FeedbackOnStart(s, lift != 0f, GestureKind.Touch, s == 0, palm[s], 0.7f, false, Fingers.All, 0.8f);
                 if (lift == 0f) continue;
                 lastAction = Clock;
                 Acted("move rocks");

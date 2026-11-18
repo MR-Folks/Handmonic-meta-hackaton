@@ -49,6 +49,7 @@ namespace MusicInYourHands.EditorTools
             ok &= CheckCassetteDeck();
             ok &= CheckMenuHands();
             ok &= CheckMusicGestures();
+            ok &= CheckGestureFeedback();
             ok &= CheckShadowArms();
             ok &= CheckRibbonPreview();
             ok &= CheckStringsPreview();

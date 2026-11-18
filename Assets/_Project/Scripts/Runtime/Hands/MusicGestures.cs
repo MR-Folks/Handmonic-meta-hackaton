@@ -196,7 +196,7 @@ namespace MusicInYourHands
                     Debug.Log($"[Gestures] {(s == 0 ? "left" : "right")} {(Microgesture)gesture}: {held ?? "acted"} (pinch {(h != null ? h.Pinch : -1f):0.00}, fist {(h != null ? h.Fist : -1f):0.00})");
                 }
                 if (held != null) continue;
-                if (!Act((Microgesture)gesture, music, rig.Get(s == 0))) continue;
+                if (!Act((Microgesture)gesture, music, rig.Get(s == 0), s == 0)) continue;
                 lastCommand = clock;
                 Used?.Invoke(s == 0, (Microgesture)gesture);
             }
@@ -204,18 +204,24 @@ namespace MusicInYourHands
             Draw(music, menuOpen, view, dt);
         }
 
-        /// <summary>Carries out one gesture and shows what it did. False when the gesture does nothing.</summary>
-        bool Act(Microgesture gesture, IMusicRemote music, HandRig.Hand hand)
+        /// <summary>
+        /// Carries out one gesture and shows what it did: the caption, and the thumb and index lighting up with a burst
+        /// of sparks and a click (a tap) or a swish (a swipe) from the thumb. False when the gesture does nothing.
+        /// </summary>
+        bool Act(Microgesture gesture, IMusicRemote music, HandRig.Hand hand, bool left)
         {
             int step = gesture == Microgesture.SwipeRight ? 1 : gesture == Microgesture.SwipeLeft ? -1 : 0;
             // Forward and backward swipes are left free.
             if (step == 0 && gesture != Microgesture.ThumbTap) return false;
             awaited = null;
+            var thumb = hand.TipJoints[0] != null ? hand.TipJoints[0].position : hand.Tips[0];
+            var kind = step == 0 ? GestureKind.ThumbTap : GestureKind.ThumbSwipe;
             if (music.IsListening)
             {
                 // The microphone follows music playing in the room, which these controls can't pause or change. No note
-                // either, so the microphone doesn't pick it up.
+                // either, so the microphone doesn't pick it up; the fingers still light, so you know it was seen.
                 Show("Listening to the room", ListenIcon, false, ListenColor, 0);
+                GestureFeedback.Light(left, GestureFeedback.FingersFor(kind));
                 return true;
             }
 
@@ -244,8 +250,8 @@ namespace MusicInYourHands
                 // Up for the next song, down for the previous one.
                 wanted = step > 0 ? 74 : 62;
             }
-            var thumb = hand.TipJoints[0] != null ? hand.TipJoints[0].position : hand.Tips[0];
             Musical.Play(voices, music.Frame, wanted, thumb, volume);
+            GestureFeedback.Show(kind, left, thumb);
             return true;
         }
 

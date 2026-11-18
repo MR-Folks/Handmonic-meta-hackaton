@@ -528,6 +528,7 @@ namespace MusicInYourHands
             var lean = Vector2.zero;
             var under = Vector2.zero;
             float stretch = 0f, open = 0f, warm = 0f, over = 0f;
+            bool overLeft = false;
             float height = Mathf.Max(f.Height * size, 0.05f);
             var head = f.Root + Vector3.up * (height + f.Neck * size);
             if (size > 0.15f && sunShine > 0f)
@@ -563,6 +564,7 @@ namespace MusicInYourHands
                               * Smooth01((above + 0.04f) / 0.08f) * Smooth01((1.1f - above) / 0.3f);
                     if (w <= over) continue;
                     over = w;
+                    overLeft = s == 0;
                     under = toward;
                     f.Palm = palm;
                     stretch = Mathf.Clamp((palm.y - 0.08f - f.Root.y - f.Neck * size) / height - 1f, 0f, maxStretch);
@@ -583,6 +585,8 @@ namespace MusicInYourHands
                 f.Chime = 1.2f;
                 Musical.Play(voices, Music, Styles[(int)f.Kind].Note, f.FacePoint, 0.35f);
                 Puff(f, 10, 0.1f);
+                // The palm that drew it up lights up as it arrives; its note is the sound.
+                if (over > 0f) Feedback(GestureKind.Touch, overLeft, f.Palm, 0.7f, false, Fingers.All);
             }
             else if (f.Over < 0.25f) f.Touched = false;
             // A thin stream of pollen rises from its face to the palm.

@@ -618,6 +618,8 @@ namespace MusicInYourHands
                         // Both sound from where the bubble was.
                         popVoices.Play(Synth.Pop(), b.Position, 0.25f);
                         Musical.Play(voices, frame, b.Midi, b.Position, 0.4f);
+                        // The popping fingertip lights up; the pop is the sound.
+                        Feedback(GestureKind.Touch, side == 0, tip, 1f, false, GestureFeedback.Of((HandRig.Finger)k));
                         Burst(b, true);
                         Acted("pop");
                         return true;
@@ -837,7 +839,12 @@ namespace MusicInYourHands
                 if (menu || hand.InSystemGesture) calling[side] = false;
                 else if (heldOut[side] > 0.3f) calling[side] = true;
                 else if (lapsed[side] > 0.6f) calling[side] = false;
-                if (calling[side] && !was) Acted("fish gather");
+                if (calling[side] && !was)
+                {
+                    // The calling hand lights up with a soft bell as the fish turn to it.
+                    Feedback(GestureKind.Done, side == 0, palm, 0.7f);
+                    Acted("fish gather");
+                }
             }
         }
 

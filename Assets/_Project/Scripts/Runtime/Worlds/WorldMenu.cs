@@ -67,7 +67,18 @@ namespace MusicInYourHands
         /// <summary>Raised by the menu button feed (Meta's menu gesture); the menu opens or closes.</summary>
         public static event Action ToggleRequested;
         public static WorldMenu Instance { get; private set; }
-        public static void RequestToggle() => ToggleRequested?.Invoke();
+        /// <summary>Meta's menu gesture, made with the left hand.</summary>
+        public static void RequestToggle() => RequestToggle(true);
+
+        /// <summary>Opens or closes the menu for a gesture of the given hand, which lights up as it does.</summary>
+        public static void RequestToggle(bool left)
+        {
+            toggleLeft = left;
+            ToggleRequested?.Invoke();
+        }
+
+        // The hand that asked for the last toggle.
+        static bool toggleLeft = true;
 
         static readonly int ColorId = Shader.PropertyToID("_Color");
         static readonly int IconId = Shader.PropertyToID("_Icon");
@@ -245,6 +256,7 @@ namespace MusicInYourHands
             {
                 toggleRequested = false;
                 Toggle(Camera.main);
+                ToggleFeedback(HandRig.Instance, Camera.main);
             }
             Step(HandRig.Instance, WorldManager.Instance, MusicBus.Instance, Camera.main, Time.deltaTime);
         }
@@ -258,6 +270,18 @@ namespace MusicInYourHands
             if (deck != null && deck.IsOpen) deck.Close();
             else if (open) Close();
             else Open(view);
+        }
+
+        /// <summary>
+        /// The hand that opened or closed the menu lights up, and a chime runs up as it opens or down as it closes,
+        /// from that hand (or in front of you, if it can't be seen). Public for the editor checks.
+        /// </summary>
+        public void ToggleFeedback(HandRig rig, Camera view)
+        {
+            var hand = rig != null ? rig.Get(toggleLeft) : null;
+            var at = hand != null && hand.IsTracked ? (hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position)
+                : view != null ? view.transform.position + Effects.FlatForward(view) * 0.4f : Vector3.zero;
+            GestureFeedback.Show(IsOpen ? GestureKind.MenuOpen : GestureKind.MenuClose, toggleLeft, at);
         }
 
         /// <summary>Opens the cassette deck straight away, the menu stepping aside (editor checks and screenshots).</summary>
@@ -487,14 +511,19 @@ namespace MusicInYourHands
             // pinching doesn't change the choice.
             if (open && cooldown <= 0f && !library.IsOpen)
             {
-                foreach (var p in pointers)
+                for (int s = 0; s < 2; s++)
                 {
+                    var p = pointers[s];
+                    bool touched = p.Tapped.HasValue;
                     int chosen = p.Tapped is Vector2 tap ? BubbleAt(tap, TouchReach)
                         : p.Active && p.Pinching && p.AimedAge <= 0.35f ? p.Aimed : -1;
                     if (chosen < 0) continue;
                     var b = bubbles[chosen];
                     if (openTime - b.Delay < 0.32f) continue;
                     Press(b, manager, bus);
+                    // The finger that pressed lights up (the pop has already sounded): the index for a touch, thumb and
+                    // index for a pinch.
+                    GestureFeedback.Light(s == 0, touched ? Fingers.Index : Fingers.Thumb | Fingers.Index);
                     p.Aimed = -1;
                     break;
                 }

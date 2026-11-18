@@ -150,7 +150,7 @@ namespace MusicInYourHands
         Vector3 lastA, lastB;
         float hold, ribbonLength, look;
         int beats, lookTarget;
-        bool held;
+        bool held, wasHeld;
         // Whether the ribbon is drawn this frame (set in OnStep), for the sung words' fade.
         bool showing;
 
@@ -177,7 +177,7 @@ namespace MusicInYourHands
 
         protected override void OnExit()
         {
-            held = false;
+            held = wasHeld = false;
             hold = 0f;
             if (HandRig.Instance != null)
             {
@@ -228,6 +228,14 @@ namespace MusicInYourHands
             held = tracked && left.Pinch > need && right.Pinch > need && !left.InSystemGesture && !right.InSystemGesture
                 && PinchFree(true) && PinchFree(false);
             if (held) Acted("hold ribbon");
+            // Both pinches light up with a tick as they take the ribbon, and with a softer tock as they let it go.
+            if (held != wasHeld && tracked && !MenuOpen)
+            {
+                var kind = held ? GestureKind.Pinch : GestureKind.Release;
+                Feedback(kind, true, PinchPoint(left), held ? 1f : 0.7f);
+                GestureFeedback.Light(false, GestureFeedback.FingersFor(kind), held ? 1f : 0.7f);
+            }
+            wasHeld = held;
             hold =Mathf.MoveTowards(hold, held ? 1f : 0f, dt * (held ? 6f : 2.5f));
 
             // The silk's inside moves on every few beats (OnBeat), taking two seconds over each change.

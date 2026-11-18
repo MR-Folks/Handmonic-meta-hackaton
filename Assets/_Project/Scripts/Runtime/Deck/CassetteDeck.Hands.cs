@@ -248,6 +248,8 @@ namespace MusicInYourHands
             var half = cassetteSize * 0.5f;
             c.GrabLocal = new Vector3(Mathf.Clamp(local.x, -half.x, half.x), Mathf.Clamp(local.y, -half.y, half.y), Mathf.Clamp(local.z, -half.z, half.z));
             voices.Play(DeckSounds.Click, grab, 0.6f, 1.15f);
+            // The fingers that took it light up; the deck's click is its sound.
+            GestureFeedback.Light(h == hands[0], byFist ? Fingers.All : Fingers.Thumb | Fingers.Index);
             // Taking a cassette off a turntable that is still spinning catches it: it brakes and settles.
             turning.Catch();
         }
@@ -292,7 +294,12 @@ namespace MusicInYourHands
             var c = h.Holding;
             h.Holding = null;
             if (c == null || c.Place != Place.Held) return;
-            if (mayInsert && c.InRange) Insert(c, true);
+            if (mayInsert && c.InRange)
+            {
+                Insert(c, true);
+                // The hand that put it in lights up as it lets go; the radio's clunk is the sound.
+                GestureFeedback.Light(h == hands[0], h.ByFist ? Fingers.All : Fingers.Thumb | Fingers.Index);
+            }
             else Return(c);
             c.InRange = false;
         }

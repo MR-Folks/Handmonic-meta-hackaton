@@ -285,6 +285,7 @@ namespace MusicInYourHands
         /// <summary>Where the system is centred (below your head, at orbit height), and where it is drawn while it glides there.</summary>
         Vector3 centre, shownCentre;
         Vector3 sunAt, warmPalm;
+        bool warmLeft;
         Quaternion facing = Quaternion.identity;
         /// <summary>How far the room lets the orbits beyond Mars reach out (LeastFit-1), and the size that gives the bodies out there.</summary>
         float fit = 1f, sizeFit = 1f, beltScale = 1f;
@@ -681,15 +682,25 @@ namespace MusicInYourHands
                 return;
             }
             PickUp(grip, near);
+            // The pinching fingers light up with a burst; the planet's note is the sound.
+            Feedback(GestureKind.Pinch, left, grip.Point, 1f, false);
             Acted("pick up planet");
         }
 
         protected override void OnRelease(HandRig.Hand hand, bool left)
         {
             var grip = grips[left ? 0 : 1];
-            if (grip.Held >= 0) LetGo(grip);
+            if (grip.Held >= 0)
+            {
+                LetGo(grip);
+                // The fingers that let it go light up; its new orbit's note is the sound.
+                Feedback(GestureKind.Release, left, PinchPoint(hand), 0.8f, false);
+            }
             grip.Free = false;
         }
+
+        /// <summary>Only a pinch at a planet picks something up, so OnPinch and OnRelease show their own feedback.</summary>
+        protected override bool AutoPinchFeedback => false;
 
         protected override void OnStep(HandRig rig, MusicFrame music, Camera view, float dt)
         {
@@ -1009,6 +1020,7 @@ namespace MusicInYourHands
                 if (w <= want) continue;
                 want = w;
                 warmPalm = palm;
+                warmLeft = s == 0;
             }
             if (want > 0f) Acted("warm sun");
             warmth = Mathf.MoveTowards(warmth, want, dt / (want > warmth ? warmUp : 2.5f));
@@ -1019,6 +1031,8 @@ namespace MusicInYourHands
                 flare = 1.6f;
                 Burst(at, SunGold, 40, 0.35f, 0.02f);
                 Musical.Play(voices, music, 76, at, 0.4f);
+                // The warming palm lights up as the sun bursts; its note is the sound.
+                if (want > 0f) Feedback(GestureKind.Done, warmLeft, warmPalm, 1f, false);
             }
             else if (warmth < 0.6f) burst = false;
 
@@ -1609,6 +1623,7 @@ namespace MusicInYourHands
             Star best = null;
             float bestAngle = 6f;
             Vector3 tipOfBest = Vector3.zero;
+            bool leftOfBest = false;
             if (rig != null)
             {
                 var side = Vector3.Cross(Vector3.up, Effects.FlatForward(view)).normalized;
@@ -1627,7 +1642,7 @@ namespace MusicInYourHands
                         for (int i = 0; i < sky.Count; i++)
                         {
                             float a = Vector3.Angle(dir, sky.Stars[i].Position - tip);
-                            if (a < bestAngle) { bestAngle = a; best = sky.Stars[i]; tipOfBest = tip; }
+                            if (a < bestAngle) { bestAngle = a; best = sky.Stars[i]; tipOfBest = tip; leftOfBest = s == 0; }
                         }
                     }
                 }
@@ -1635,7 +1650,12 @@ namespace MusicInYourHands
             if (best != null)
             {
                 Acted("star pick");
-                if (best != pointed) Glyphs.BuildWord(readingMesh, TypeFace.Bold, best.Text, 1f, 1, 0f, Color.white, Color.white);
+                if (best != pointed)
+                {
+                    Glyphs.BuildWord(readingMesh, TypeFace.Bold, best.Text, 1f, 1, 0f, Color.white, Color.white);
+                    // The pointing finger lights up as its star's word comes down to you.
+                    GestureFeedback.Light(leftOfBest, Fingers.Index, 0.7f);
+                }
                 pointed = best;
                 readHold = 1.2f;
                 pointerPath[0] = tipOfBest;

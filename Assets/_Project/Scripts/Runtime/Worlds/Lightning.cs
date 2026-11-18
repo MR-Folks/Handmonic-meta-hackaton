@@ -187,8 +187,13 @@ namespace MusicInYourHands
         {
             if (hand.Fist > 0.8f) return;
             Zap(PinchPoint(hand), left ? 0 : 1, Music, View);
+            // The pinching fingers light up with a burst; the zap is the sound.
+            Feedback(GestureKind.Pinch, left, PinchPoint(hand), 1f, false);
             Acted("zap");
         }
+
+        /// <summary>A pinch made inside a fist zaps nothing, so OnPinch shows its own feedback.</summary>
+        protected override bool AutoPinchFeedback => false;
 
         /// <summary>A pinch held zaps again on every beat.</summary>
         protected override void OnBeat(MusicFrame music)
@@ -238,6 +243,8 @@ namespace MusicInYourHands
             {
                 Strike(hand, music, view);
                 cooldown = 0.45f;
+                // The fist lights up with a burst; the thunder is the sound.
+                Feedback(GestureKind.Fist, side == 0, HandFistPoint(hand), 1f, false);
                 Acted("strike");
             }
             wasFist[side] = fist || (wasFist[side] && tracked && hand.Fist > 0.5f);

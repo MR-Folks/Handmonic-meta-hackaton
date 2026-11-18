@@ -199,6 +199,7 @@ namespace MusicInYourHands
         /// <summary>A hand sweeping across in front pushes the words near it to lean away, like grass.</summary>
         void Sweep(HandRig rig, float dt)
         {
+            sweeping[0] = sweeping[1] = false;
             foreach (var s in stalks)
             {
                 if (!s.Used) continue;
@@ -220,12 +221,24 @@ namespace MusicInYourHands
                         float off = Vector3.Cross(along, flat.normalized).magnitude * flat.magnitude;
                         if (off > 0.5f) continue;
                         push += flatVelocity / speed * Mathf.Min(speed, 2f) * (1f - off / 0.5f) * 0.6f;
+                        sweeping[side] = true;
                         Acted("sweep");
                     }
                 }
                 s.Lean = Vector3.Lerp(s.Lean, push, 1f - Mathf.Exp(-(push.sqrMagnitude > 0f ? 8f : 2.5f) * dt));
             }
+            // The sweeping hand lights up as it starts to part the words.
+            if (rig == null) return;
+            for (int side = 0; side < 2; side++)
+            {
+                var hand = rig.Get(side == 0);
+                FeedbackOnStart(side, sweeping[side], GestureKind.Touch, side == 0, hand.PalmJoint != null ? hand.PalmJoint.position : hand.Palm.position,
+                    0.6f, true, Fingers.All, 0.8f);
+            }
         }
+
+        // Whether each hand sweeps the words this frame.
+        readonly bool[] sweeping = new bool[2];
 
         void Draw(MusicFrame music, Camera view, float dt)
         {

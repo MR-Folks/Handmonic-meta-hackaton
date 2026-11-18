@@ -116,7 +116,7 @@ namespace MusicInYourHands
         Vector3 angularVelocity;
         float radius, visibility, moteDebt, morph = -1f, energy, waveAge = 9f;
         int beats;
-        bool hasCenter, hasAxis;
+        bool hasCenter, hasAxis, wasHolding;
         float savedVolume = -1f;
 
         protected override int SungWordCount => 3;
@@ -134,7 +134,7 @@ namespace MusicInYourHands
         {
             if (MusicBus.Instance != null && savedVolume >= 0f) MusicBus.Instance.Volume = savedVolume;
             savedVolume = -1f;
-            hasCenter = hasAxis = false;
+            hasCenter = hasAxis = wasHolding = false;
             visibility = 0f;
             if (HandRig.Instance != null)
             {
@@ -159,6 +159,13 @@ namespace MusicInYourHands
             // While the menu is open the hands are choosing there: the orb lets go (and the volume stays put) until it closes.
             bool holding = left.IsTracked && right.IsTracked && !MenuOpen;
             float spread = 0f;
+            // Both hands light up as they take hold of the orb, with a soft tick between them.
+            if (holding && !wasHolding)
+            {
+                Feedback(GestureKind.Touch, true, (PalmPosition(left) + PalmPosition(right)) * 0.5f, 0.8f, true, Fingers.All);
+                GestureFeedback.Light(false, Fingers.All, 0.8f);
+            }
+            wasHolding = holding;
             if (holding)
             {
                 Acted("hold orb");

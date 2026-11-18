@@ -167,8 +167,10 @@ namespace MusicInYourHands
         /// <summary>While a hand pinches, its stroke grows from the pinch point; a small light marks the nib.</summary>
         void Draw(HandRig.Hand hand, int side, Color color, MusicFrame music, Camera view, float dt)
         {
-            // A pinch at the open menu chooses there; it doesn't draw.
-            bool pinching = hand.IsTracked && hand.Pinch > 0.8f && !hand.InSystemGesture && PinchFree(side == 0);
+            // A pinch at the open menu chooses there; it doesn't draw. A stroke holds on until the pinch opens past 0.7,
+            // so a pinch wavering round 0.8 doesn't break it into new strokes (each with its own tick).
+            bool pinching = hand.IsTracked && hand.Pinch > (drawing[side] != null ? 0.7f : 0.8f) && !hand.InSystemGesture
+                && PinchFree(side == 0);
             var nib = nibs[side];
             if (nib.gameObject.activeSelf != hand.IsTracked) nib.gameObject.SetActive(hand.IsTracked);
             if (!hand.IsTracked) { drawing[side] = null; return; }
@@ -194,6 +196,8 @@ namespace MusicInYourHands
             if (stroke == null || stroke.Centres.Count >= pointsPerStroke)
             {
                 var previous = stroke;
+                // A new stroke starts: the pinching fingers light up with a tick.
+                if (previous == null) Feedback(GestureKind.Pinch, side == 0, point, 1f);
                 stroke = Begin();
                 drawing[side] = stroke;
                 // Continue seamlessly from a full stroke.
@@ -284,10 +288,19 @@ namespace MusicInYourHands
             // Fists made at the open menu clear nothing.
             bool fists = !MenuOpen && rig.Left.IsTracked && rig.Right.IsTracked && rig.Left.Fist > 0.7f && rig.Right.Fist > 0.7f;
             clearHold = fists ? clearHold + dt : 0f;
+            // The fists glow brighter as the clearing builds.
+            if (fists && clearFade >= 1f)
+            {
+                FeedbackHold(true, clearHold / 0.8f);
+                FeedbackHold(false, clearHold / 0.8f);
+            }
             if (clearHold > 0.8f && clearFade >= 1f)
             {
                 clearFade = 0.999f;
                 drawing[0] = drawing[1] = null;
+                // Both fists light up with a low thump as the sculpture fades.
+                Feedback(GestureKind.Fist, true, (HandFistPoint(rig.Left) + HandFistPoint(rig.Right)) * 0.5f);
+                GestureFeedback.Light(false, Fingers.All);
                 Acted("clear");
             }
         }

@@ -211,6 +211,8 @@ namespace MusicInYourHands
                 if (!pushing && distance > 0.12f) continue;
                 AddWave(hit, true);
                 cooldown[side] = 0.45f;
+                // The pushing hand lights up; the wave's note is the sound.
+                Feedback(GestureKind.Touch, side == 0, palm, 1f, false, Fingers.All);
                 Acted("wall wave");
             }
         }

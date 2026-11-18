@@ -689,6 +689,8 @@ namespace MusicInYourHands
                     Splash(c, RainWordColor, 8, 0.22f);
                 }
                 Musical.Play(voices, music, snowing ? 79 : 74, c, 0.22f);
+                // The palm lights up as the word lands on it; its note is the sound.
+                Feedback(GestureKind.Touch, side == 0, c, 0.7f, false, Fingers.All);
                 Acted("catch word");
                 return true;
             }
@@ -824,9 +826,14 @@ namespace MusicInYourHands
             if (held[side] >= holdSeconds)
             {
                 ChangeWeather(fist, music, view);
+                // The whole hand lights up with a burst as the weather turns; the gust is the sound.
+                Feedback(GestureKind.Done, side == 0, fist, 1f, false);
                 return;
             }
-            DrawCharge(side, fist, Mathf.InverseLerp(HoldShow, holdSeconds, held[side]), view, dt);
+            float fill = Mathf.InverseLerp(HoldShow, holdSeconds, held[side]);
+            // The fist glows brighter as the change builds, beside the ring filling round it.
+            if (closed) FeedbackHold(side == 0, fill);
+            DrawCharge(side, fist, fill, view, dt);
         }
 
         /// <summary>

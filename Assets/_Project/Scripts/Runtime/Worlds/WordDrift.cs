@@ -192,6 +192,8 @@ namespace MusicInYourHands
                     {
                         Hold(d);
                         touchPause = 0.25f;
+                        // The touching fingertip lights up with a light tick as the word stops for you.
+                        Feedback(GestureKind.Touch, touchLeft, touchTip, 1f, true, GestureFeedback.Of((HandRig.Finger)touchFinger));
                         Acted("touch word");
                     }
                 }
@@ -293,6 +295,11 @@ namespace MusicInYourHands
         }
 
         /// <summary>A fingertip on the word's face: within its width and height, and close to its plane.</summary>
+        // The fingertip that last touched a word, for its feedback.
+        bool touchLeft;
+        int touchFinger;
+        Vector3 touchTip;
+
         bool TouchedBy(HandRig rig, Drifter d)
         {
             var centre = d.Position + Vector3.up * d.Size * 0.35f;
@@ -306,7 +313,13 @@ namespace MusicInYourHands
                     var tip = hand.TipJoints[k] != null ? hand.TipJoints[k].position : hand.Tips[k];
                     var offset = tip - centre;
                     if (Mathf.Abs(Vector3.Dot(offset, right)) < d.Width * d.Size * 0.5f + 0.02f &&
-                        Mathf.Abs(offset.y) < d.Size * 0.6f + 0.02f && Mathf.Abs(Vector3.Dot(offset, forward)) < 0.1f) return true;
+                        Mathf.Abs(offset.y) < d.Size * 0.6f + 0.02f && Mathf.Abs(Vector3.Dot(offset, forward)) < 0.1f)
+                    {
+                        touchLeft = side == 0;
+                        touchFinger = k;
+                        touchTip = tip;
+                        return true;
+                    }
                 }
             }
             return false;
