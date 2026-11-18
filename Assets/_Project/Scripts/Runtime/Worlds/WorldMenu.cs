@@ -10,12 +10,12 @@ namespace MusicInYourHands
     /// rows from the number of worlds so that it always fits the middle of your view (Meta's recommended design area,
     /// 58° across and 54° high), shrinking and staying centred as worlds come and go. Below it a row plays and pauses the
     /// song, steps to the previous and next song (including songs added on the headset), switches to
-    /// listening to the room, turns the lyrics on and off, turns Less flashing on and off (ComfortOptions) and opens the
-    /// cassette deck (CassetteDeck), where you choose a
+    /// listening to the room, turns the lyrics on and off and opens the cassette deck (CassetteDeck), where you choose a
     /// song by putting its cassette in a radio; the menu steps aside for it. The deck's song list button brings the menu
     /// back with the song page (SongLibrary) in the honeycomb's place, and the page's Back button returns to the deck.
-    /// The honeycomb's last cell, just above the end of the song row, is a "?" bubble ("Show me how"): the menu closes
-    /// and the onboarding's lessons start again. Bubbles near where you look are a little larger.
+    /// After the last world the honeycomb has two more cells, just above the end of the song row: Less flashing, which
+    /// turns that option on and off (ComfortOptions), and a "?" bubble ("Show me how"), which closes the menu and starts
+    /// the onboarding's lessons again. Bubbles near where you look are a little larger.
     /// The menu opens half a metre along your gaze, within reach, so you can touch a bubble or button with your index
     /// fingertip, or point at it from farther away and pinch. It stays put while you look round it, but once you have
     /// looked well away for a moment it glides back in front of you, up or down as well as sideways, and never away from
@@ -100,9 +100,11 @@ namespace MusicInYourHands
         const int LessFlashingToggle = -7;
         const int Help = -8;
         /// <summary>The bubbles of the song row under the honeycomb.</summary>
-        const int SongRow = 7;
-        /// <summary>The bubbles that aren't worlds: the song row, and the "?" at the end of the honeycomb.</summary>
-        public const int ExtraBubbles = SongRow + 1;
+        const int SongRow = 6;
+        /// <summary>The honeycomb's cells after the last world: Less flashing, then the "?".</summary>
+        const int AfterWorlds = 2;
+        /// <summary>The bubbles that aren't worlds: the song row, and Less flashing and the "?" at the end of the honeycomb.</summary>
+        public const int ExtraBubbles = SongRow + AfterWorlds;
         const string HelpName = "Show me how";
         static readonly Color ListenColor = new Color(0.98f, 0.62f, 0.5f);
         static readonly Color SongColor = new Color(0.72f, 0.7f, 1f);
@@ -932,12 +934,12 @@ namespace MusicInYourHands
         }
 
         /// <summary>
-        /// Lays the worlds out as one honeycomb in menu order, row by row, the "?" in the cell after the last world, with the
-        /// song row under it, the caption over it and the two hint lines under the song row. It tries every number of rows
-        /// and keeps the one that fits AimArea best at the menu's distance (the narrower and lower, the better, both counted
-        /// against the area), so the honeycomb shrinks and stays centred as worlds are removed. The middle of the menu is
-        /// halfway between the top of the caption and the foot of the second hint line. Fills <paramref name="slots"/>
-        /// (worlds, the song row, then the "?") and places the text.
+        /// Lays the worlds out as one honeycomb in menu order, row by row, Less flashing and the "?" in the two cells after the
+        /// last world, with the song row under it, the caption over it and the two hint lines under the song row. It tries
+        /// every number of rows and keeps the one that fits AimArea best at the menu's distance (the narrower and lower, the
+        /// better, both counted against the area), so the honeycomb shrinks and stays centred as worlds are removed. The
+        /// middle of the menu is halfway between the top of the caption and the foot of the second hint line. Fills
+        /// <paramref name="slots"/> (worlds, the song row, then Less flashing and the "?") and places the text.
         /// </summary>
         void LayOut(int count, Vector2[] slots)
         {
@@ -955,8 +957,8 @@ namespace MusicInYourHands
             float aimWidth = 2f * viewDistance * Mathf.Tan(AimArea.x * 0.5f * Mathf.Deg2Rad);
             float aimHeight = 2f * viewDistance * Mathf.Tan(AimArea.y * 0.5f * Mathf.Deg2Rad);
 
-            // The honeycomb's cells: the worlds, then the "?".
-            int cells = count + 1;
+            // The honeycomb's cells: the worlds, then Less flashing and the "?".
+            int cells = count + AfterWorlds;
             var lengths = new int[cells];
             var centres = new float[lengths.Length];
             int bestRows = 0;
@@ -984,17 +986,16 @@ namespace MusicInYourHands
             float songY = bestRows > 0 ? -(bestRows - 1) * rowStep - songBelow : 0f;
             // Centre it all on the menu's middle, from the top of the caption to the foot of the second hint line.
             float shift = -(top + songY - underSongs) * 0.5f;
-            // The worlds, then the "?" in the last cell (its slot follows the song row's).
+            // The worlds, then Less flashing and the "?" in the last two cells (their slots follow the song row's).
             int next = 0;
             for (int r = 0; r < bestRows; r++)
                 for (int i = 0; i < rowLengths[r]; i++, next++)
-                    slots[next < count ? next : count + SongRow] = new Vector2((centres[r] + i - (rowLengths[r] - 1) * 0.5f) * step, -r * rowStep + shift);
-            // The song row: previous, play or pause, next, listen, lyrics, the cassette deck, and at its end less flashing.
+                    slots[next < count ? next : next + SongRow] = new Vector2((centres[r] + i - (rowLengths[r] - 1) * 0.5f) * step, -r * rowStep + shift);
+            // The song row: previous, play or pause, next, listen, lyrics, the cassette deck.
             for (int i = 0; i < SongRow; i++)
             {
                 int world = i == 0 ? NowPlaying : ListenToggle - (i - 1);
-                int column = world == PreviousSong ? 0 : world == NowPlaying ? 1 : world == NextSong ? 2 : world == ListenToggle ? 3
-                    : world == LyricsToggle ? 4 : world == Library ? 5 : 6;
+                int column = world == PreviousSong ? 0 : world == NowPlaying ? 1 : world == NextSong ? 2 : world == ListenToggle ? 3 : world == LyricsToggle ? 4 : 5;
                 slots[count + i] = new Vector2((column - (SongRow - 1) * 0.5f) * step, songY + shift);
             }
 
@@ -1042,7 +1043,8 @@ namespace MusicInYourHands
             LayOut(count, slots);
             for (int i = 0; i < bubbles.Length; i++)
             {
-                int world = i < count ? i : i == count ? NowPlaying : i < count + SongRow ? ListenToggle - (i - count - 1) : Help;
+                int world = i < count ? i : i == count ? NowPlaying : i < count + SongRow ? ListenToggle - (i - count - 1)
+                    : i == count + SongRow ? LessFlashingToggle : Help;
                 var slot = slots[i];
                 string objectName = world >= 0 ? $"Bubble {world}" : world == ListenToggle ? "Bubble Listen"
                     : world == PreviousSong ? "Bubble Previous Song" : world == NextSong ? "Bubble Next Song"

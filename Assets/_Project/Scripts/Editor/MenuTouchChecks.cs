@@ -127,7 +127,7 @@ namespace MusicInYourHands.EditorTools
             Move(lyrics - toward * 0.1f, 6);
             Run(0.7f);
 
-            // The Less flashing bubble at the end of the song row turns the option on (and is lit while it is on).
+            // The Less flashing bubble, beside the "?" at the end of the honeycomb, turns the option on (and is lit while it is on).
             var calm = Bubble("Bubble Less Flashing");
             bool calmWas = ComfortOptions.LessFlashing;
             ComfortOptions.LessFlashing = false;
