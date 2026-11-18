@@ -16,7 +16,7 @@ Assets/_Project/
   Resources/  the baked lettering and CassetteDeck/ (the cassette deck's four models and their materials)
   Scenes/     Main.unity
   Scripts/
-    Runtime/Music/   MusicBus (bands, beats, song time), SongAsset, AddedSongs
+    Runtime/Music/   MusicBus (bands, beats, song time), SongAsset, AddedSongs, SongMaker (new songs with ElevenLabs)
     Runtime/Lyrics/  LyricsTrack (LRC parser and current line/word lookup)
     Runtime/Hands/   HandRig (palm, fingertips, pinch, fist, palm-up for every world)
     Runtime/Worlds/  World (the base every world builds on), the worlds, the menu and its song page
@@ -103,6 +103,19 @@ People can play their own music: they copy an audio file (`.mp3`, `.ogg` or `.wa
 - The menu looks for new files each time it opens. An added song's audio is loaded only while it plays, and MP3 and OGG files stay compressed, so a song starts without a pause.
 - They have no melody notes, so the worlds that use them behave as in Listen mode.
 - The app only plays these files and shows their lyrics to the person wearing the headset; nothing is uploaded or shared.
+
+## Making a song with ElevenLabs
+The song page's **Make a song** button makes a new song with the player's own [ElevenLabs](https://elevenlabs.io) account (`SongMaker`, laid out by `SongLibrary`):
+
+1. **Connect, once.** The player types their API key on Meta's system keyboard (**Type my key**), or copies a file named `ElevenLabs key.txt` with the key in it into `Android/data/com.musicinyourhands.app/files/`. The app keeps the key in its private settings (`PlayerPrefs`, not the shared folder), deletes the key file once it has read it, and only ever sends the key to `api.elevenlabs.io`. **Forget my key** on the theme page removes it. The key needs the **Music** permission, and **Speech to Text** for word-timed lyrics; ElevenLabs only offers music on paid plans.
+2. **Pick a theme:** ❤️ Love, ☀️ Happy, 🌙 Dreamy, 🔥 Energy or 🌊 Calm.
+3. **Pick a genre:** 🎤 Pop, 🎸 Rock, 🎧 Lo-fi, 💃 Dance or 🪕 Folk.
+4. **Confirm.** The page says it takes a minute or two and uses about 1,850 of the player's ElevenLabs credits (a two-minute song at ElevenLabs' 900 credits a minute, plus the lyric timing).
+5. **Wait.** The page shows each step. It keeps going with the menu closed, and when the song is ready it joins **Your songs** and plays.
+
+Behind it are three requests: `POST /v1/music/plan` writes the sections and lyrics from a prompt built from the two choices (free), `POST /v1/music` composes that plan with `music_v2_5`, and `POST /v1/forced-alignment` times every sung word. The song is saved to the `Songs` folder as `<title>.mp3` with an `.lrc` (`[ar:Made with ElevenLabs]`), titled after the chorus's first words, so it plays, shows its lyrics and can be removed like any song the player added. Without the Speech to Text permission the lines are timed by their sections instead. Failures say what to do: a missing permission, a key that isn't accepted, too few credits, ElevenLabs being busy, or the headset being offline.
+
+The emojis are drawn on the headset by Android's own emoji font (`Assets/Plugins/Android/EmojiPicture.java`, through `EmojiPictures`) and shown on the menu's `Panel` shader, so the app ships no emoji images. The editor has no emoji font, so there the tiles show their names alone.
 
 ## Adding a world
 Each world is one class in `Assets/_Project/Scripts/Runtime/Worlds` that extends `World`. The base class runs what every world shares, so a world describes itself and overrides the hooks it needs:

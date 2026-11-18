@@ -11,12 +11,25 @@ namespace MusicInYourHands
     /// lyrics or remove the song. Adding a song is a guided step at a time: pick the song from the headset's files, it
     /// starts playing straight away, then the page offers to add its lyrics. The menu steps aside while the file
     /// picker's window is open and comes back when it is done.
+    /// Making a song (SongMaker) is a step at a time too: connect an ElevenLabs account once (type the API key on the
+    /// headset's keyboard, or copy a key file over), pick a theme emoji, pick a genre emoji, confirm what it costs,
+    /// and the page shows how it's going. It keeps going with the menu closed, and the new song plays when it's ready.
     /// The page is reached from the cassette deck's song list button, and its Back button goes back to the deck.
     /// </summary>
     public sealed class SongLibrary
     {
         // Numbered for the editor screenshots (Preview), so new views go at the end.
-        enum View { List, AskLyrics, ConfirmRemove }
+        enum View { List, AskLyrics, ConfirmRemove, Connect, Theme, Genre, Confirm, Making, Failed }
+
+        /// <summary>An emoji drawn on the page (null texture in the editor, where there's no emoji font).</summary>
+        sealed class Picture
+        {
+            public Renderer Quad;
+            public Texture2D Texture;
+            public Vector2 At;
+            public float Size;
+            public bool Shown;
+        }
 
         sealed class Button
         {
@@ -58,6 +71,8 @@ namespace MusicInYourHands
         static readonly int RadiusId = Shader.PropertyToID("_Radius");
         static readonly int HoverId = Shader.PropertyToID("_Hover");
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
+        static readonly int MainTexId = Shader.PropertyToID("_MainTex");
+        static readonly int PictureId = Shader.PropertyToID("_Picture");
         static readonly Color PanelFill = new Color(0.05f, 0.055f, 0.09f, 0.88f);
         static readonly Color PanelEdge = new Color(1f, 1f, 1f, 0.2f);
         static readonly Color Primary = new Color(0.16f, 0.55f, 0.4f, 0.96f);
@@ -68,6 +83,7 @@ namespace MusicInYourHands
         static readonly Color Soft = new Color(1f, 1f, 1f, 0.72f);
         static readonly Color HasLyrics = new Color(0.55f, 0.95f, 0.7f);
         static readonly Color NoLyrics = new Color(1f, 0.8f, 0.45f);
+        static readonly Color MakeColor = new Color(0.42f, 0.38f, 1f, 0.9f);
 
         readonly Transform page;
         readonly Renderer panel;
@@ -79,14 +95,20 @@ namespace MusicInYourHands
         readonly List<SongAsset> songs = new List<SongAsset>();
         readonly Row[] rows = new Row[RowsPerPage];
         readonly Material material;
-        readonly Button add, back, previous, next, confirm, decline;
-        readonly Text heading, count, pageNumber, line1, line2, line3, toast;
+        readonly Button add, make, back, previous, next, confirm, decline, forget;
+        readonly Button[] choices = new Button[5];
+        readonly Picture[] pictures = new Picture[5];
+        readonly Text heading, count, pageNumber, line1, line2, line3, line4, detail1, detail2, toast;
 
         View view;
         SongAsset focus, playing;
         IReadOnlyList<SongAsset> previewSongs;
         int pageIndex;
-        float fade, toastLeft;
+        float fade, toastLeft, keyFileCheck;
+        int theme, genre;
+        TouchScreenKeyboard keyboard;
+        SongMaker.Status previewStatus;
+        string previewError;
 
         /// <summary>True while the page is showing in the menu.</summary>
         public bool IsOpen { get; private set; }
@@ -124,6 +146,9 @@ namespace MusicInYourHands
             line1 = MakeText("Line 1", 0.022f, false);
             line2 = MakeText("Line 2", 0.0155f, false);
             line3 = MakeText("Line 3", 0.0125f, false);
+            line4 = MakeText("Line 4", 0.0125f, false);
+            detail1 = MakeText("Detail 1", 0.0145f, false);
+            detail2 = MakeText("Detail 2", 0.0145f, false);
             toast = MakeText("Message", 0.0135f, false);
             for (int i = 0; i < RowsPerPage; i++)
                 rows[i] = new Row
@@ -136,11 +161,19 @@ namespace MusicInYourHands
                     Remove = MakeButton($"Row {i} Remove", 0.018f)
                 };
             add = MakeButton("Add", 0.0155f);
+            make = MakeButton("Make", 0.0155f);
             back = MakeButton("Back", 0.0145f);
             previous = MakeButton("Previous Page", 0.018f);
             next = MakeButton("Next Page", 0.018f);
             confirm = MakeButton("Confirm", 0.0155f);
             decline = MakeButton("Decline", 0.0155f);
+            forget = MakeButton("Forget Key", 0.0125f);
+            for (int i = 0; i < choices.Length; i++) choices[i] = MakeButton($"Choice {i}", 0.0135f);
+            for (int i = 0; i < pictures.Length; i++)
+            {
+                pictures[i] = new Picture { Quad = Effects.MakeQuad($"Emoji {i}", page, material) };
+                pictures[i].Quad.gameObject.SetActive(false);
+            }
             page.gameObject.SetActive(false);
         }
 
@@ -185,7 +218,16 @@ namespace MusicInYourHands
             focus = list != null && list.Count > 0 ? list[0] : null;
             if (view == View.List) toastLeft = ToastSeconds;
             if (view == View.List) toast.Label.Text = "Lyrics added to Sunday Morning";
+            // The song maker's steps, as if a Happy rock song were chosen and being composed.
+            theme = 1;
+            genre = 1;
+            previewStatus = view == View.Failed ? SongMaker.Status.Failed : SongMaker.Status.Composing;
+            previewError = SongMaker.Explain(401, "{\"detail\":{\"status\":\"missing_permissions\",\"message\":\"The API key you used is missing the permission music_generation to execute this operation.\"}}", null, out _);
         }
+
+        SongMaker.Status MakerState => previewSongs != null ? previewStatus : SongMaker.State;
+        string MakerError => previewSongs != null ? previewError : SongMaker.Error;
+        bool MakerKeyProblem => previewSongs != null || SongMaker.KeyProblem;
 
         /// <summary>
         /// Takes in what the file picker did. True when the menu should come back to show it; <paramref name="outcome"/>
@@ -305,18 +347,27 @@ namespace MusicInYourHands
             bool show = fade > 0.001f;
             if (page.gameObject.activeSelf != show) page.gameObject.SetActive(show);
             toastLeft -= dt;
+            PollMaker(bus);
+            PollKeyboard();
             if (!show) return;
 
             Gather(bus);
             foreach (var b in buttons) b.Shown = false;
             foreach (var t in texts) t.Shown = false;
+            foreach (var p in pictures) p.Shown = false;
             switch (view)
             {
                 case View.AskLyrics: LayOutAskLyrics(); break;
                 case View.ConfirmRemove: LayOutConfirmRemove(bus); break;
+                case View.Connect: LayOutConnect(); break;
+                case View.Theme: LayOutChoices(SongMaker.Themes, theme, true); break;
+                case View.Genre: LayOutChoices(SongMaker.Genres, genre, false); break;
+                case View.Confirm: LayOutConfirm(bus); break;
+                case View.Making: LayOutMaking(); break;
+                case View.Failed: LayOutFailed(bus); break;
                 default: LayOutList(bus); break;
             }
-            if (toastLeft > 0f && view == View.List) Show(toast, null, new Vector2(0f, -0.14f), Soft);
+            if (toastLeft > 0f && (view == View.List || view == View.Connect)) Show(toast, null, new Vector2(0f, -0.14f), Soft);
 
             Style(panel, new Vector2(Width, Height), 0.022f, PanelFill, PanelEdge, 0f);
             var pressed = Topmost(presses[0]) ?? Topmost(presses[1]);
@@ -340,6 +391,18 @@ namespace MusicInYourHands
             {
                 if (t.Label.GameObject.activeSelf != t.Shown) t.Label.GameObject.SetActive(t.Shown);
                 if (t.Shown) t.Label.Color = new Color(t.Color.r, t.Color.g, t.Color.b, t.Color.a * fade);
+            }
+            foreach (var p in pictures)
+            {
+                bool shown = p.Shown && p.Texture != null;
+                if (p.Quad.gameObject.activeSelf != shown) p.Quad.gameObject.SetActive(shown);
+                if (!shown) continue;
+                p.Quad.transform.localPosition = new Vector3(p.At.x, p.At.y, -0.001f);
+                p.Quad.transform.localScale = new Vector3(p.Size, p.Size, 1f);
+                Style(p.Quad, new Vector2(p.Size, p.Size), 0f, Color.clear, Color.clear, 0f);
+                block.SetTexture(MainTexId, p.Texture);
+                block.SetFloat(PictureId, 1f);
+                p.Quad.SetPropertyBlock(block);
             }
             if (pressed == null) return;
             pressed.Press = 1f;
@@ -372,14 +435,17 @@ namespace MusicInYourHands
         {
             Show(heading, "Your songs", new Vector2(-Width * 0.5f + 0.03f, 0.172f), Color.white);
             if (songs.Count > 0) Show(count, songs.Count == 1 ? "1 song" : $"{songs.Count} songs", new Vector2(-Width * 0.5f + 0.03f, 0.145f), Soft);
-            Put(add, new Vector2(0.17f, 0.165f), new Vector2(0.19f, 0.05f), "+  Add a song", Primary, () => Pick(SongPicker.Kind.Song, null));
+            Put(add, new Vector2(0.2f, 0.165f), new Vector2(0.15f, 0.05f), "+  Add a song", Primary, () => Pick(SongPicker.Kind.Song, null));
+            var state = MakerState;
+            string makeLabel = previewSongs == null && SongMaker.Busy ? "Making…" : previewSongs == null && state == SongMaker.Status.Failed ? "Song failed" : "Make a song";
+            Put(make, new Vector2(0.035f, 0.165f), new Vector2(0.15f, 0.05f), makeLabel, MakeColor, StartMaking);
             Put(back, new Vector2(-0.215f, -0.178f), new Vector2(0.11f, 0.042f), "Back", Secondary, Back);
 
             if (songs.Count == 0)
             {
                 Show(line1, "No songs yet", new Vector2(0f, 0.05f), Color.white);
-                Show(line2, "Add an .mp3, .ogg or .wav file from this headset.", new Vector2(0f, 0.012f), Soft);
-                Show(line3, "Download one in the Browser, or copy it over with a USB cable.", new Vector2(0f, -0.018f), Soft);
+                Show(line2, "Add an .mp3, .ogg or .wav file from this headset, or make one.", new Vector2(0f, 0.012f), Soft);
+                Show(line3, "Make a song needs your own ElevenLabs account.", new Vector2(0f, -0.018f), Soft);
                 return;
             }
 
@@ -427,6 +493,223 @@ namespace MusicInYourHands
             Show(line2, "This deletes the app's copy of the song and its lyrics.", new Vector2(0f, 0.055f), Soft);
             Put(confirm, new Vector2(-0.08f, -0.01f), new Vector2(0.17f, 0.056f), "Remove", Danger, () => Remove(bus, focus));
             Put(decline, new Vector2(0.1f, -0.01f), new Vector2(0.13f, 0.056f), "Keep", Secondary, () => view = View.List);
+        }
+
+        // --- Making a song ----------------------------------------------------------------------------------------
+
+        /// <summary>The list's Make a song button: picks up where the song maker is, or starts at the key or the theme.</summary>
+        void StartMaking()
+        {
+            var state = MakerState;
+            if (SongMaker.Busy) view = View.Making;
+            else if (state == SongMaker.Status.Failed) view = View.Failed;
+            else view = SongMaker.HasKey ? View.Theme : View.Connect;
+        }
+
+        void LayOutConnect()
+        {
+            const float wide = Width - 0.06f;
+            Show(heading, "Make a song", new Vector2(-Width * 0.5f + 0.03f, 0.172f), Color.white);
+            Show(line1, "Connect your ElevenLabs account", new Vector2(0f, 0.105f), Color.white);
+            Show(line2, Fit("Use your own API key, with Music and Speech to Text allowed.", 0.0155f, wide), new Vector2(0f, 0.068f), Soft);
+            Show(line3, Fit("It stays on this headset and is only ever sent to ElevenLabs.", 0.0125f, wide), new Vector2(0f, 0.04f), Soft);
+            Put(confirm, new Vector2(0f, -0.022f), new Vector2(0.2f, 0.056f), "Type my key", Primary, OpenKeyboard);
+            Show(line4, Fit($"Or copy a file named \"{SongMaker.KeyFileName}\" into the app's folder.", 0.0125f, wide), new Vector2(0f, -0.085f), Soft);
+            Put(back, new Vector2(-0.215f, -0.178f), new Vector2(0.11f, 0.042f), "Back", Secondary, () => view = View.List);
+
+            // A key file copied over: take it, and go on to the themes.
+            if (previewSongs != null || Time.unscaledTime < keyFileCheck) return;
+            keyFileCheck = Time.unscaledTime + 1f;
+            if (!SongMaker.ImportKeyFile()) return;
+            Say($"Key added from {SongMaker.KeyFileName}");
+            view = View.Theme;
+        }
+
+        void OpenKeyboard()
+        {
+            if (!TouchScreenKeyboard.isSupported)
+            {
+                Say("The keyboard opens on the headset");
+                return;
+            }
+            keyboard = TouchScreenKeyboard.Open("", TouchScreenKeyboardType.Default, false, false, true, false, "Your ElevenLabs API key");
+        }
+
+        void PollKeyboard()
+        {
+            if (keyboard == null) return;
+            switch (keyboard.status)
+            {
+                case TouchScreenKeyboard.Status.Done:
+                    if (SongMaker.SetKey(keyboard.text))
+                    {
+                        Say("Connected to ElevenLabs");
+                        if (view == View.Connect) view = View.Theme;
+                    }
+                    keyboard = null;
+                    break;
+                case TouchScreenKeyboard.Status.Canceled:
+                case TouchScreenKeyboard.Status.LostFocus:
+                    keyboard = null;
+                    break;
+            }
+        }
+
+        /// <summary>Five emoji tiles to pick from: the themes, then the genres.</summary>
+        void LayOutChoices(SongMaker.Choice[] list, int selected, bool themes)
+        {
+            Show(heading, themes ? "Pick a theme" : "Pick a genre", new Vector2(-Width * 0.5f + 0.03f, 0.172f), Color.white);
+            Show(count, themes ? "Step 1 of 2" : $"Step 2 of 2  ·  {SongMaker.Themes[theme].Name}", new Vector2(-Width * 0.5f + 0.03f, 0.145f), Soft);
+            for (int i = 0; i < choices.Length && i < list.Length; i++)
+            {
+                var c = list[i];
+                int pick = i;
+                var at = new Vector2(-0.22f + i * 0.11f, 0.025f);
+                var fill = new Color(c.Color.r, c.Color.g, c.Color.b, i == selected ? 0.42f : 0.18f);
+                Put(choices[i], at, new Vector2(0.1f, 0.13f), c.Name, fill, () =>
+                {
+                    if (themes)
+                    {
+                        theme = pick;
+                        view = View.Genre;
+                    }
+                    else
+                    {
+                        genre = pick;
+                        view = View.Confirm;
+                    }
+                });
+                // With its emoji the name goes underneath; without (in the editor) it stays in the middle.
+                if (ShowPicture(i, c.Emoji, at + new Vector2(0f, 0.014f), 0.068f))
+                    choices[i].Label.Transform.localPosition = new Vector3(at.x, at.y - 0.044f, -0.002f);
+            }
+            Show(line3, themes ? "What's your song about?" : "How should it sound?", new Vector2(0f, -0.085f), Soft);
+            Put(back, new Vector2(-0.215f, -0.178f), new Vector2(0.11f, 0.042f), "Back", Secondary, () => view = themes ? View.List : View.Theme);
+            if (themes)
+                Put(forget, new Vector2(0.205f, -0.178f), new Vector2(0.15f, 0.042f), "Forget my key", Secondary, () =>
+                {
+                    SongMaker.ForgetKey();
+                    view = View.Connect;
+                });
+        }
+
+        void LayOutConfirm(MusicBus bus)
+        {
+            const float wide = Width - 0.06f;
+            var t = SongMaker.Themes[theme];
+            var g = SongMaker.Genres[genre];
+            Show(heading, "Make this song?", new Vector2(-Width * 0.5f + 0.03f, 0.172f), Color.white);
+            ShowPicture(0, t.Emoji, new Vector2(-0.045f, 0.1f), 0.075f);
+            ShowPicture(1, g.Emoji, new Vector2(0.045f, 0.1f), 0.075f);
+            Show(line1, $"{t.Name}  ·  {g.Name}", new Vector2(0f, 0.035f), Color.white);
+            Show(line2, Fit($"About {SongMaker.SongSeconds / 60} minutes, with lyrics. Takes a minute or two to make.", 0.0155f, wide), new Vector2(0f, 0.002f), Soft);
+            Show(line3, Fit($"Uses about {SongMaker.ApproxCredits:N0} of your ElevenLabs credits.", 0.0125f, wide), new Vector2(0f, -0.026f), NoLyrics);
+            Put(confirm, new Vector2(-0.08f, -0.09f), new Vector2(0.2f, 0.056f), "Make my song", Primary, () => Make(bus));
+            Put(decline, new Vector2(0.1f, -0.09f), new Vector2(0.13f, 0.056f), "Back", Secondary, () => view = View.Genre);
+        }
+
+        void Make(MusicBus bus)
+        {
+            if (previewSongs != null) return;
+            if (SongMaker.Start(bus, theme, genre)) view = View.Making;
+            else if (!SongMaker.HasKey) view = View.Connect;
+            else if (SongMaker.Busy) view = View.Making;
+        }
+
+        void LayOutMaking()
+        {
+            var state = MakerState;
+            int t = previewSongs != null ? theme : SongMaker.Theme, g = previewSongs != null ? genre : SongMaker.Genre;
+            Show(heading, "Making your song", new Vector2(-Width * 0.5f + 0.03f, 0.172f), Color.white);
+            // The emojis bob gently while it works.
+            float bob = 0.004f * Mathf.Sin(Time.unscaledTime * 3f);
+            ShowPicture(0, SongMaker.Themes[t].Emoji, new Vector2(-0.045f, 0.1f + bob), 0.075f);
+            ShowPicture(1, SongMaker.Genres[g].Emoji, new Vector2(0.045f, 0.1f - bob), 0.075f);
+            var (what, step) = state switch
+            {
+                SongMaker.Status.Writing => ("Writing the lyrics…", 1),
+                SongMaker.Status.Composing => ("Composing the music…", 2),
+                SongMaker.Status.Timing => ("Timing the lyrics…", 3),
+                SongMaker.Status.Saving => ("Saving your song…", 3),
+                _ => ("Getting ready…", 1)
+            };
+            Show(line1, what, new Vector2(0f, 0.035f), Color.white);
+            Show(line2, $"Step {step} of 3  ·  {SongMaker.Themes[t].Name} {SongMaker.Genres[g].Name}", new Vector2(0f, 0.002f), Soft);
+            Show(line3, "It keeps going if you close the menu, and plays when it's ready.", new Vector2(0f, -0.026f), Soft);
+            Put(confirm, new Vector2(0f, -0.09f), new Vector2(0.17f, 0.056f), "Your songs", Secondary, () => view = View.List);
+        }
+
+        void LayOutFailed(MusicBus bus)
+        {
+            Show(heading, "Couldn't make the song", new Vector2(-Width * 0.5f + 0.03f, 0.172f), NoLyrics);
+            Wrap(MakerError ?? "Something went wrong.", 0.0145f, Width - 0.08f, out var first, out var second);
+            Show(detail1, first, new Vector2(0f, 0.085f), Color.white);
+            if (second.Length > 0) Show(detail2, second, new Vector2(0f, 0.058f), Color.white);
+            Show(line3, "Nothing was saved.", new Vector2(0f, 0.022f), Soft);
+            Put(confirm, new Vector2(-0.08f, -0.03f), new Vector2(0.15f, 0.056f), "Try again", Primary, () =>
+            {
+                if (previewSongs != null) return;
+                if (SongMaker.Start(bus, SongMaker.Theme, SongMaker.Genre)) view = View.Making;
+                else if (!SongMaker.HasKey) view = View.Connect;
+            });
+            if (MakerKeyProblem)
+                Put(decline, new Vector2(0.1f, -0.03f), new Vector2(0.15f, 0.056f), "Change key", Secondary, () =>
+                {
+                    SongMaker.Dismiss();
+                    SongMaker.ForgetKey();
+                    view = View.Connect;
+                });
+            Put(back, new Vector2(-0.215f, -0.178f), new Vector2(0.11f, 0.042f), "Back", Secondary, () =>
+            {
+                SongMaker.Dismiss();
+                view = View.List;
+            });
+        }
+
+        /// <summary>The finished song plays and joins the list; a failure shows on the page if it's waiting for it.</summary>
+        void PollMaker(MusicBus bus)
+        {
+            if (bus == null || previewSongs != null) return;
+            if (SongMaker.TryTakeMade(out var path, out var title))
+            {
+                bus.RefreshSongs();
+                foreach (var song in bus.Songs)
+                    if (song != null && song.audioPath == path)
+                    {
+                        bus.Play(song);
+                        break;
+                    }
+                Say($"{title} is ready and playing");
+                if (view == View.Making) view = View.List;
+            }
+            else if (SongMaker.State == SongMaker.Status.Failed && view == View.Making) view = View.Failed;
+        }
+
+        /// <summary>Shows an emoji. False where it can't be drawn (in the editor).</summary>
+        bool ShowPicture(int index, string emoji, Vector2 at, float size)
+        {
+            var p = pictures[index];
+            p.Texture = EmojiPictures.Get(emoji);
+            p.At = at;
+            p.Size = size;
+            p.Shown = true;
+            return p.Texture != null;
+        }
+
+        /// <summary>Splits text into two lines that fit a width; the second is shortened if it still doesn't fit.</summary>
+        public static void Wrap(string text, float height, float width, out string first, out string second)
+        {
+            var face = TypeFace.Bold;
+            var words = (text ?? "").Split(' ');
+            int split = words.Length;
+            for (int n = 1; n <= words.Length; n++)
+                if (face.Width(string.Join(" ", words, 0, n)) * height > width)
+                {
+                    split = Mathf.Max(1, n - 1);
+                    break;
+                }
+            first = Fit(string.Join(" ", words, 0, split), height, width);
+            second = split < words.Length ? Fit(string.Join(" ", words, split, words.Length - split), height, width) : "";
         }
 
         void Show(Text text, string value, Vector2 at, Color color)

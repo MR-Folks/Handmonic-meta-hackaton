@@ -488,6 +488,14 @@ namespace MusicInYourHands.EditorTools
             Page("7b-library-empty", new SongAsset[0], 0);
             Page("7c-library-ask-lyrics", songs, 1);
             Page("7d-library-remove", songs, 2);
+            // Making a song with ElevenLabs. The emojis are drawn by the headset's emoji font, so here the tiles show
+            // their names alone.
+            Page("7m-make-connect", songs, 3);
+            Page("7n-make-theme", songs, 4);
+            Page("7o-make-genre", songs, 5);
+            Page("7p-make-confirm", songs, 6);
+            Page("7q-make-making", songs, 7);
+            Page("7r-make-failed", songs, 8);
 
             // For the Devpost: the menu where it opens in front of a standing player looking straight ahead (as
             // CheckMenuFieldOfView measures it), the hands lowered, and the outline of Meta's

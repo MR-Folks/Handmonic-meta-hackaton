@@ -1,6 +1,7 @@
 // Flat glass for the menu's pages: a rounded rectangle with a fine edge line, sharp at any size because its shape is
 // worked out in metres. _Size is the quad's size in metres; _Hover lightens it under a pointer. _Soft feathers the edge
-// (metres) for a soft backing behind a caption.
+// (metres) for a soft backing behind a caption. With _Picture at 1 it shows _MainTex (an emoji on the song maker's page)
+// over its fill.
 Shader "MusicInYourHands/Panel"
 {
     Properties
@@ -12,6 +13,8 @@ Shader "MusicInYourHands/Panel"
         _Hover ("Hover 0-1", Float) = 0
         _Alpha ("Fade", Float) = 1
         _Soft ("Soft edge (m)", Float) = 0
+        _MainTex ("Picture", 2D) = "white" {}
+        _Picture ("Picture 0-1", Float) = 0
     }
 
     SubShader
@@ -40,7 +43,11 @@ Shader "MusicInYourHands/Panel"
                 float _Hover;
                 float _Alpha;
                 float _Soft;
+                float _Picture;
             CBUFFER_END
+
+            TEXTURE2D(_MainTex);
+            SAMPLER(sampler_MainTex);
 
             struct Attributes
             {
@@ -81,6 +88,9 @@ Shader "MusicInYourHands/Panel"
                 float alpha = saturate(_Color.a + _Hover * 0.14);
                 color = lerp(color, _Edge.rgb, line_ * _Edge.a);
                 alpha = max(alpha, line_ * _Edge.a);
+                half4 picture = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv) * _Picture;
+                color = lerp(color, picture.rgb, picture.a);
+                alpha = max(alpha, picture.a);
                 return half4(color, alpha * inside * _Alpha);
             }
             ENDHLSL
