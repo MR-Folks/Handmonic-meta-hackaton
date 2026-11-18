@@ -62,6 +62,12 @@ namespace MusicInYourHands.EditorTools
             Shot<Lightning>("22-lightning", HandPose.BacksToFace, 14f, prepare: world => storm = (Lightning)world,
                 holdPose: _ => { if (++stormFrames == 352) storm.PreviewStorm(); }, lead: 12f);
             Shot<Lightning>("22s-lightning-snow", HandPose.PalmsUp, 30f, prepare: world => ((Lightning)world).PreviewWeather(true), lead: 30f);
+            // A strike in the settled snow: the bolt is ice blue, laid over the white ground rather than added to it.
+            Lightning snowStorm = null;
+            int snowFrames = 0;
+            Shot<Lightning>("22st-lightning-snow-strike", HandPose.BacksToFace, 14f,
+                prepare: world => { snowStorm = (Lightning)world; snowStorm.PreviewWeather(true); },
+                holdPose: _ => { if (++snowFrames == 892) snowStorm.PreviewStorm(); }, lead: 30f);
             // Shadow play with a tracked body (arms bent, elbows out), and with the hands alone, as without body tracking.
             Shot<ShadowPlay>("23-shadow-play", HandPose.BacksToFace, 6f, holdPose: rig => PreviewBody(rig, 1f / 30f),
                 closeUp: rig => new Vector3(0.12f, 1.95f, 2.6f), handOffset: ShadowPlayHands);

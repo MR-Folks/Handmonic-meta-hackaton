@@ -51,7 +51,18 @@ namespace MusicInYourHands
         static readonly Color StrikeColor = new Color(0.78f, 0.86f, 1f);
         static readonly Color ZapColor = new Color(0.75f, 0.62f, 1f);
         static readonly Color SparkColor = new Color(0.62f, 0.78f, 1f);
+        // In the snow the bolts turn a deep ice blue and are laid over what is behind them instead of adding light,
+        // so they still show against the white ground.
+        static readonly Color SnowStrikeColor = new Color(0.16f, 0.42f, 1f);
+        static readonly Color SnowZapColor = new Color(0.3f, 0.34f, 1f);
+        static readonly Color SnowSparkColor = new Color(0.24f, 0.52f, 1f);
+        static readonly int DstBlendId = Shader.PropertyToID("_DstBlend");
+        static readonly int CoreId = Shader.PropertyToID("_Core");
         static readonly int ColorId = Shader.PropertyToID("_Color");
+
+        Color StrikeTint => snowing ? SnowStrikeColor : StrikeColor;
+        Color ZapTint => snowing ? SnowZapColor : ZapColor;
+        Color SparkTint => snowing ? SnowSparkColor : SparkColor;
         static readonly int IntensityId = Shader.PropertyToID("_Intensity");
         static readonly int RadiusId = Shader.PropertyToID("_Radius");
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
@@ -71,7 +82,7 @@ namespace MusicInYourHands
             public Vector3 From, To;
             public float Life, Max, Width, Jag, Rejag, Brightness;
             public Color Color;
-            public bool Active;
+            public bool Active, Snow;
         }
 
         sealed class Mark
@@ -89,7 +100,7 @@ namespace MusicInYourHands
         readonly float[] charge = new float[2];
         static readonly Vector3[] scratchA = new Vector3[MaxPoints], scratchB = new Vector3[MaxPoints];
         Renderer veil;
-        Material veilInstance;
+        Material veilInstance, snowLine;
         MaterialPropertyBlock block;
         ParticleSystem sparks;
         AudioPool voices;
@@ -108,6 +119,12 @@ namespace MusicInYourHands
             {
                 bolts[i] = new Bolt { Line = new LineStrip($"Bolt {i}", transform, lineMaterial, MaxPoints) };
                 bolts[i].Line.SetVisible(false);
+            }
+            if (lineMaterial != null)
+            {
+                snowLine = new Material(lineMaterial) { name = "Bolt in Snow" };
+                snowLine.SetFloat(DstBlendId, (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                snowLine.SetFloat(CoreId, 0.3f);
             }
             for (int i = 0; i < marks.Length; i++)
             {
@@ -239,7 +256,7 @@ namespace MusicInYourHands
                 light.transform.localScale = Vector3.one * (0.012f + energy * 0.012f) * Random.Range(0.8f, 1.2f);
                 Effects.Face(light.transform, view);
                 block.Clear();
-                block.SetColor(ColorId, SparkColor);
+                block.SetColor(ColorId, SparkTint);
                 block.SetFloat(IntensityId, 0.5f + energy * 0.8f);
                 light.SetPropertyBlock(block);
 
@@ -248,13 +265,13 @@ namespace MusicInYourHands
                     var outward = (tip - hand.Palm.position).normalized;
                     var dir = (outward + Random.insideUnitSphere * 0.9f).normalized;
                     float length = Random.Range(0.025f, 0.06f) * (0.7f + energy * 0.6f);
-                    Spawn(tip, tip + dir * length, 3, length * 0.5f, 0.006f, Random.Range(0.05f, 0.1f), SparkColor, 1.2f);
+                    Spawn(tip, tip + dir * length, 3, length * 0.5f, 0.006f, Random.Range(0.05f, 0.1f), SparkTint,1.2f);
                 }
                 // Now and then an arc jumps to the next finger.
                 if (f < 4 && Random.value < dt * energy * 4f)
                 {
                     var next = Tip(hand, f + 1);
-                    Spawn(tip, next, 3, Vector3.Distance(tip, next) * 0.4f, 0.005f, 0.08f, SparkColor, 1f);
+                    Spawn(tip, next, 3, Vector3.Distance(tip, next) * 0.4f, 0.005f, 0.08f, SparkTint,1f);
                 }
             }
         }
@@ -281,17 +298,17 @@ namespace MusicInYourHands
             var top = new Vector3(ground.x, ceiling, ground.z) + Random.insideUnitSphere.normalized * 0.25f;
             top.y = ceiling;
 
-            var main = Spawn(top, ground, 6, 0.4f, 0.05f, 0.55f, StrikeColor, 2.2f, rejag: 0.12f);
+            var main = Spawn(top, ground, 6, 0.4f, 0.05f, 0.55f, StrikeTint,2.2f, rejag: 0.12f);
             for (int i = 0; i < 7; i++)
             {
                 var from = main.Points[Random.Range(main.Count / 6, main.Count * 3 / 4)];
                 var branch = (Vector3.down * 0.8f + Random.insideUnitSphere).normalized;
                 float length = Random.Range(0.3f, 0.8f);
-                Spawn(from, from + branch * length, 4, length * 0.35f, 0.018f, 0.45f, StrikeColor, 1.4f, rejag: 0.15f);
+                Spawn(from, from + branch * length, 4, length * 0.35f, 0.018f, 0.45f, StrikeTint,1.4f, rejag: 0.15f);
             }
             flash = 1f;
-            AddMark(ground + Vector3.up * 0.005f, Vector3.up, 1.1f, StrikeColor, 2.5f);
-            Burst(ground + Vector3.up * 0.05f, 60, StrikeColor, 1.2f);
+            AddMark(ground + Vector3.up * 0.005f, Vector3.up, 1.1f, StrikeTint,2.5f);
+            Burst(ground + Vector3.up * 0.05f, 60, StrikeTint,1.2f);
             WeatherImpact(ground, Vector3.up, 0.5f, true);
             voices.Play(Thunder(), ground, 1f);
             // The song's note underneath, low, so the thunder belongs to the music.
@@ -328,17 +345,17 @@ namespace MusicInYourHands
             var to = from + dir * distance;
             var start = from + dir * 0.02f;
 
-            var main = Spawn(start, to, 5, distance * 0.07f, 0.022f, 0.3f, ZapColor, 1.8f, rejag: 0.08f);
+            var main = Spawn(start, to, 5, distance * 0.07f, 0.022f, 0.3f, ZapTint,1.8f, rejag: 0.08f);
             for (int i = 0; i < 3; i++)
             {
                 var at = main.Points[Random.Range(main.Count / 4, main.Count - 2)];
                 var branch = (dir + Random.insideUnitSphere * 1.2f).normalized;
                 float length = Random.Range(0.08f, 0.25f) * Mathf.Min(distance, 2f);
-                Spawn(at, at + branch * length, 3, length * 0.4f, 0.01f, 0.22f, ZapColor, 1.1f);
+                Spawn(at, at + branch * length, 3, length * 0.4f, 0.01f, 0.22f, ZapTint,1.1f);
             }
-            if (hit) AddMark(to + normal * 0.005f, normal, 0.25f, ZapColor, 1.2f);
+            if (hit) AddMark(to + normal * 0.005f, normal, 0.25f, ZapTint,1.2f);
             if (hit && normal.y > 0.7f) WeatherImpact(to, normal, 0.14f, false);
-            Burst(to + normal * 0.03f, 18, ZapColor, 0.5f);
+            Burst(to + normal * 0.03f, 18, ZapTint,0.5f);
             flash = Mathf.Max(flash, 0.25f);
             voices.Play(ZapSound(), to, 0.5f);
             // Higher on the wall, higher the note.
@@ -364,6 +381,8 @@ namespace MusicInYourHands
             pick.Brightness = brightness;
             pick.Rejag = rejag;
             pick.Active = true;
+            pick.Snow = snowing && snowLine != null;
+            pick.Line.Renderer.sharedMaterial = pick.Snow ? snowLine : lineMaterial;
             pick.Count = Jagged(from, to, pick.Depth, jag, pick.Points);
             return pick;
         }
@@ -419,7 +438,8 @@ namespace MusicInYourHands
                 b.Line.SetVisible(true);
                 b.Line.Set(b.Points, b.Count, b.Width * (0.6f + 0.4f * t), b.Color, eye, false);
                 block.Clear();
-                block.SetFloat(IntensityId, b.Brightness * flicker * Mathf.Clamp01(t * 2.5f));
+                // Laid over the snow, a bolt at full strength would be a solid ribbon; softer, its edges stay a glow.
+                block.SetFloat(IntensityId, b.Brightness * (b.Snow ? 0.6f : 1f) * flicker * Mathf.Clamp01(t * 2.5f));
                 b.Line.Renderer.SetPropertyBlock(block);
             }
         }
