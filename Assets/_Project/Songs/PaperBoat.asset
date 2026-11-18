@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: PaperBoat
   m_EditorClassIdentifier: Assembly-CSharp::MusicInYourHands.SongAsset
   title: Paper Boat
-  artist: Music In Your Hands demo
+  artist: Handmonic demo
   clip: {fileID: 8300000, guid: 0ccd37a4a16842f5afa778f362c8b5f5, type: 3}
   lyrics: {fileID: 4606409926849070353, guid: 5198e0fc52ef469383d4ccfd4a0989a9, type: 3}
   notes: {fileID: 4606409926849070353, guid: ba9992be57a548cea075a9413547178a, type: 3}

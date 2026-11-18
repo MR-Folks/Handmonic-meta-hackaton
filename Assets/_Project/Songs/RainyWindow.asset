@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: RainyWindow
   m_EditorClassIdentifier: Assembly-CSharp::MusicInYourHands.SongAsset
   title: Rainy Window
-  artist: Music In Your Hands demo
+  artist: Handmonic demo
   clip: {fileID: 8300000, guid: 1a01f83754224fe48072a2d48e8ab313, type: 3}
   lyrics: {fileID: 4606409926849070353, guid: 8f21114e2b5c4d7da6f05474680b3475, type: 3}
   notes: {fileID: 4606409926849070353, guid: a2761165e6e74069bebca1d015c38b11, type: 3}

@@ -1,7 +1,7 @@
 ===SHORT===
 Play with music using your bare hands, right inside your own room. Drop a cassette into the radio to pick a song, then step into a mixed reality world that moves with every beat, note and sung word. No controllers needed.
 ===LONG===
-**Music In Your Hands** turns your room into a music visualizer that you play with your bare hands.
+**Handmonic** turns your room into a music visualizer that you play with your bare hands.
 
 **How it works**
 - Pick a song by putting its cassette into the radio. Seven original songs come with the app, and you can add your own.

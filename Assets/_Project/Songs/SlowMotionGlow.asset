@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: SlowMotionGlow
   m_EditorClassIdentifier: Assembly-CSharp::MusicInYourHands.SongAsset
   title: Slow Motion Glow
-  artist: Music In Your Hands
+  artist: Handmonic
   clip: {fileID: 8300000, guid: c76cae3377b04104aab65391e9fd7434, type: 3}
   lyrics: {fileID: 4606409926849070353, guid: 77d9f0e428d0433bb0f70e0b065338b8, type: 3}
   notes: {fileID: 0}

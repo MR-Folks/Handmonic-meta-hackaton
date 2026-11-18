@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: TurnItUpToLight
   m_EditorClassIdentifier: Assembly-CSharp::MusicInYourHands.SongAsset
   title: Turn It Up to Light
-  artist: Music In Your Hands
+  artist: Handmonic
   clip: {fileID: 8300000, guid: f370539061aa46089329e9b9d7980983, type: 3}
   lyrics: {fileID: 4606409926849070353, guid: a6806dd5289844f098fc72e66951425b, type: 3}
   notes: {fileID: 0}

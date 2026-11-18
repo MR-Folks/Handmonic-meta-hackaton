@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: NeonTide
   m_EditorClassIdentifier: Assembly-CSharp::MusicInYourHands.SongAsset
   title: Neon Tide
-  artist: Music In Your Hands demo
+  artist: Handmonic demo
   clip: {fileID: 8300000, guid: e3ec1fb8dc34434eb8bc002460fed8d2, type: 3}
   lyrics: {fileID: 4606409926849070353, guid: c5d8e366e7e641a29b05ecaa37b3b437, type: 3}
   notes: {fileID: 4606409926849070353, guid: 72ff0294136445f284e1f173424de883, type: 3}
