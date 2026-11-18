@@ -1,23 +1,26 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace MusicInYourHands
 {
     /// <summary>
-    /// The world menu: glass bubbles in two honeycombs, like an Apple Watch home screen, opened with Meta's left-hand
-    /// menu gesture. The sound worlds cluster on the left and the lyric worlds on the right, each bubble showing a
-    /// small animated emblem; below them a row plays and pauses the song, steps to the previous and next song
-    /// (including songs added on the headset), switches to listening to the room, turns the lyrics
-    /// on and off and opens the cassette deck (CassetteDeck), where you choose a song by putting its cassette in a
-    /// radio; the menu steps aside for it. The deck's song list button brings the menu back with the song page
-    /// (SongLibrary) in the honeycombs' place, and the page's Back button returns to the deck. Bubbles near where you look
-    /// are a little larger, and if you look away the menu glides back in front of you, but never away from a fingertip
-    /// reaching for it.
-    /// The menu opens within arm's reach, so you can touch a bubble or button with your index fingertip, or point at it
-    /// from farther away and pinch. A pointing hand casts a soft ray onto the menu (from the shoulder through the
-    /// pinch); once its fingertip comes within 15 cm of the menu, the ray gives way to a dot under the fingertip that
-    /// shrinks as the finger nears (Meta's touch specs). The bubble you point at or reach for swells and its name shows
-    /// large above the honeycomb. Under the menu a line says how to choose, or that a song is loading or couldn't play.
+    /// The world menu: glass bubbles in one honeycomb, like an Apple Watch home screen, opened with Meta's left-hand
+    /// menu gesture. Every world has a bubble with a small animated emblem, in menu order, and the honeycomb works out its
+    /// rows from the number of worlds so that it always fits the middle of your view (Meta's recommended design area,
+    /// 58° across and 54° high), shrinking and staying centred as worlds come and go. Below it a row plays and pauses the
+    /// song, steps to the previous and next song (including songs added on the headset), switches to
+    /// listening to the room, turns the lyrics on and off and opens the cassette deck (CassetteDeck), where you choose a
+    /// song by putting its cassette in a radio; the menu steps aside for it. The deck's song list button brings the menu
+    /// back with the song page (SongLibrary) in the honeycomb's place, and the page's Back button returns to the deck.
+    /// Bubbles near where you look are a little larger.
+    /// The menu opens half a metre along your gaze, within reach, so you can touch a bubble or button with your index
+    /// fingertip, or point at it from farther away and pinch. It stays put while you look round it, but once you have
+    /// looked well away for a moment it glides back in front of you, up or down as well as sideways, and never away from
+    /// a hand reaching for it. A pointing hand casts a soft ray onto the menu (from the shoulder through the pinch); once
+    /// its fingertip comes within 15 cm of the menu, the ray gives way to a dot under the fingertip that shrinks as the
+    /// finger nears (Meta's touch specs). The bubble you point at or reach for swells and its name shows large above the
+    /// honeycomb. Under the menu two lines say how to choose, or that a song is loading or couldn't play.
     /// </summary>
     [DefaultExecutionOrder(170)]
     public class WorldMenu : MonoBehaviour
@@ -26,19 +29,39 @@ namespace MusicInYourHands
         [SerializeField] Material glowMaterial;
         [SerializeField] Material lineMaterial;
         [SerializeField] Material panelMaterial;
-        [Tooltip("How far ahead of your eyes the menu opens (m). Meta suggests 42 to 46 cm for UI you touch.")]
-        [SerializeField] float distance = 0.44f;
-        [SerializeField] float drop = 0.05f;
-        [SerializeField] float spacing = 0.086f;
-        [SerializeField] float bubbleSize = 0.078f;
-        [Tooltip("How far (degrees) the menu may be from the centre of your view before it follows you.")]
-        [SerializeField] float followAngle = 44f;
+        [Tooltip("How far along your gaze the middle of the menu opens (m). Things you touch should be at least 50 cm from the eyes, and 50 cm is still within reach when seated.")]
+        [SerializeField] float viewDistance = 0.5f;
+        [Tooltip("How far below the centre of your view the middle of the menu sits (degrees).")]
+        [SerializeField] float dropAngle = 1f;
+        [Tooltip("How wide a bubble is at rest (m), the smallest it ever shows; bubbles near where you look grow a little. Meta's smallest target for hands is 64 mm.")]
+        [SerializeField] float bubbleDiameter = 0.066f;
+        [Tooltip("The gap between neighbouring bubbles at rest (m).")]
+        [SerializeField] float bubbleGap = 0.006f;
+        [Tooltip("How far (degrees) the menu may be from the middle of your view, and for how long (s), before it glides back in front of you.")]
+        [SerializeField] Vector2 lazyFollow = new Vector2(20f, 0.4f);
+        [Tooltip("Roughly how long the glide back in front of you takes (s).")]
+        [SerializeField] float glideTime = 0.3f;
         [Tooltip("Pinch strength (0-1) that selects, and the strength the pinch must drop below before it can select again.")]
         [SerializeField] Vector2 pinchThresholds = new Vector2(0.85f, 0.5f);
         [Tooltip("A fingertip nearer the menu than the first distance (m) touches instead of pointing, until it is farther than the second (Meta's hover zone).")]
         [SerializeField] Vector2 touchZone = new Vector2(0.15f, 0.2f);
         [Tooltip("How the cassette deck's turntable turns under the hands: how long it glides, how a brushing hand pulls it along, how a hand catches it, and its top speed.")]
         [SerializeField] DeckRing.Tuning turntable = new DeckRing.Tuning();
+
+        /// <summary>Meta's recommended design area for essential content: degrees across and high, round the centre of the view.</summary>
+        public static readonly Vector2 DesignArea = new Vector2(58f, 54f);
+        /// <summary>The area (degrees across and high) the layout aims to stay within, a margin inside the design area.</summary>
+        public static readonly Vector2 AimArea = new Vector2(50f, 48f);
+        /// <summary>How much larger than at rest a bubble near where you look grows, and how much more one you point at swells.</summary>
+        public const float NearGaze = 1.08f, Swell = 1.2f;
+        /// <summary>Letter heights (m) of the caption over the honeycomb and the hint lines under the song row.</summary>
+        public const float CaptionSize = 0.018f, HintSize = 0.013f;
+        /// <summary>The song page's size in the menu, so that it fits the design area too.</summary>
+        public const float PageScale = 0.88f;
+        /// <summary>How far up and down (degrees) the menu follows your gaze: not so low or high that it is hard to reach.</summary>
+        static readonly Vector2 PitchRange = new Vector2(-40f, 15f);
+        // Lettering, in letter heights: above and below the baseline, and from one line's baseline to the next.
+        const float Ascent = 0.78f, Descent = 0.22f, LineStep = 1.3f;
 
         /// <summary>Raised by the menu button feed (Meta's menu gesture); the menu opens or closes.</summary>
         public static event Action ToggleRequested;
@@ -89,6 +112,10 @@ namespace MusicInYourHands
             public float Pinch;
             public Vector3 Hit;
             public Vector3 Origin;
+            /// <summary>Where the ray passes through the hand, held in the palm's frame so a closing pinch doesn't move it.</summary>
+            public Vector3 AimOffset;
+            /// <summary><see cref="AimOffset"/> belongs to this hand's current pointing (not yet reset by a touch or loss).</summary>
+            public bool Aiming;
             public int Target = -1;
             public int Aimed = -1;
             public Vector2 AimedAt;
@@ -111,18 +138,29 @@ namespace MusicInYourHands
         // A touch presses when the index fingertip reaches the surface (Meta's touch specs model the fingertip as a 5 mm
         // sphere), and the next press needs the finger 2 cm back out first, so a resting or trembling finger presses once.
         const float TouchContact = 0.005f, TouchRearm = 0.02f;
+        /// <summary>How quickly (per second) the ray's point in the open hand follows the hand's shape (see Pointer.AimOffset).</summary>
+        const float AimSettle = 1.5f;
+        /// <summary>Thumb to index fingertip (m) beyond which the hand counts as open, so its shape may still settle the aim.</summary>
+        const float OpenSpread = 0.06f;
         // The song page sits this far behind the bubbles.
         const float PageDepth = 0.003f;
-        const string ChooseHint = "Touch or pinch to choose · thumb tap: play/pause · thumb swipe: change song";
+        const string ChooseHint = "Touch or pinch a bubble to choose";
+        const string GestureHint = "Thumb tap: play or pause  ·  thumb swipe: change song";
 
         Bubble[] bubbles = Array.Empty<Bubble>();
         readonly Pointer[] pointers = { new Pointer(), new Pointer() };
         readonly Vector3[] rayPath = new Vector3[2];
-        TypeLabel caption, hint, soundLabel, lyricLabel;
-        Vector3 followPosition;
-        Quaternion followRotation;
-        float awayTime;
-        bool following;
+        TypeLabel caption, hint, gestures;
+        string previewCaption;
+        // What the caption and the hint were last worked out for, so their words are only made again when that changes.
+        Bubble captioned;
+        int captionedState = -1;
+        SongAsset captionedSong, hintLoading, hintFailed;
+        bool hinted;
+        // The glide back in front of you: degrees per second sideways and up, and metres per second nearer or farther.
+        Vector2 glideSpeed;
+        float distanceSpeed, awayTime;
+        bool gliding;
         Transform root;
         MaterialPropertyBlock block;
         AudioPool voices;
@@ -139,6 +177,9 @@ namespace MusicInYourHands
         // Where a fingertip can touch the menu (in its space), and how far behind the bubbles the surface it touches is.
         Rect touchArea;
         float surface;
+        // The layout: how many worlds each row holds, how wide the text may be, and where the lines of text sit.
+        int[] rowLengths = Array.Empty<int>();
+        float textWidth;
 
         /// <summary>
         /// True while the menu or the cassette deck is open (the song page included): the hands are choosing, so the
@@ -148,6 +189,12 @@ namespace MusicInYourHands
 
         /// <summary>The cassette deck, once the menu has been built (for the editor checks and screenshots).</summary>
         public CassetteDeck Deck => deck;
+
+        /// <summary>How many world bubbles each row of the honeycomb holds, top to bottom (for the editor checks).</summary>
+        public IReadOnlyList<int> RowLengths => rowLengths;
+
+        /// <summary>True while the menu is gliding back in front of you (for the editor checks).</summary>
+        public bool Gliding => gliding;
 
         void OnEnable()
         {
@@ -239,45 +286,96 @@ namespace MusicInYourHands
         void Place(Camera view)
         {
             if (root == null) return;
-            Placement(view, out var position, out var rotation);
-            root.SetPositionAndRotation(position, rotation);
-            following = false;
+            var direction = HomeDirection(view);
+            root.SetPositionAndRotation(view.transform.position + direction * viewDistance, Quaternion.LookRotation(direction, Vector3.up));
+            gliding = false;
             awayTime = 0f;
-        }
-
-        void Placement(Camera view, out Vector3 position, out Quaternion rotation)
-        {
-            var head = view.transform.position;
-            var forward = Effects.FlatForward(view);
-            position = head + forward * distance + Vector3.down * drop;
-            rotation = Quaternion.LookRotation(position - head, Vector3.up);
+            glideSpeed = Vector2.zero;
+            distanceSpeed = 0f;
         }
 
         /// <summary>
-        /// When the menu has been outside the middle of your view for half a second, it glides back in front of you
-        /// (with a little lag, so it never chases small head movements).
+        /// Where the middle of the menu belongs, as a direction from the eyes: along your gaze, a little lower, and kept
+        /// within PitchRange up and down so it never opens out of easy reach.
+        /// </summary>
+        Vector3 HomeDirection(Camera view)
+        {
+            var forward = view.transform.forward;
+            var flat = Effects.FlatForward(view);
+            float yaw = Mathf.Atan2(flat.x, flat.z) * Mathf.Rad2Deg;
+            float pitch = Mathf.Clamp(Mathf.Asin(Mathf.Clamp(forward.y, -1f, 1f)) * Mathf.Rad2Deg, PitchRange.x, PitchRange.y) - dropAngle;
+            return Direction(yaw, pitch);
+        }
+
+        static Vector3 Direction(float yaw, float pitch)
+        {
+            float y = yaw * Mathf.Deg2Rad, p = pitch * Mathf.Deg2Rad;
+            return new Vector3(Mathf.Cos(p) * Mathf.Sin(y), Mathf.Sin(p), Mathf.Cos(p) * Mathf.Cos(y));
+        }
+
+        static void Angles(Vector3 direction, out float yaw, out float pitch)
+        {
+            yaw = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg;
+            pitch = Mathf.Asin(Mathf.Clamp(direction.y, -1f, 1f)) * Mathf.Rad2Deg;
+        }
+
+        /// <summary>
+        /// Lazy follow. The menu stays where it is in the room while you look round it. Once its middle has been more
+        /// than lazyFollow.x degrees from where it belongs (the middle of your view) for lazyFollow.y seconds, it glides
+        /// back there round your head at its own distance, easing in and out, sideways and up or down. A hand touching it
+        /// or pointing at it holds it still, and one that reaches for it mid-glide brings it smoothly to a stop.
         /// </summary>
         void Follow(Camera view, float dt)
         {
-            // Never slide away from a fingertip reaching for a bubble, even an outer one far from the centre of view.
-            if (pointers[0].Touching || pointers[1].Touching)
+            var head = view.transform.position;
+            var home = HomeDirection(view);
+            var offset = root.position - head;
+            float distanceNow = offset.magnitude;
+            var direction = distanceNow > 1e-4f ? offset / distanceNow : home;
+            bool reaching = Reaching();
+            awayTime = !reaching && Vector3.Angle(direction, home) > lazyFollow.x ? awayTime + dt : 0f;
+            if (awayTime >= lazyFollow.y) gliding = true;
+            if (!gliding || dt <= 0f) return;
+
+            Angles(direction, out float yaw, out float pitch);
+            Angles(home, out float homeYaw, out float homePitch);
+            bool settled;
+            if (reaching)
             {
-                awayTime = 0f;
-                following = false;
-                return;
+                float brake = Mathf.Exp(-12f * dt);
+                glideSpeed *= brake;
+                distanceSpeed *= brake;
+                yaw += glideSpeed.x * dt;
+                pitch += glideSpeed.y * dt;
+                distanceNow += distanceSpeed * dt;
+                settled = glideSpeed.sqrMagnitude < 1f;
             }
-            var toMenu = root.position - view.transform.position;
-            float angle = Vector3.Angle(view.transform.forward, toMenu);
-            awayTime = angle > followAngle ? awayTime + dt : 0f;
-            if (awayTime > 0.5f && !following)
+            else
             {
-                following = true;
-                Placement(view, out followPosition, out followRotation);
+                float time = Mathf.Max(glideTime, 0.01f);
+                yaw = Mathf.SmoothDampAngle(yaw, homeYaw, ref glideSpeed.x, time, Mathf.Infinity, dt);
+                pitch = Mathf.SmoothDampAngle(pitch, homePitch, ref glideSpeed.y, time, Mathf.Infinity, dt);
+                distanceNow = Mathf.SmoothDamp(distanceNow, viewDistance, ref distanceSpeed, time, Mathf.Infinity, dt);
+                settled = Mathf.Abs(Mathf.DeltaAngle(yaw, homeYaw)) < 0.3f && Mathf.Abs(pitch - homePitch) < 0.3f && glideSpeed.sqrMagnitude < 4f;
             }
-            if (!following) return;
-            float ease = 1f - Mathf.Exp(-5f * dt);
-            root.SetPositionAndRotation(Vector3.Lerp(root.position, followPosition, ease), Quaternion.Slerp(root.rotation, followRotation, ease));
-            if ((root.position - followPosition).sqrMagnitude < 0.0001f) following = false;
+            var to = Direction(yaw, pitch);
+            var facing = Quaternion.LookRotation(to, Vector3.up);
+            var rotation = Quaternion.Slerp(root.rotation, facing, 1f - Mathf.Exp(-12f * dt));
+            root.SetPositionAndRotation(head + to * distanceNow, rotation);
+            if (settled && Quaternion.Angle(rotation, facing) < 0.5f)
+            {
+                gliding = false;
+                glideSpeed = Vector2.zero;
+                distanceSpeed = 0f;
+            }
+        }
+
+        /// <summary>Whether a hand is touching the menu or pointing at it, so it shouldn't move.</summary>
+        bool Reaching()
+        {
+            foreach (var p in pointers)
+                if (p.Touching || (p.Active && Over(root.InverseTransformPoint(p.Hit), 0f))) return true;
+            return false;
         }
 
         /// <summary>One frame of the menu. Public so the editor preview can drive it.</summary>
@@ -311,6 +409,7 @@ namespace MusicInYourHands
             UpdatePointers(rig, view, dt);
 
             float t = Application.isPlaying ? Time.time : 0f;
+            float spacing = Spacing;
             int hovered = -1;
             for (int i = 0; i < bubbles.Length; i++)
             {
@@ -323,17 +422,17 @@ namespace MusicInYourHands
                 if (!visible) continue;
                 anyVisible = true;
 
-                // Apple Watch style: bubbles near where you look are a little larger.
+                // Apple Watch style: bubbles near where you look are a little larger (never smaller than at rest).
                 var local = new Vector3(b.Slot.x, b.Slot.y, 0f) + new Vector3(0f, Mathf.Sin(t * 1.3f + i) * 0.003f, 0f);
-                float fisheye = Mathf.Lerp(0.82f, 1.06f, Mathf.Exp(-((Vector2)local - gaze).sqrMagnitude / (spacing * spacing * 1.3f)));
+                float fisheye = Mathf.Lerp(1f, NearGaze, Mathf.Exp(-((Vector2)local - gaze).sqrMagnitude / (spacing * spacing * 1.3f)));
                 var world = root.TransformPoint(local);
-                float size = bubbleSize * fisheye * show;
+                float size = bubbleDiameter * fisheye * show;
 
                 bool aimed = open && !library.IsOpen && (pointers[0].Target == i || pointers[1].Target == i);
                 b.Hover = Mathf.MoveTowards(b.Hover, aimed ? 1f : 0f, dt * 7f);
                 if (aimed) hovered = i;
 
-                float scale = size * (1f + b.Hover * 0.2f + b.Pop * 0.45f);
+                float scale = size * (1f + b.Hover * (Swell - 1f) + b.Pop * 0.45f);
                 b.Renderer.transform.position = world;
                 b.Renderer.transform.localScale = Vector3.one * Mathf.Max(scale, 1e-4f);
                 Effects.Face(b.Renderer.transform, view);
@@ -370,7 +469,7 @@ namespace MusicInYourHands
             }
 
             StepLibrary(bus, dt);
-            DrawCaption(manager, bus, hovered, view, dt);
+            DrawCaption(manager, bus, hovered);
             DrawPointers(view);
             if (root.gameObject.activeSelf != (anyVisible || open)) root.gameObject.SetActive(anyVisible || open);
             deck.Step(rig, bus, view, dt);
@@ -397,8 +496,16 @@ namespace MusicInYourHands
         }
 
         /// <summary>Shows made-up songs on the library page, for the editor screenshots.</summary>
-        public void PreviewLibrary(System.Collections.Generic.IReadOnlyList<SongAsset> songs, SongAsset playing, int view) =>
+        public void PreviewLibrary(IReadOnlyList<SongAsset> songs, SongAsset playing, int view) =>
             library.Preview(songs, playing, view);
+
+        /// <summary>Shows these words as the caption (null for the usual one), for the editor checks.</summary>
+        public void PreviewCaption(string text)
+        {
+            previewCaption = text;
+            captioned = null;
+            captionedState = -1;
+        }
 
         static float Icon(int bubble) => bubble switch
         {
@@ -426,7 +533,7 @@ namespace MusicInYourHands
             return song == null ? $"{where} song" : $"{where}: {song.title}";
         }
 
-        /// <summary>The line under the menu: news of a song that is loading or couldn't play, else how to choose.</summary>
+        /// <summary>The first line under the menu: news of a song that is loading or couldn't play, else how to choose.</summary>
         static string HintText(MusicBus bus)
         {
             if (bus == null) return ChooseHint;
@@ -461,7 +568,7 @@ namespace MusicInYourHands
                 if (!open || hand == null || !hand.IsTracked || hand.InSystemGesture)
                 {
                     // A lost hand's ray or dot goes at once rather than lingering where the hand was.
-                    p.Touching = p.TouchArmed = false;
+                    p.Touching = p.TouchArmed = p.Aiming = false;
                     p.Visibility = 0f;
                     continue;
                 }
@@ -487,20 +594,34 @@ namespace MusicInYourHands
                     // A pinch made while touching mustn't select once the hand pulls back and points.
                     p.Armed = false;
                     p.Pinch = 0f;
+                    p.Aiming = false;
                 }
                 else
                 {
                     var thumb = hand.TipJoints[0] != null ? hand.TipJoints[0].position : hand.Tips[0];
                     var pinchPoint = (thumb + tip) * 0.5f;
                     var shoulder = head + Vector3.down * 0.17f + side * (s == 0 ? -0.17f : 0.17f);
-                    var ray = new Ray(shoulder, pinchPoint - shoulder);
+                    float pinch = p.Pinch = hand.Pinch;
+                    // The ray aims through the point between thumb and index, but that point drops as the index comes
+                    // down to the thumb, which pulled the cursor off the bubble just as it was pinched. So the point is
+                    // held in the palm's frame: it follows the hand's shape only slowly and only while the hand is
+                    // clearly open, so the ray moves with the hand, not with the closing fingers.
+                    var palm = hand.Palm;
+                    var offset = Quaternion.Inverse(palm.rotation) * (pinchPoint - palm.position);
+                    if (!p.Aiming) p.AimOffset = offset;
+                    else if (Vector3.Distance(thumb, tip) > OpenSpread)
+                        p.AimOffset = Vector3.Lerp(p.AimOffset, offset, 1f - Mathf.Exp(-AimSettle * dt));
+                    p.Aiming = true;
+                    var aimPoint = palm.position + palm.rotation * p.AimOffset;
+                    var ray = new Ray(shoulder, aimPoint - shoulder);
                     p.Active = plane.Raycast(ray, out float enter);
                     var hit = ray.GetPoint(enter);
-                    // Smooth the cursor a little; hand tracking jitters more than a controller.
-                    p.Hit = pointed ? Vector3.Lerp(p.Hit, hit, 1f - Mathf.Exp(-25f * dt)) : hit;
+                    // Smooth the cursor a little, and a little more while pinching; hand tracking jitters more than a
+                    // controller.
+                    float settle = pinch > 0f ? 12f : 25f;
+                    p.Hit = pointed ? Vector3.Lerp(p.Hit, hit, 1f - Mathf.Exp(-settle * dt)) : hit;
                     p.Origin = pinchPoint;
 
-                    float pinch = p.Pinch = hand.Pinch;
                     if (pinch < pinchThresholds.y) p.Armed = true;
                     if (p.Armed && pinch >= pinchThresholds.x)
                     {
@@ -510,7 +631,7 @@ namespace MusicInYourHands
 
                     // The nearest bubble within reach of the cursor is the target.
                     var localHit = (Vector2)root.InverseTransformPoint(p.Hit);
-                    if (p.Active) p.Target = BubbleAt(localHit, bubbleSize * 0.62f);
+                    if (p.Active) p.Target = BubbleAt(localHit, bubbleDiameter * 0.62f);
                     // Remember the aim while the pinch is still open.
                     if (pinch < 0.6f)
                     {
@@ -570,7 +691,10 @@ namespace MusicInYourHands
             }
         }
 
-        float TouchReach => bubbleSize * 0.55f;
+        /// <summary>Centre to centre between neighbouring bubbles (m).</summary>
+        float Spacing => bubbleDiameter + bubbleGap;
+
+        float TouchReach => bubbleDiameter * 0.55f;
 
         /// <summary>The bubble nearest a point on the menu, if one is within <paramref name="reach"/> of it, else -1.</summary>
         int BubbleAt(Vector2 at, float reach)
@@ -594,9 +718,11 @@ namespace MusicInYourHands
 
         /// <summary>
         /// The name of the bubble you point at, large above the honeycomb (or the current world's when you point at
-        /// none), with a soft shadow so it reads over any room. A small hint below says how to choose.
+        /// none), with a soft shadow so it reads over any room. Two small lines under the song row say how to choose.
+        /// Words too wide for the menu are shortened, so nothing reaches past the bubbles. Each is only worked out again
+        /// when what it says changes.
         /// </summary>
-        void DrawCaption(WorldManager manager, MusicBus bus, int hovered, Camera view, float dt)
+        void DrawCaption(WorldManager manager, MusicBus bus, int hovered)
         {
             float show = open ? Mathf.Clamp01((openTime - 0.1f) / 0.3f) * honeycomb : 0f;
             bool visible = show > 0.001f;
@@ -604,35 +730,39 @@ namespace MusicInYourHands
             {
                 caption.GameObject.SetActive(visible);
                 hint.GameObject.SetActive(visible);
-                soundLabel.GameObject.SetActive(visible);
-                lyricLabel.GameObject.SetActive(visible && lyricCount > 0);
+                gestures.GameObject.SetActive(visible);
             }
             if (!visible) return;
 
             Bubble subject = hovered >= 0 ? bubbles[hovered] : null;
             if (subject == null)
                 foreach (var b in bubbles) if (b.World == manager.Current) subject = b;
-            string text = subject != null ? BubbleName(subject, manager, bus) : "";
-            caption.Text = text;
+            int state = (bus != null ? 1 : 0) | (bus != null && bus.IsPlaying ? 2 : 0) | (bus != null && bus.IsListening ? 4 : 0) |
+                        (LyricsOption.On ? 8 : 0) | ((bus != null ? bus.Songs.Count : 0) << 4);
+            var song = bus != null ? bus.CurrentSong : null;
+            if (subject != captioned || state != captionedState || song != captionedSong)
+            {
+                captioned = subject;
+                captionedState = state;
+                captionedSong = song;
+                string text = previewCaption ?? (subject != null ? BubbleName(subject, manager, bus) : "");
+                caption.Text = SongLibrary.Fit(text, CaptionSize, textWidth);
+            }
             var color = subject != null ? Color.Lerp(Color.white, BubbleColor(subject, manager), hovered >= 0 ? 0.3f : 0.15f) : Color.white;
             color.a = show * (hovered >= 0 ? 1f : 0.8f);
             caption.Color = color;
-            hint.Color = new Color(1f, 1f, 1f, show * 0.8f);
-            soundLabel.Color = lyricLabel.Color = new Color(1f, 1f, 1f, show * 0.9f);
 
-            float highest = spacing, lowest = 0f;
-            foreach (var b in bubbles)
+            var loading = bus != null ? bus.Loading : null;
+            var failed = bus != null ? bus.Failed : null;
+            if (!hinted || loading != hintLoading || failed != hintFailed)
             {
-                highest = Mathf.Max(highest, b.Slot.y);
-                lowest = Mathf.Min(lowest, b.Slot.y);
+                hinted = true;
+                hintLoading = loading;
+                hintFailed = failed;
+                hint.Text = SongLibrary.Fit(HintText(bus), HintSize, textWidth);
             }
-            var rotation = root.rotation;
-            var top = root.TransformPoint(new Vector3(0f, highest + bubbleSize * 1.45f, 0f));
-            caption.Transform.SetPositionAndRotation(top, rotation);
-            hint.Text = HintText(bus);
-            hint.Transform.SetPositionAndRotation(root.TransformPoint(new Vector3(0f, lowest - bubbleSize * 0.75f, 0f)), rotation);
-            soundLabel.Transform.SetPositionAndRotation(root.TransformPoint(new Vector3(SoundCenter.x, highest + bubbleSize * 0.62f, 0f)), rotation);
-            lyricLabel.Transform.SetPositionAndRotation(root.TransformPoint(new Vector3(LyricCenter.x, highest + bubbleSize * 0.62f, 0f)), rotation);
+            hint.Color = new Color(1f, 1f, 1f, show * 0.8f);
+            gestures.Color = new Color(1f, 1f, 1f, show * 0.6f);
         }
 
         /// <summary>
@@ -681,31 +811,121 @@ namespace MusicInYourHands
             return 1f + c3 * Mathf.Pow(x - 1f, 3f) + c1 * Mathf.Pow(x - 1f, 2f);
         }
 
-        // Each group is a small honeycomb: a centre cell, a ring of six, then outer cells on its far side first, so
-        // the two groups grow away from each other.
-        Vector2 SoundCenter => new Vector2(-spacing * 2.25f, spacing * 0.35f);
-        Vector2 LyricCenter => new Vector2(spacing * 2.25f, spacing * 0.35f);
-        static readonly float[] InnerAngles = { 90f, 30f, -30f, -90f, -150f, 150f };
-        static readonly (float angle, bool corner)[] OuterLeft =
+        /// <summary>
+        /// How many bubbles each of <paramref name="rows"/> rows holds: as even as can be, a longer and a shorter row
+        /// taking turns when that works out (they nest neatly), else the longer rows first.
+        /// </summary>
+        static void SplitRows(int count, int rows, int[] lengths)
         {
-            (180f, false), (150f, true), (-150f, true), (120f, false), (-120f, false), (90f, true),
-            (-90f, true), (60f, false), (-60f, false), (30f, true), (-30f, true), (0f, false)
-        };
-        int lyricCount;
-
-        Vector2 HexSlot(Vector2 center, int index, bool growLeft)
-        {
-            if (index == 0) return center;
-            if (index <= 6)
+            int shortLength = count / rows, longRows = count % rows, shortRows = rows - longRows;
+            bool alternate = longRows > 0 && Mathf.Abs(longRows - shortRows) <= 1;
+            bool longFirst = longRows >= shortRows;
+            for (int r = 0; r < rows; r++)
             {
-                float a = InnerAngles[index - 1] * Mathf.Deg2Rad;
-                return center + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * spacing;
+                bool isLong = alternate ? (r % 2 == 0) == longFirst : r < longRows;
+                lengths[r] = shortLength + (isLong ? 1 : 0);
             }
-            var (angle, corner) = OuterLeft[(index - 7) % OuterLeft.Length];
-            if (!growLeft) angle = 180f - angle;
-            float r = corner ? spacing * 2f : spacing * Mathf.Sqrt(3f);
-            float rad = angle * Mathf.Deg2Rad;
-            return center + new Vector2(Mathf.Cos(rad), Mathf.Sin(rad)) * r;
+        }
+
+        /// <summary>
+        /// Where the middle of each row goes, in bubble steps: half a step along from the row above, so the rows nest like
+        /// a honeycomb, as near the middle as it can, and then all of them centred together. Returns their width in steps.
+        /// </summary>
+        static float NestRows(int[] lengths, int rows, float[] centres)
+        {
+            if (rows == 0) return 0f;
+            centres[0] = 0f;
+            for (int r = 1; r < rows; r++)
+            {
+                // Rows whose lengths differ by an odd number nest on whole steps; the others on half steps.
+                float half = (lengths[r] - lengths[r - 1]) % 2 == 0 ? 0.5f : 0f;
+                centres[r] = centres[r - 1] + Mathf.Round(-centres[r - 1] - half) + half;
+            }
+            float min = float.MaxValue, max = float.MinValue;
+            for (int r = 0; r < rows; r++)
+            {
+                min = Mathf.Min(min, centres[r] - (lengths[r] - 1) * 0.5f);
+                max = Mathf.Max(max, centres[r] + (lengths[r] - 1) * 0.5f);
+            }
+            for (int r = 0; r < rows; r++) centres[r] -= (min + max) * 0.5f;
+            return max - min;
+        }
+
+        /// <summary>
+        /// Lays the worlds out as one honeycomb in menu order, row by row, with the song row under it, the caption over
+        /// it and the two hint lines under the song row. It tries every number of rows and keeps the one that fits
+        /// AimArea best at the menu's distance (the narrower and lower, the better, both counted against the area), so the
+        /// honeycomb shrinks and stays centred as worlds are removed. The middle of the menu is halfway between the top
+        /// of the caption and the foot of the second hint line. Fills <paramref name="slots"/> (worlds, then the song row)
+        /// and places the text.
+        /// </summary>
+        void LayOut(int count, Vector2[] slots)
+        {
+            float step = Spacing, rowStep = step * 0.866f;
+            float big = bubbleDiameter * NearGaze, swollen = big * Swell * 0.5f;
+            float songWidth = (ExtraBubbles - 1) * step + big;
+            // The caption's baseline above the top row, clear of a swollen bubble; the song row under the bottom row; the
+            // first hint line's baseline under the song row, its capitals a little below a bubble near your gaze; then the
+            // second hint line.
+            float captionAbove = swollen + 0.006f + CaptionSize * Descent;
+            float songBelow = big + 0.008f;
+            float hintBelow = big * 0.5f + 0.006f + HintSize * Ascent;
+            float top = captionAbove + CaptionSize * Ascent;
+            float underSongs = hintBelow + HintSize * LineStep + HintSize * Descent;
+            float aimWidth = 2f * viewDistance * Mathf.Tan(AimArea.x * 0.5f * Mathf.Deg2Rad);
+            float aimHeight = 2f * viewDistance * Mathf.Tan(AimArea.y * 0.5f * Mathf.Deg2Rad);
+
+            var lengths = new int[Mathf.Max(count, 1)];
+            var centres = new float[lengths.Length];
+            int bestRows = 0;
+            float bestCost = float.MaxValue, bestSum = float.MaxValue, bestWidth = songWidth;
+            for (int rows = count > 0 ? 1 : 0; rows <= count; rows++)
+            {
+                if (rows > 0) SplitRows(count, rows, lengths);
+                float span = NestRows(lengths, rows, centres);
+                float width = Mathf.Max(rows > 0 ? span * step + big : 0f, songWidth);
+                float height = top + (rows > 0 ? (rows - 1) * rowStep + songBelow : 0f) + underSongs;
+                float w = width / aimWidth, h = height / aimHeight;
+                float cost = Mathf.Max(w, h), sum = w + h;
+                if (cost < bestCost - 0.005f || (cost < bestCost + 0.005f && sum < bestSum))
+                {
+                    bestRows = rows;
+                    bestCost = cost;
+                    bestSum = sum;
+                    bestWidth = width;
+                }
+            }
+
+            rowLengths = new int[bestRows];
+            if (bestRows > 0) SplitRows(count, bestRows, rowLengths);
+            NestRows(rowLengths, bestRows, centres);
+            float songY = bestRows > 0 ? -(bestRows - 1) * rowStep - songBelow : 0f;
+            // Centre it all on the menu's middle, from the top of the caption to the foot of the second hint line.
+            float shift = -(top + songY - underSongs) * 0.5f;
+            int next = 0;
+            for (int r = 0; r < bestRows; r++)
+                for (int i = 0; i < rowLengths[r]; i++)
+                    slots[next++] = new Vector2((centres[r] + i - (rowLengths[r] - 1) * 0.5f) * step, -r * rowStep + shift);
+            // The song row: previous, play or pause, next, listen, lyrics, the cassette deck.
+            for (int i = 0; i < ExtraBubbles; i++)
+            {
+                int world = i == 0 ? NowPlaying : ListenToggle - (i - 1);
+                int column = world == PreviousSong ? 0 : world == NowPlaying ? 1 : world == NextSong ? 2 : world == ListenToggle ? 3 : world == LyricsToggle ? 4 : 5;
+                slots[count + i] = new Vector2((column - (ExtraBubbles - 1) * 0.5f) * step, songY + shift);
+            }
+
+            textWidth = bestWidth;
+            gestures.Text = SongLibrary.Fit(GestureHint, HintSize, textWidth);
+            float hintY = songY - hintBelow + shift;
+            Put(caption, captionAbove + shift);
+            Put(hint, hintY);
+            Put(gestures, hintY - HintSize * LineStep);
+        }
+
+        static void Put(TypeLabel label, float y)
+        {
+            label.Transform.localPosition = new Vector3(0f, y, 0f);
+            label.Transform.localRotation = Quaternion.identity;
         }
 
         void Build(WorldManager manager)
@@ -720,33 +940,23 @@ namespace MusicInYourHands
             root.SetParent(transform, false);
             voices ??= new AudioPool(transform, 4);
 
+            // The words: baselines on their lines, centred.
+            caption = new TypeLabel("Caption", root, CaptionSize, 0f);
+            hint = new TypeLabel("Hint", root, HintSize, 0f);
+            gestures = new TypeLabel("Hint 2", root, HintSize, 0f);
+            captioned = null;
+            captionedState = -1;
+            hinted = false;
+            foreach (var label in new[] { caption, hint, gestures }) label.GameObject.SetActive(false);
+
             int count = manager.Worlds.Count;
             bubbles = new Bubble[count + ExtraBubbles];
-            int soundIndex = 0, lyricIndex = 0;
-            lyricCount = 0;
-            float lowest = 0f;
-            var slots = new Vector2[count];
-            for (int w = 0; w < count; w++)
-            {
-                bool lyric = manager.Worlds[w] != null && manager.Worlds[w].IsLyric;
-                slots[w] = lyric ? HexSlot(LyricCenter, lyricIndex++, false) : HexSlot(SoundCenter, soundIndex++, true);
-                lowest = Mathf.Min(lowest, slots[w].y);
-            }
-            lyricCount = lyricIndex;
-            // The song row sits under both groups: previous, play or pause, next, listen, lyrics, add a song.
-            float rowY = lowest - spacing * 1.15f;
-            float rowX = (SoundCenter.x + LyricCenter.x) * 0.5f;
+            var slots = new Vector2[bubbles.Length];
+            LayOut(count, slots);
             for (int i = 0; i < bubbles.Length; i++)
             {
                 int world = i < count ? i : i == count ? NowPlaying : ListenToggle - (i - count - 1);
-                Vector2 slot = world >= 0 ? slots[world]
-                    : world == PreviousSong ? new Vector2(rowX - spacing * 2.5f, rowY)
-                    : world == NowPlaying ? new Vector2(rowX - spacing * 1.5f, rowY)
-                    : world == NextSong ? new Vector2(rowX - spacing * 0.5f, rowY)
-                    : world == ListenToggle ? new Vector2(rowX + spacing * 0.5f, rowY)
-                    : world == LyricsToggle ? new Vector2(rowX + spacing * 1.5f, rowY)
-                    : new Vector2(rowX + spacing * 2.5f, rowY);
-
+                var slot = slots[i];
                 string objectName = world >= 0 ? $"Bubble {world}" : world == ListenToggle ? "Bubble Listen"
                     : world == PreviousSong ? "Bubble Previous Song" : world == NextSong ? "Bubble Next Song"
                     : world == LyricsToggle ? "Bubble Lyrics" : world == Library ? "Bubble Library" : "Bubble Now Playing";
@@ -756,18 +966,9 @@ namespace MusicInYourHands
                 r.gameObject.SetActive(false);
             }
 
-            soundLabel = new TypeLabel("Sound Worlds", root, 0.0135f, 0f);
-            soundLabel.Text = "Sound worlds";
-            lyricLabel = new TypeLabel("Lyric Worlds", root, 0.0135f, 0f);
-            lyricLabel.Text = "Lyric worlds";
-            caption = new TypeLabel("Caption", root, 0.019f, 0f);
-            hint = new TypeLabel("Hint", root, 0.0135f, 1f);
-            hint.Text = ChooseHint;
-            foreach (var label in new[] { soundLabel, lyricLabel, caption, hint }) label.GameObject.SetActive(false);
-
             // Editor previews build a menu without the scene's materials.
             var panel = panelMaterial != null ? panelMaterial : new Material(Shader.Find("MusicInYourHands/Panel"));
-            library = new SongLibrary(root, panel, new Vector2(0f, spacing * 0.2f));
+            library = new SongLibrary(root, panel, Vector2.zero, PageScale);
             library.Pressed += OnLibraryPressed;
             library.PickerOpened += Close;
             library.BackPressed += OnLibraryBack;
@@ -786,8 +987,8 @@ namespace MusicInYourHands
                 max = Vector2.Max(max, b.Slot);
             }
             var page = library.Area;
-            touchArea = Rect.MinMaxRect(Mathf.Min(min.x - bubbleSize, page.xMin), Mathf.Min(min.y - bubbleSize, page.yMin),
-                Mathf.Max(max.x + bubbleSize, page.xMax), Mathf.Max(max.y + bubbleSize, page.yMax));
+            touchArea = Rect.MinMaxRect(Mathf.Min(min.x - bubbleDiameter, page.xMin), Mathf.Min(min.y - bubbleDiameter, page.yMin),
+                Mathf.Max(max.x + bubbleDiameter, page.xMax), Mathf.Max(max.y + bubbleDiameter, page.yMax));
 
             for (int s = 0; s < 2; s++)
             {

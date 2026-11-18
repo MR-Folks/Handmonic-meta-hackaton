@@ -140,6 +140,42 @@ namespace MusicInYourHands.EditorTools
             bool pinched = manager.Current == 1;
             Run(0.6f);
 
+            // A pinch that closes the way fingers do, the index coming down to the thumb while the palm stays put,
+            // leaves the cursor where it was, so the bubble aimed at is the one chosen.
+            OpenMenu();
+            var bubbles = Bubble("Bubble 2");
+            var cursor = root.Find("Cursor R");
+            var open = shoulder + (bubbles - shoulder) * 0.4f;
+            var palmAt = open + new Vector3(-0.02f, -0.04f, -0.09f);
+            Vector3 thumbOpen = open + new Vector3(0f, -0.035f, 0f), indexOpen = open + new Vector3(0f, 0.035f, 0f);
+            Vector3 thumbShut = open + new Vector3(0f, -0.03f, 0f), indexShut = open + new Vector3(0f, -0.02f, 0f);
+            void Fingers(float closed)
+            {
+                var index = Vector3.Lerp(indexOpen, indexShut, closed);
+                var tips = new[]
+                {
+                    Vector3.Lerp(thumbOpen, thumbShut, closed),
+                    index,
+                    indexOpen + new Vector3(-0.02f, -0.05f, -0.06f),
+                    indexOpen + new Vector3(-0.03f, -0.055f, -0.065f),
+                    indexOpen + new Vector3(-0.04f, -0.06f, -0.07f)
+                };
+                rig.Push(false, true, new Pose(palmAt, Quaternion.identity), Vector3.left, tips);
+                menu.Step(rig, manager, null, camera, Frame);
+            }
+            // Hold the open hand long enough for its aim to settle on this hand shape.
+            for (float t = 0f; t < 3f; t += Frame) Fingers(0f);
+            var aimedAt = cursor.position;
+            float drift = 0f;
+            const int Closing = 15;
+            for (int i = 1; i <= Closing + 4; i++)
+            {
+                Fingers(Mathf.Min(1f, i / (float)Closing));
+                if (cursor.gameObject.activeSelf) drift = Mathf.Max(drift, Vector3.Distance(cursor.position, aimedAt));
+            }
+            bool steady = drift < 0.006f && manager.Current == 2;
+            Run(0.6f);
+
             // The song bubble opens the cassette deck and the menu steps aside. A touch presses the song page's buttons:
             // open the page (as the deck's song list button does), then touch its Add button, which shows a message here
             // since the file picker only opens on the headset.
@@ -163,11 +199,12 @@ namespace MusicInYourHands.EditorTools
 
             menu.Close();
             LyricsOption.On = lyricsWere;
-            bool ok = !early && reached && ignored && cameBack && once && twice && pinched && deckOpened && pageShown && added;
-            if (ok) Debug.Log("[Check] The menu answers touch and pinch: a fingertip presses a bubble as it reaches it, once per tap and never from behind, a far hand still points and pinches, the song bubble opens the cassette deck, and a touch presses the song page's buttons.");
+            bool ok = !early && reached && ignored && cameBack && once && twice && pinched && steady && deckOpened && pageShown && added;
+            if (ok) Debug.Log($"[Check] The menu answers touch and pinch: a fingertip presses a bubble as it reaches it, once per tap and never from behind, a far hand still points and pinches, a closing pinch moves its cursor only {drift * 1000f:0.0} mm, the song bubble opens the cassette deck, and a touch presses the song page's buttons.");
             else Debug.LogError($"[Check] Menu touch: pressed early {early}, pressed on arrival {reached}, ignored from behind {ignored}, " +
                                 $"pressed after coming back out {cameBack}, held press counted once {once}, second tap {twice}, " +
-                                $"pinch from afar {pinched}, song bubble opened the deck {deckOpened}, song page opened {pageShown}, page's Add button touched {added}.");
+                                $"pinch from afar {pinched}, cursor steady through a closing pinch {steady} ({drift * 1000f:0.0} mm, chose world {manager.Current}), " +
+                                $"song bubble opened the deck {deckOpened}, song page opened {pageShown}, page's Add button touched {added}.");
             return ok;
         }
     }

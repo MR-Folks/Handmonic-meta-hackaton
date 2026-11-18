@@ -44,6 +44,8 @@ namespace MusicInYourHands
             public Text Title, Status, Artist;
         }
 
+        /// <summary>The smallest letters on the page (m, before the page's scale): the artists and statuses.</summary>
+        public const float SmallText = 0.0125f;
         const int RowsPerPage = 4;
         const float Width = 0.6f, Height = 0.43f;
         const float RowStep = 0.062f, FirstRow = 0.105f;
@@ -70,6 +72,7 @@ namespace MusicInYourHands
         readonly Transform page;
         readonly Renderer panel;
         readonly Vector2 center;
+        readonly float scale;
         readonly MaterialPropertyBlock block = new MaterialPropertyBlock();
         readonly List<Button> buttons = new List<Button>();
         readonly List<Text> texts = new List<Text>();
@@ -89,7 +92,7 @@ namespace MusicInYourHands
         public bool IsOpen { get; private set; }
 
         /// <summary>The page's rectangle in the menu's space, where a fingertip can touch it.</summary>
-        public Rect Area => new Rect(center.x - Width * 0.5f, center.y - Height * 0.5f, Width, Height);
+        public Rect Area => new Rect(center.x - Width * scale * 0.5f, center.y - Height * scale * 0.5f, Width * scale, Height * scale);
 
         /// <summary>Raised on any press, for the menu's sound.</summary>
         public event Action Pressed;
@@ -100,13 +103,17 @@ namespace MusicInYourHands
         /// <summary>Raised by the page's Back button, after it hides: the menu goes back to the cassette deck.</summary>
         public event Action BackPressed;
 
-        public SongLibrary(Transform parent, Material panelMaterial, Vector2 center)
+        /// <param name="center">Where the middle of the page goes in the menu's space.</param>
+        /// <param name="scale">How large the page is drawn in the menu (1 is full size); presses are scaled to match.</param>
+        public SongLibrary(Transform parent, Material panelMaterial, Vector2 center, float scale = 1f)
         {
             this.center = center;
+            this.scale = scale;
             material = panelMaterial;
             page = new GameObject("Song Library").transform;
             page.SetParent(parent, false);
             page.localPosition = new Vector3(center.x, center.y, 0.003f);
+            page.localScale = Vector3.one * scale;
             panel = Effects.MakeQuad("Panel", page, material);
             panel.transform.localScale = new Vector3(Width, Height, 1f);
             panel.sortingOrder = -2;
@@ -123,8 +130,8 @@ namespace MusicInYourHands
                 {
                     Play = MakeButton($"Row {i}", 0.0125f),
                     Title = MakeText($"Row {i} Title", 0.0175f, true),
-                    Status = MakeText($"Row {i} Lyrics Status", 0.0118f, true),
-                    Artist = MakeText($"Row {i} Artist", 0.0118f, true),
+                    Status = MakeText($"Row {i} Lyrics Status", SmallText, true),
+                    Artist = MakeText($"Row {i} Artist", SmallText, true),
                     Lyrics = MakeButton($"Row {i} Lyrics", 0.0125f),
                     Remove = MakeButton($"Row {i} Remove", 0.018f)
                 };
@@ -393,7 +400,7 @@ namespace MusicInYourHands
             Show(row.Title, Fit(song.title, 0.0175f, TitleWidth), new Vector2(left, y + 0.0095f), Color.white);
             Show(row.Status, lyrics ? "Has lyrics" : "No lyrics", new Vector2(left, y - 0.0135f), lyrics ? HasLyrics : NoLyrics);
             string detail = isPlaying ? (string.IsNullOrEmpty(song.artist) ? "Playing now" : $"Playing now  ·  {song.artist}") : song.artist;
-            if (!string.IsNullOrEmpty(detail)) Show(row.Artist, Fit(detail, 0.0118f, ArtistWidth), new Vector2(left + 0.078f, y - 0.0135f), Soft);
+            if (!string.IsNullOrEmpty(detail)) Show(row.Artist, Fit(detail, SmallText, ArtistWidth), new Vector2(left + 0.078f, y - 0.0135f), Soft);
             Put(row.Lyrics, new Vector2(0.135f, y), new Vector2(0.125f, 0.038f), lyrics ? "Change lyrics" : "Add lyrics", lyrics ? Secondary : Primary,
                 () => Pick(SongPicker.Kind.Lyrics, song));
             Put(row.Remove, new Vector2(0.24f, y), new Vector2(0.04f, 0.038f), "×", Secondary, () =>
@@ -447,7 +454,7 @@ namespace MusicInYourHands
         Button Topmost(Vector2? point)
         {
             if (point == null) return null;
-            var p = point.Value - center;
+            var p = (point.Value - center) / scale;
             for (int i = buttons.Count - 1; i >= 0; i--)
             {
                 var b = buttons[i];
@@ -471,7 +478,7 @@ namespace MusicInYourHands
         }
 
         /// <summary>Shortens text with an ellipsis to fit a width (m) at a letter height (m).</summary>
-        static string Fit(string text, float height, float width)
+        internal static string Fit(string text, float height, float width)
         {
             if (string.IsNullOrEmpty(text)) return "";
             var face = TypeFace.Bold;
