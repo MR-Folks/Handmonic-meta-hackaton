@@ -16,7 +16,8 @@ namespace MusicInYourHands
     /// standing, most of a leg's shadow falls on the floor below the wall, as a lamp behind you would cast it. The trunk
     /// and legs ring none of the lights. On every beat your shadow leaves a coloured echo that drifts up and grows as it fades. Small notes
     /// of light float in the lamp's pool; cover one with a shadow and it rings, a higher note higher up the wall, so
-    /// your shadow plays along with the song. The lamp breathes with the bass, and the sung words appear on the wall.
+    /// your shadow plays along with the song. The lamp breathes with the bass. Each sung word lands on one of the lights
+    /// and drifts with it, just above it; ring that light and the word fades slowly away as its ring spreads.
     /// </summary>
     public class ShadowPlay : World
     {
@@ -98,6 +99,14 @@ namespace MusicInYourHands
         [SerializeField] float echoLife = 1.8f;
         [SerializeField] int lightNotes = 22;
 
+        [Header("Lyrics")]
+        [Tooltip("Seconds a sung word stays on its light if no shadow rings the light first.")]
+        [SerializeField] float wordLife = 6f;
+        [Tooltip("Seconds a word takes to fade away once its light rings, as the ring spreads.")]
+        [SerializeField] float wordFade = 1.6f;
+        [Tooltip("How close (m on the wall) a new word may land to a light already carrying one, while others are free.")]
+        [SerializeField] float wordSpacing = 0.2f;
+
         static readonly Color[] EchoColors = { Effects.Pink, Effects.Blue, Effects.Mint, Effects.Gold, Effects.Violet, Effects.Orange };
         static readonly int ColorId = Shader.PropertyToID("_Color");
         static readonly int IntensityId = Shader.PropertyToID("_Intensity");
@@ -164,6 +173,9 @@ namespace MusicInYourHands
             public Vector2 Position, Velocity;
             public float Ring, Rest, Seed;
             public bool Covered;
+            /// <summary>The sung word riding on this light, if any, and seconds since the light rang it away (-1 not yet).</summary>
+            public WordLayer.Word Word;
+            public float Fading = -1f;
         }
 
         sealed class Ripple
@@ -221,7 +233,8 @@ namespace MusicInYourHands
         MaterialPropertyBlock block;
         AudioPool voices;
 
-        protected override int SungWordCount => 5;
+        // Enough for a line's words to stay on their lights a while before the oldest is taken back.
+        protected override int SungWordCount => 8;
 
         protected override float SungWordHeight => 0.045f;
 
@@ -283,7 +296,12 @@ namespace MusicInYourHands
         {
             BodyRig.Wanted = false;
             HandSkin.FocusStrength = 0f;
-            foreach (var n in notes) n.Light.gameObject.SetActive(false);
+            foreach (var n in notes)
+            {
+                n.Light.gameObject.SetActive(false);
+                n.Word = null;
+                n.Fading = -1f;
+            }
             foreach (var r in ripples) { r.Age = 99f; r.Ring.gameObject.SetActive(false); }
         }
 
@@ -847,6 +865,8 @@ namespace MusicInYourHands
                     n.Ring = 1f;
                     n.Rest = 0.35f;
                     Splash(n.Position, NoteColor(midi));
+                    // The word riding on this light fades away as the ring spreads (Sing).
+                    if (n.Word != null && n.Fading < 0f) n.Fading = 0f;
                 }
                 n.Covered = covered;
 
@@ -907,14 +927,55 @@ namespace MusicInYourHands
         }
 
         /// <summary>The sung words appear on the wall, in the light above your shadow.</summary>
+        /// <summary>
+        /// A sung word lands on one of the lights: the best lit that carries no word and lies under no shadow, kept a
+        /// little apart from the lights already carrying words while any are free. It rides along just above its light
+        /// (Sing) until the light rings, or its life runs out.
+        /// </summary>
         protected override void OnWord(string word, bool newLine)
         {
-            var upOnWall = new Vector2(Vector3.Dot(Vector3.up, wall.Right), Vector3.Dot(Vector3.up, wall.Up));
-            var w = SungWords.Add(word, new Color(1f, 0.9f, 0.75f), 2.4f, alone: true);
-            w.Position = OnWall(pool + upOnWall * (poolRadius * 0.62f), 0.02f);
-            w.Velocity = Vector3.up * 0.02f;
+            var w = SungWords.Add(word, new Color(1f, 0.9f, 0.75f), wordLife);
+            // All words in use: the layer has taken the oldest back, so its light carries nothing now.
+            foreach (var n in notes)
+                if (n.Word == w) n.Word = null;
+            Note best = null;
+            float bestScore = float.MinValue;
+            foreach (var n in notes)
+            {
+                if (n.Word != null || n.Covered) continue;
+                float score = Lit(n.Position, 1f) + Random.value * 0.15f;
+                foreach (var o in notes)
+                    if (o.Word != null && (o.Position - n.Position).magnitude < wordSpacing) score -= 1f;
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    best = n;
+                }
+            }
+            if (best == null)
+            {
+                // Every light busy or in shadow: the word shows above the pool and drifts up, as words did before.
+                var upOnWall = new Vector2(Vector3.Dot(Vector3.up, wall.Right), Vector3.Dot(Vector3.up, wall.Up));
+                w.Position = OnWall(pool + upOnWall * (poolRadius * 0.62f), 0.02f);
+                w.Velocity = Vector3.up * 0.02f;
+                return;
+            }
+            best.Word = w;
+            best.Fading = -1f;
+            w.Position = WordAt(best);
         }
 
+        /// <summary>Where a light's word sits: just above the light, so the light still shows under it.</summary>
+        Vector3 WordAt(Note n)
+        {
+            var upOnWall = new Vector2(Vector3.Dot(Vector3.up, wall.Right), Vector3.Dot(Vector3.up, wall.Up));
+            return OnWall(n.Position + upOnWall * 0.032f, 0.02f);
+        }
+
+        /// <summary>
+        /// The words face out of the wall and glow on the kick. Each rides just above its light; once the light has rung,
+        /// the word fades slowly away and grows a little as the ring spreads, then lets the light go.
+        /// </summary>
         void Sing(MusicFrame music, Camera view, float dt)
         {
             var facing = Quaternion.LookRotation(-wall.Normal, Vector3.up);
@@ -927,6 +988,29 @@ namespace MusicInYourHands
                 w.Position += w.Velocity * dt;
                 w.Rotation = facing;
                 w.Halo = 0.3f + music.Kick * 0.3f;
+            }
+            for (int i = 0; i < notes.Count; i++)
+            {
+                var n = notes[i];
+                var w = n.Word;
+                if (w == null) continue;
+                // Its life ran out.
+                if (!w.Active)
+                {
+                    n.Word = null;
+                    continue;
+                }
+                w.Position = WordAt(n);
+                if (n.Fading < 0f) continue;
+                n.Fading += dt;
+                float t = Mathf.Clamp01(n.Fading / Mathf.Max(wordFade, 0.01f));
+                w.Alpha = 1f - Ease(t);
+                w.Size = 1f + t * 0.25f;
+                if (t < 1f) continue;
+                // Gone: the layer puts it away, and the light can carry a new word.
+                w.Life = w.Age;
+                n.Word = null;
+                n.Fading = -1f;
             }
         }
 
@@ -956,6 +1040,40 @@ namespace MusicInYourHands
 
         /// <summary>For the editor checks: 2 where the shadow would ring a light here, 1 where only the trunk or legs cover it, else 0.</summary>
         public int PreviewShadowAt(Vector2 p) => ShadowAt(p);
+
+        /// <summary>For the editor checks: sings a word, as the lyrics would.</summary>
+        public void PreviewSing(string word) => OnWord(word, false);
+
+        /// <summary>
+        /// For the editor checks: the first word riding on a light, where it and its light are on the wall, and how much
+        /// of it shows (0-1, as the layer draws it). False when no light carries a word.
+        /// </summary>
+        public bool PreviewWord(out Vector2 word, out Vector2 light, out float shown)
+        {
+            foreach (var n in notes)
+            {
+                var w = n.Word;
+                if (w == null || !w.Active) continue;
+                word = wall.Local(w.Position);
+                light = n.Position;
+                shown = Mathf.Clamp01(w.Age / 0.25f) * Mathf.Clamp01((w.Life - w.Age) / 0.6f) * w.Alpha;
+                return true;
+            }
+            word = light = default;
+            shown = 0f;
+            return false;
+        }
+
+        /// <summary>For the editor checks: rings the light under the first word, as a shadow covering it would.</summary>
+        public void PreviewRingWord()
+        {
+            foreach (var n in notes)
+                if (n.Word != null && n.Fading < 0f)
+                {
+                    n.Fading = 0f;
+                    return;
+                }
+        }
 #endif
     }
 }

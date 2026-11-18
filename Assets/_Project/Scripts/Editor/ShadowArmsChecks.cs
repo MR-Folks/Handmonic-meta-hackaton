@@ -75,7 +75,8 @@ namespace MusicInYourHands.EditorTools
         /// hips through the knee to the toes, tapering, ringing no lights, and with the upper body only the legs fade while
         /// the trunk stays; a straight arm casts a straight shadow; a fist moves neither
         /// the body's arm nor the hands-only estimate; without a body, or with one whose forearm is too long to believe,
-        /// only the estimated forearm is left; the arms fade between the two with no jumps; entering the world wants the
+        /// only the estimated forearm is left; the arms fade between the two with no jumps; a sung word rides just above a
+        /// light as it drifts and fades slowly away once that light rings; entering the world wants the
         /// body and leaving it lets it go; and frames allocate nothing. Also: the main scene has the body feed, its
         /// OVRManager doesn't ask for body tracking at startup, and Meta's project config has body tracking Supported.
         /// </summary>
@@ -313,6 +314,26 @@ namespace MusicInYourHands.EditorTools
             Run(0.5f, false);
             int without = AllocationsIn(() => Run(1.5f, false));
             allocationProbe = null;
+
+            // 8. A sung word lands on a light and rides just above it as the light drifts; once that light rings, the word
+            // fades slowly away as the ring spreads. The menu is still open, so no shadow rings the light first.
+            world.PreviewSing("light");
+            Run(0.6f, true);
+            bool riding = world.PreviewWord(out var wordAt, out var lightAt, out float shown);
+            int rideAllocations = AllocationsIn(() => Run(1f, true));
+            bool still = world.PreviewWord(out var wordLater, out var lightLater, out _);
+            Expect(riding && still && shown > 0.9f && (wordAt - lightAt).magnitude < 0.06f
+                   && ((wordLater - lightLater) - (wordAt - lightAt)).magnitude < 0.002f && (lightLater - lightAt).magnitude > 0.01f,
+                $"a sung word doesn't ride on a light (on one {riding}, still {still}, {shown:0.00} shown, " +
+                $"{(wordAt - lightAt).magnitude:0.000} m from it)");
+            Expect(rideAllocations == 0, $"frames with a word on a light allocate ({rideAllocations} times in 1 s)");
+            world.PreviewRingWord();
+            Run(0.5f, true);
+            world.PreviewWord(out _, out _, out float fading);
+            Run(1.6f, true);
+            bool gone = !world.PreviewWord(out _, out _, out _);
+            Expect(fading > 0.2f && fading < 0.95f && gone,
+                $"a rung light's word doesn't fade slowly away ({fading:0.00} shown 0.5 s after the ring, gone after 2.1 s {gone})");
             RunMessage(menu, "OnDisable");
             Expect(probe > 0 && withBody == 0 && without == 0,
                 $"frames allocate: {withBody} times in 1.5 s with the body, {without} without (probe {probe})");
@@ -328,7 +349,8 @@ namespace MusicInYourHands.EditorTools
                           "to the shoulder, joined by the shoulders and neck; the trunk from the chest to the hips and each leg from the " +
                           "hips through the knee to the toes, tapering and ringing no lights, the legs gone with the upper body only; " +
                           "a straight arm casts a straight shadow; a fist swings no " +
-                          "arm; without a believable body only the estimated forearm stays; the fades don't pop; leaving lets the body " +
+                          "arm; without a believable body only the estimated forearm stays; the fades don't pop; a sung word rides " +
+                          "on a light and fades slowly away once the light rings; leaving lets the body " +
                           "go; no allocations. The main scene has the body feed and asks for nothing at startup. " +
                           $"(Elbows bent {string.Join(" and ", bends.Select(b => $"{b:0}"))} degrees on the wall; a fade's largest " +
                           $"frame step {worstStep:P0} of its way; a fist moved an elbow end {fistDrift * 1000f:0.0} mm.)");
