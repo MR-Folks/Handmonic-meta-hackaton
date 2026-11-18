@@ -251,6 +251,24 @@ namespace MusicInYourHands.EditorTools
                     Run(6.5f);
                     Expect(onboarding.ShowingMotion == GhostMotion.None, $"{label}'s demo goes after its ten seconds");
                 }
+
+                // Solar system's pinch hands over to a ghost pointing up at the stars, with its caption, and both go.
+                int solar = IndexOf<SolarSystem>();
+                manager.Switch(solar);
+                onboarding.NotifyWorldChanged(solar);
+                Run(1.5f);
+                Expect(onboarding.ShowingMotion == GhostMotion.Pinch && onboarding.Caption == "",
+                    $"Solar system's demo starts with the pinch (showing {onboarding.ShowingMotion})");
+                Run(5.5f);
+                var skyward = onboarding.RightGhost.Tip(1) - onboarding.RightGhost.PalmPosition;
+                string skyCaption = GhostMotions.FollowUps[0].Caption;
+                Expect(onboarding.ShowingMotion == GhostMotion.PointUp && onboarding.Caption == skyCaption && skyward.y > skyward.magnitude * 0.6f,
+                    $"then its ghost points up at the stars with \"{skyCaption}\" (showing {onboarding.ShowingMotion}, \"{onboarding.Caption}\", " +
+                    $"index {Vector3.Angle(skyward, Vector3.up):0}° from straight up)");
+                Expect(InComfortableView(camera, onboarding.RightGhost.PalmPosition), "Solar system's point-up demo is within Meta's comfortable view area");
+                Run(6f);
+                Expect(onboarding.ShowingMotion == GhostMotion.None && onboarding.Caption == "", "Solar system's demos go after twelve seconds");
+
                 var probeWorld = new GameObject("Hook probe").AddComponent<HookProbe>();
                 Expect(GhostMotions.ForWorld(probeWorld) == GhostMotion.None, "a world without a demo keeps its text only");
                 Object.DestroyImmediate(probeWorld.gameObject);
@@ -382,6 +400,9 @@ namespace MusicInYourHands.EditorTools
                 var types = new HashSet<string>(WorldCatalog.Types().Select(t => t.Name));
                 foreach (var (world, motion) in GhostMotions.WorldTable)
                     Expect(types.Contains(world) && motion != GhostMotion.None, $"the demo table's {world} is a world with a motion");
+                foreach (var (world, motion, caption) in GhostMotions.FollowUps)
+                    Expect(types.Contains(world) && motion != GhostMotion.None && !string.IsNullOrEmpty(caption) &&
+                           GhostMotions.WorldTable.Any(e => e.World == world), $"the second demos' {world} is a world with a first demo, a motion and a caption");
                 var unmapped = types.Where(t => GhostMotions.WorldTable.All(e => e.World != t)).ToList();
 
                 Expect(probe > 0 && lessonFrames == 0, $"lesson frames allocate nothing ({lessonFrames}, probe {probe})");
@@ -389,7 +410,8 @@ namespace MusicInYourHands.EditorTools
                     Debug.Log("[Check] Onboarding: a first launch opens in Flower dance, and after its payoff the ghost left hand shows the menu " +
                               "gesture; opening the menu brings the poke at the menu, choosing a world completes it; the thumb lesson comes " +
                               "later, fades, comes back once and a thumb gesture completes it; it is all remembered, Skip skips it and Replay " +
-                              "restarts, and so does the menu's \"?\"; lesson 2 points at a real bubble; world demos show for their first seconds, never over the menu; " +
+                              "restarts, and so does the menu's \"?\"; lesson 2 points at a real bubble; world demos show for their first seconds, never over the menu, " +
+                              "and Solar system's then points up at the stars with its caption; " +
                               "MusicGestures reports the thumb gestures it carries out; " +
                               "ghost thumbs meet the index; " +
                               $"nothing nearer than half a metre to read; steady frames allocate nothing. Ghost hands made in {buildMs:0} ms. " +

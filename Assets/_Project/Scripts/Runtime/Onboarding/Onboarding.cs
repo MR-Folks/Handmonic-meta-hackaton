@@ -21,6 +21,8 @@ namespace MusicInYourHands
     /// shows how to open it; "--ez onboarding true" on the adb launch starts the whole first launch again.
     /// Every world also gets a ghost demo of its own gesture for its first ten seconds, beside its text hint (see
     /// <see cref="GhostMotions.WorldTable"/>), never while the menu is open; on a journey, only the first time it comes in.
+    /// A world with more to find hands over partway to a second demo with a caption (<see cref="GhostMotions.FollowUps"/>):
+    /// in Solar system the ghost points up and the caption says to look up and point at a star to read its word.
     /// With Journey mode on, the opening world plays the opening song's first section and the journey goes on from it
     /// (JourneyMode.OpenWith). The onboarding is made at run time (nothing in the scene) and reads the menu only through
     /// WorldMenu.ToggleRequested, WorldMenu.IsOpen and WorldManager.WorldChanged, and the thumb gestures through
@@ -65,6 +67,9 @@ namespace MusicInYourHands
         [SerializeField] float hintSeconds = 10f;
         [Tooltip("Seconds after a world starts before its ghost demo fades in.")]
         [SerializeField] float hintDelay = 0.6f;
+        [Tooltip("For a world with a second demo: seconds after it starts that the second takes over, and how long it shows.")]
+        [SerializeField] float followUpAt = 5f;
+        [SerializeField] float followUpSeconds = 7f;
 
         public static Onboarding Instance { get; private set; }
 
@@ -86,8 +91,9 @@ namespace MusicInYourHands
         WorldManager manager;
         HandRig lastRig;
         MusicFrame music;
-        // The world hint: the motion of the world that started last, and how long ago.
-        GhostMotion hintMotion;
+        // The world hint: the motion of the world that started last (and its second, with its caption), and how long ago.
+        GhostMotion hintMotion, hintFollowUp;
+        string hintFollowUpCaption;
         bool hintLeft, hintSidePending;
         float worldClock = 99f;
         // The song being watched for its end (on the headset).
@@ -382,7 +388,7 @@ namespace MusicInYourHands
         /// first song has ended or the player has spent thumbAfterSeconds in the world they chose.
         /// </summary>
         bool ThumbDue(bool menuOpen) =>
-            !menuOpen && menuClosedClock > 2f && worldClock > hintSeconds + 1f && clock >= thumbWaitUntil &&
+            !menuOpen && menuClosedClock > 2f && worldClock > HintEnd + 1f && clock >= thumbWaitUntil &&
             settledClock >= 15f && (songEnded || settledClock >= thumbAfterSeconds);
 
         void StartThumb(HandRig rig)
@@ -432,14 +438,19 @@ namespace MusicInYourHands
             bool again = journey != null && journey.IsActive && Tried(index);
             if (index >= 0) MarkTried(index);
             worldClock = 0f;
-            hintMotion = GhostMotion.None;
+            hintMotion = hintFollowUp = GhostMotion.None;
+            hintFollowUpCaption = null;
             if (again || manager == null || index < 0 || index >= manager.Worlds.Count) return;
             hintMotion = GhostMotions.ForWorld(manager.Worlds[index]);
+            hintFollowUp = GhostMotions.FollowUpForWorld(manager.Worlds[index], out hintFollowUpCaption);
             hintSidePending = true;
         }
 
+        /// <summary>How long after a world starts its demo ends: later for a world with a second demo.</summary>
+        float HintEnd => hintFollowUp != GhostMotion.None ? followUpAt + followUpSeconds : hintSeconds;
+
         bool HintShowing(bool menuOpen) =>
-            hintMotion != GhostMotion.None && worldClock >= hintDelay && worldClock < hintSeconds && !menuOpen &&
+            hintMotion != GhostMotion.None && worldClock >= hintDelay && worldClock < HintEnd && !menuOpen &&
             !(opening && openingClock < 1.5f);
 
         /// <summary>What should show this frame: a lesson's ghost, caption and Skip target, or else the world's demo.</summary>
@@ -492,6 +503,13 @@ namespace MusicInYourHands
             }
             want.Motion = hintMotion;
             want.Left = hintLeft;
+            // The second demo takes over, with its caption on the far side from the ghost hand.
+            if (hintFollowUp != GhostMotion.None && worldClock >= followUpAt)
+            {
+                want.Motion = hintFollowUp;
+                want.Caption = hintFollowUpCaption;
+                want.CaptionSide = hintLeft ? 1f : -1f;
+            }
         }
 
         static void MenuLesson(ref Display want, Lesson lesson)

@@ -27,7 +27,8 @@ namespace MusicInYourHands
         SpreadFingers,
         Push,
         Dip,
-        TwoHandFrame
+        TwoHandFrame,
+        PointUp
     }
 
     /// <summary>
@@ -237,6 +238,19 @@ namespace MusicInYourHands
             }
         };
 
+        // The index rises from pointing ahead to pointing up at the sky, a little ahead, holds there glowing, and comes down.
+        static readonly Vector3 SkyFingers = V(-0.15f, 1.6f, 0.7f), SkyPalm = V(-1f, 0f, 0.2f), SkyLift = V(0f, 0.1f, 0.03f);
+        static readonly Motion PointUpMotion = new Motion
+        {
+            Duration = 3.4f, Active = Index, Right = new[]
+            {
+                K(0f, V(-0.1f, 0.25f, 1f), V(-0.4f, -1f, 0f), Point, ThumbShape.Tuck),
+                K(0.8f, SkyFingers, SkyPalm, Point, ThumbShape.Tuck, SkyLift, glow: 1f),
+                K(2.1f, SkyFingers, SkyPalm, Point, ThumbShape.Tuck, SkyLift, glow: 0.7f),
+                K(2.8f, V(-0.1f, 0.25f, 1f), V(-0.4f, -1f, 0f), Point, ThumbShape.Tuck)
+            }
+        };
+
         // An open hand clenches into a fist with a firm little drop, holds, and opens.
         static readonly Vector3 FistFingers = V(-0.1f, 0.55f, 0.85f), FistPalm = V(-1f, -0.1f, -0.15f);
         static readonly Motion FistMotion = new Motion
@@ -337,7 +351,7 @@ namespace MusicInYourHands
         {
             null, MenuGestureMotion, TouchMenuMotion, ThumbMotion, OpenPalmMotion, PalmUpMotion, PalmsFacingMotion, PinchMotion,
             TwoHandPinchMotion, PointPokeMotion, FistMotion, BothFistsMotion, SweepMotion, SpreadMotion, PushMotion, DipMotion,
-            FrameMotion
+            FrameMotion, PointUpMotion
         };
 
         /// <summary>
@@ -375,6 +389,31 @@ namespace MusicInYourHands
             var name = world.GetType().Name;
             for (int i = 0; i < WorldTable.Length; i++)
                 if (WorldTable[i].World == name) return WorldTable[i].Motion;
+            return GhostMotion.None;
+        }
+
+        /// <summary>
+        /// A second demo, with its caption, for a world whose first one can't show what is worth finding: it takes over
+        /// from the first partway through the world's demo time. Keyed like <see cref="WorldTable"/>.
+        /// </summary>
+        public static readonly (string World, GhostMotion Motion, string Caption)[] FollowUps =
+        {
+            // The lyrics are stars overhead; a star pointed at sends its word down to read.
+            ("SolarSystem", GhostMotion.PointUp, "Look up: point at a star to read its word")
+        };
+
+        /// <summary>The second demo a world shows and its caption, or None.</summary>
+        public static GhostMotion FollowUpForWorld(World world, out string caption)
+        {
+            caption = null;
+            if (world == null) return GhostMotion.None;
+            var name = world.GetType().Name;
+            for (int i = 0; i < FollowUps.Length; i++)
+                if (FollowUps[i].World == name)
+                {
+                    caption = FollowUps[i].Caption;
+                    return FollowUps[i].Motion;
+                }
             return GhostMotion.None;
         }
 
