@@ -3,8 +3,9 @@ using UnityEngine;
 namespace MusicInYourHands
 {
     /// <summary>
-    /// The player's upper body in world space, for worlds that need more than the hands: each arm's shoulder, elbow and
-    /// wrist, and the chest, neck and head. Tracking the body costs the headset some work, so it runs only while a world
+    /// The player's body in world space, for worlds that need more than the hands: each arm's shoulder, elbow and
+    /// wrist, the hips, chest, neck and head, and each leg's hip, knee, ankle and toes (with full-body tracking; the legs
+    /// stay invalid with the upper body only). Tracking the body costs the headset some work, so it runs only while a world
     /// asks for it: set <see cref="Wanted"/> in OnEnter and clear it in OnExit. A body feed (BodyFeed on Quest, with
     /// Meta's body tracking) fills the joints each frame while the body is wanted, so worlds never depend on a tracking
     /// SDK. Without a feed, without the player's permission, or while the body is lost, <see cref="IsTracked"/> is false
@@ -23,6 +24,18 @@ namespace MusicInYourHands
             /// </summary>
             public Vector3 Wrist;
             /// <summary>True when all three joints came with a valid position this frame.</summary>
+            public bool Valid;
+        }
+
+        public sealed class Leg
+        {
+            /// <summary>The hip joint, where the thigh starts.</summary>
+            public Vector3 Hip;
+            public Vector3 Knee;
+            public Vector3 Ankle;
+            /// <summary>The ball of the foot, where the toes start.</summary>
+            public Vector3 Toes;
+            /// <summary>True when all four joints came with a valid position this frame.</summary>
             public bool Valid;
         }
 
@@ -52,10 +65,20 @@ namespace MusicInYourHands
         public static Vector3 Neck { get; private set; }
         public static Vector3 Head { get; private set; }
 
+        /// <summary>True when the hips (the root of the spine, between the legs) came with a valid position this frame.</summary>
+        public static bool HipsValid { get; private set; }
+
+        public static Vector3 Hips { get; private set; }
+
         public static Arm Left { get; } = new Arm();
         public static Arm Right { get; } = new Arm();
 
         public static Arm Get(bool left) => left ? Left : Right;
+
+        public static Leg LeftLeg { get; } = new Leg();
+        public static Leg RightLeg { get; } = new Leg();
+
+        public static Leg GetLeg(bool left) => left ? LeftLeg : RightLeg;
 
         // Below this confidence the body counts for nothing, from the upper value fully.
         const float LowConfidence = 0.2f, GoodConfidence = 0.5f;
@@ -77,6 +100,24 @@ namespace MusicInYourHands
             Chest = chest;
             Neck = neck;
             Head = head;
+        }
+
+        /// <summary>Called by a body feed with the hips, before <see cref="Push"/>.</summary>
+        public static void SetHips(bool valid, Vector3 hips)
+        {
+            HipsValid = valid;
+            Hips = hips;
+        }
+
+        /// <summary>Called by a body feed with one leg's joints (invalid without full-body tracking), before <see cref="Push"/>.</summary>
+        public static void SetLeg(bool left, bool valid, Vector3 hip, Vector3 knee, Vector3 ankle, Vector3 toes)
+        {
+            var leg = GetLeg(left);
+            leg.Valid = valid;
+            leg.Hip = hip;
+            leg.Knee = knee;
+            leg.Ankle = ankle;
+            leg.Toes = toes;
         }
 
         /// <summary>Called by a body feed once per frame after setting the joints: the body is tracked this frame.</summary>
@@ -105,8 +146,9 @@ namespace MusicInYourHands
             IsTracked = false;
             Confidence = 0f;
             Blend = 0f;
-            SpineValid = false;
+            SpineValid = HipsValid = false;
             Left.Valid = Right.Valid = false;
+            LeftLeg.Valid = RightLeg.Valid = false;
         }
 
         // Entering play mode without a domain reload keeps statics; start clean.

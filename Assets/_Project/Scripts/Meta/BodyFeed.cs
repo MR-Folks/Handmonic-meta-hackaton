@@ -4,8 +4,11 @@ namespace MusicInYourHands.Meta
 {
     /// <summary>
     /// Feeds Meta's body tracking into BodyRig, but only while a world wants the body (BodyRig.Wanted): then it turns
-    /// on an OVRBody for the upper body at high fidelity (on Quest 3 that is Inside-Out Body Tracking, which follows the
-    /// real arms and elbows with the headset's cameras) and copies the joints into BodyRig each frame, in world space.
+    /// on an OVRBody for the full body at high fidelity (on Quest 3 the upper body is Inside-Out Body Tracking, which
+    /// follows the real arms and elbows with the headset's cameras, and the legs are Meta's Generative Legs, estimated
+    /// from the upper body rather than seen) and copies the joints into BodyRig each frame, in world space. The full body
+    /// needs the project's Body Tracking Joint Set at Full Body (OculusRuntimeSettings); if the headset won't start it,
+    /// the feed asks for the upper body alone and the legs stay invalid.
     /// When nothing wants the body it turns OVRBody off again, so body tracking costs the other worlds nothing.
     /// The first time the body is wanted it asks for Meta's body tracking permission (never at app start). If the player
     /// says no, or the headset can't track bodies, BodyRig simply stays untracked and the worlds use the hands alone.
@@ -16,6 +19,9 @@ namespace MusicInYourHands.Meta
         [Tooltip("Ask for high fidelity: on Quest 3, Inside-Out Body Tracking, which tracks the real arms and elbows " +
                  "with the headset's cameras. Off, the body is estimated from the head and hands.")]
         [SerializeField] bool highFidelity = true;
+        [Tooltip("Ask for the full body: the upper body and the legs (Meta's Generative Legs, estimated from the upper " +
+                 "body, not seen). Off, the upper body only, and the legs stay invalid.")]
+        [SerializeField] bool fullBody = true;
         [Tooltip("If body tracking won't start, how many times to try again while a world wants it, and how many " +
                  "seconds apart.")]
         [SerializeField] int startAttempts = 3;
@@ -30,11 +36,14 @@ namespace MusicInYourHands.Meta
 
         OVRBody body;
         Transform trackingSpace;
-        bool wasWanted, asked, granted, unsupported, toldUnsupported;
+        bool wasWanted, asked, granted, unsupported, toldUnsupported, legsFailed;
         int attempts;
         float nextAttempt, nextLookup, nextReport;
         int trackedFrames, lostFrames;
         float confidenceSum;
+
+        /// <summary>True while the feed asks for the legs too: wanted, and the headset hasn't refused the full body.</summary>
+        bool Legs => fullBody && !legsFailed;
 
         void OnEnable() => OVRPermissionsRequester.PermissionGranted += OnPermissionGranted;
 
@@ -111,10 +120,20 @@ namespace MusicInYourHands.Meta
             nextAttempt = Time.unscaledTime + retrySeconds;
             if (body == null) MakeBody();
             if (highFidelity) OVRBody.Fidelity = OVRPlugin.BodyTrackingFidelity2.High;
+            bool legs = Legs;
+            body.ProvidedSkeletonType = legs ? OVRPlugin.BodyJointSet.FullBody : OVRPlugin.BodyJointSet.UpperBody;
             body.enabled = true;
             if (logBody)
-                Debug.Log(body.enabled ? $"[Body] Body tracking started ({(highFidelity ? "high" : "low")} fidelity, upper body)."
-                    : $"[Body] Body tracking didn't start (try {attempts} of {startAttempts}).");
+                Debug.Log(body.enabled ? $"[Body] Body tracking started ({(highFidelity ? "high" : "low")} fidelity, {(legs ? "full body" : "upper body")})."
+                    : $"[Body] Body tracking didn't start (try {attempts} of {startAttempts}, {(legs ? "full body" : "upper body")}).");
+            // The headset wouldn't start the full body: from the next try, the upper body alone, as before the legs. The
+            // joint set lives in the project's runtime settings, so the editor (over Link) leaves that asset alone.
+            if (!body.enabled && legs && !Application.isEditor)
+            {
+                legsFailed = true;
+                OVRBody.SetRequestedJointSet(OVRPlugin.BodyJointSet.UpperBody);
+                nextAttempt = 0f;
+            }
             return body.enabled;
         }
 
@@ -125,7 +144,7 @@ namespace MusicInYourHands.Meta
             go.SetActive(false);
             go.transform.SetParent(transform, false);
             body = go.AddComponent<OVRBody>();
-            body.ProvidedSkeletonType = OVRPlugin.BodyJointSet.UpperBody;
+            body.ProvidedSkeletonType = Legs ? OVRPlugin.BodyJointSet.FullBody : OVRPlugin.BodyJointSet.UpperBody;
             body.enabled = false;
             go.SetActive(true);
         }
@@ -144,8 +163,15 @@ namespace MusicInYourHands.Meta
             spine &= Joint(joints, OVRPlugin.BoneId.Body_Neck, out var neck);
             spine &= Joint(joints, OVRPlugin.BoneId.Body_Head, out var head);
             BodyRig.SetSpine(spine, chest, neck, head);
+            BodyRig.SetHips(Joint(joints, OVRPlugin.BoneId.Body_Hips, out var hips), hips);
             ReadArm(joints, true, OVRPlugin.BoneId.Body_LeftArmUpper, OVRPlugin.BoneId.Body_LeftArmLower, OVRPlugin.BoneId.Body_LeftHandWrist);
             ReadArm(joints, false, OVRPlugin.BoneId.Body_RightArmUpper, OVRPlugin.BoneId.Body_RightArmLower, OVRPlugin.BoneId.Body_RightHandWrist);
+            // The full body's joints are the upper body's 70 and then the legs'.
+            bool legs = Legs && joints.Length >= (int)OVRPlugin.BoneId.FullBody_End;
+            ReadLeg(joints, legs, true, OVRPlugin.BoneId.FullBody_LeftUpperLeg, OVRPlugin.BoneId.FullBody_LeftLowerLeg,
+                OVRPlugin.BoneId.FullBody_LeftFootAnkle, OVRPlugin.BoneId.FullBody_LeftFootBall);
+            ReadLeg(joints, legs, false, OVRPlugin.BoneId.FullBody_RightUpperLeg, OVRPlugin.BoneId.FullBody_RightLowerLeg,
+                OVRPlugin.BoneId.FullBody_RightFootAnkle, OVRPlugin.BoneId.FullBody_RightFootBall);
             BodyRig.Push(s.Confidence, dt);
             trackedFrames++;
             confidenceSum += s.Confidence;
@@ -158,6 +184,21 @@ namespace MusicInYourHands.Meta
             valid &= Joint(joints, elbow, out var e);
             valid &= Joint(joints, wrist, out var w);
             BodyRig.SetArm(left, valid, s, e, w);
+        }
+
+        void ReadLeg(OVRPlugin.BodyJointLocation[] joints, bool legs, bool left, OVRPlugin.BoneId hip, OVRPlugin.BoneId knee,
+            OVRPlugin.BoneId ankle, OVRPlugin.BoneId toes)
+        {
+            if (!legs)
+            {
+                BodyRig.SetLeg(left, false, default, default, default, default);
+                return;
+            }
+            bool valid = Joint(joints, hip, out var h);
+            valid &= Joint(joints, knee, out var k);
+            valid &= Joint(joints, ankle, out var a);
+            valid &= Joint(joints, toes, out var t);
+            BodyRig.SetLeg(left, valid, h, k, a, t);
         }
 
         /// <summary>A joint's position in world space. Meta gives it in the camera rig's tracking space, in OpenXR's axes.</summary>
@@ -194,7 +235,7 @@ namespace MusicInYourHands.Meta
             nextReport = Time.unscaledTime + reportSeconds;
             string why = unsupported ? "not supported" : !granted ? "no permission" : body == null || !body.enabled ? "not running" : "running";
             float confidence = trackedFrames > 0 ? confidenceSum / trackedFrames : 0f;
-            Debug.Log($"[Body] last {reportSeconds:0} s: {why}, body in {trackedFrames} frames, none in {lostFrames}, " +
+            Debug.Log($"[Body] last {reportSeconds:0} s: {why} ({(Legs ? "full body" : "upper body")}), body in {trackedFrames} frames, none in {lostFrames}, " +
                       $"mean confidence {confidence:0.00}, blend {BodyRig.Blend:0.00}" +
                       (body != null && body.enabled ? $", fidelity {body.GetBodyTrackingFidelityStatus()}" : ""));
             trackedFrames = lostFrames = 0;

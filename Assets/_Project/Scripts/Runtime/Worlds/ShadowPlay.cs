@@ -11,7 +11,10 @@ namespace MusicInYourHands
     /// your real joints: each forearm runs from the hand's own wrist to your elbow, the upper arm on to your shoulder, and
     /// the shoulders and neck join them, so the silhouette bends at the elbow and holds together like a real arm. Without
     /// a body (no permission, or not tracked) each forearm is estimated from the hand alone and the rest fades away.
-    /// On every beat your shadow leaves a coloured echo that drifts up and grows as it fades. Small notes
+    /// With the full body tracked your trunk and legs cast theirs too (the legs are Meta's Generative Legs, estimated from
+    /// the upper body rather than seen): seated, the thighs point at the wall and the shins come down it to the floor;
+    /// standing, most of a leg's shadow falls on the floor below the wall, as a lamp behind you would cast it. The trunk
+    /// and legs ring none of the lights. On every beat your shadow leaves a coloured echo that drifts up and grows as it fades. Small notes
     /// of light float in the lamp's pool; cover one with a shadow and it rings, a higher note higher up the wall, so
     /// your shadow plays along with the song. The lamp breathes with the bass, and the sung words appear on the wall.
     /// </summary>
@@ -72,6 +75,24 @@ namespace MusicInYourHands
         [Tooltip("How far (m) the body's wrist may be from the hand's before the body's arm is not trusted.")]
         [SerializeField] float wristMismatch = 0.15f;
 
+        [Header("Body")]
+        [Tooltip("The trunk's radius (m) at the chest and at the hips.")]
+        [SerializeField] Vector2 trunkRadius = new Vector2(0.13f, 0.115f);
+        [Tooltip("The hips' radius (m) between the legs and at each hip joint.")]
+        [SerializeField] Vector2 hipRadius = new Vector2(0.09f, 0.08f);
+        [Tooltip("A thigh's radius (m) at the hip and at the knee.")]
+        [SerializeField] Vector2 thighRadius = new Vector2(0.075f, 0.055f);
+        [Tooltip("A shin's radius (m) at the knee and at the ankle.")]
+        [SerializeField] Vector2 shinRadius = new Vector2(0.05f, 0.035f);
+        [Tooltip("A foot's radius (m) at the ankle and at the toes.")]
+        [SerializeField] Vector2 footRadius = new Vector2(0.035f, 0.025f);
+        [Tooltip("Believable lengths (m) of the trunk (chest to hips) and of a thigh or a shin. Outside them the body's " +
+                 "joints are not trusted and the part fades away.")]
+        [SerializeField] Vector2 trunkLength = new Vector2(0.18f, 0.7f);
+        [SerializeField] Vector2 legLength = new Vector2(0.28f, 0.65f);
+        [Tooltip("How far (m) a hip joint may be from the hips before the leg is not trusted.")]
+        [SerializeField] float hipSpread = 0.25f;
+
         [Header("Music")]
         [Tooltip("Seconds a beat's coloured echo of your shadow lasts.")]
         [SerializeField] float echoLife = 1.8f;
@@ -98,8 +119,8 @@ namespace MusicInYourHands
         const int CapsPerShadow = 20;
         const int Echoes = 3;
 
-        /// <summary>The parts of the shadow drawn as capsules.</summary>
-        public enum ShadowPart { Head, Neck, Shoulder, Forearm, UpperArm }
+        /// <summary>The parts of the shadow drawn as capsules. Those from the trunk on ring none of the lights.</summary>
+        public enum ShadowPart { Head, Neck, Shoulder, Forearm, UpperArm, Trunk, Hip, Thigh, Shin, Foot }
 
         /// <summary>
         /// A tapered capsule on the wall, in metres along the wall's Right and Up: radius and soft edge at each end, and how
@@ -171,6 +192,12 @@ namespace MusicInYourHands
         readonly Vector3[] lastElbow = new Vector3[2], lastShoulder = new Vector3[2], lastShoulders = new Vector3[2];
         float torsoBlend;
         Vector3 lastNeck, lastHead;
+        // The trunk and each leg: how far they have faded in, and their last believable joints.
+        float trunkBlend;
+        Vector3 lastChest, lastHips;
+        readonly float[] legBlend = new float[2];
+        readonly Vector3[] lastPelvis = new Vector3[2], lastHip = new Vector3[2], lastKnee = new Vector3[2],
+            lastAnkle = new Vector3[2], lastToes = new Vector3[2];
         readonly HandShadow[] handShadows = { new HandShadow(), new HandShadow() };
         readonly MaterialPropertyBlock[] fills = new MaterialPropertyBlock[1 + Echoes];
         static readonly int FillId = Shader.PropertyToID("_Fill");
@@ -248,7 +275,8 @@ namespace MusicInYourHands
             foreach (var e in echoes) e.Age = 99f;
             // The arms follow the tracked body while you are here; body tracking runs only then.
             BodyRig.Wanted = true;
-            armBlend[0] = armBlend[1] = torsoBlend = 0f;
+            armBlend[0] = armBlend[1] = torsoBlend = trunkBlend = 0f;
+            legBlend[0] = legBlend[1] = 0f;
         }
 
         protected override void OnExit()
@@ -372,7 +400,7 @@ namespace MusicInYourHands
 
         /// <summary>
         /// The shadow of this frame: each tracked hand's own mesh projected from the lamp onto the wall, plus your arms,
-        /// shoulders, neck and head as soft capsules.
+        /// shoulders, neck, head, trunk and legs as soft capsules.
         /// </summary>
         void Shadows(HandRig rig, Camera view, float dt)
         {
@@ -383,6 +411,8 @@ namespace MusicInYourHands
             // The head, on the headset's own pose.
             AddShadow(head - forward * 0.06f + Vector3.up * 0.04f, head - forward * 0.06f - Vector3.up * 0.04f, 0.085f, 0.085f);
             Shoulders(dt);
+            Trunk(dt);
+            Legs(dt);
             if (rig == null) return;
             for (int side = 0; side < 2; side++)
             {
@@ -484,6 +514,57 @@ namespace MusicInYourHands
         }
 
         /// <summary>
+        /// The trunk, from the tracked body: one broad capsule from the chest down to the hips, under the shoulders. It
+        /// fades in with a believable body and out without one.
+        /// </summary>
+        void Trunk(float dt)
+        {
+            float length = Vector3.Distance(BodyRig.Chest, BodyRig.Hips);
+            bool believable = BodyRig.IsTracked && BodyRig.SpineValid && BodyRig.HipsValid && length >= trunkLength.x && length <= trunkLength.y;
+            if (believable)
+            {
+                lastChest = BodyRig.Chest;
+                lastHips = BodyRig.Hips;
+            }
+            trunkBlend = Mathf.MoveTowards(trunkBlend, believable ? 1f : 0f, dt / Mathf.Max(armFade, 0.01f));
+            float body = Ease(trunkBlend * BodyRig.Blend);
+            if (body > 0.01f) AddShadow(lastChest, lastHips, trunkRadius.x, trunkRadius.y, body, ShadowPart.Trunk);
+        }
+
+        /// <summary>
+        /// The legs, from full-body tracking: for each, the hips out to its hip joint, the thigh on to the knee, the shin
+        /// to the ankle and the foot to the toes, tapering down. A leg fades in when its joints are believable and out
+        /// without them (the upper body alone has no legs).
+        /// </summary>
+        void Legs(float dt)
+        {
+            for (int side = 0; side < 2; side++)
+            {
+                bool left = side == 0;
+                var leg = BodyRig.GetLeg(left);
+                float thigh = Vector3.Distance(leg.Hip, leg.Knee), shin = Vector3.Distance(leg.Knee, leg.Ankle);
+                bool believable = BodyRig.IsTracked && BodyRig.HipsValid && leg.Valid
+                    && thigh >= legLength.x && thigh <= legLength.y && shin >= legLength.x && shin <= legLength.y
+                    && Vector3.Distance(BodyRig.Hips, leg.Hip) <= hipSpread;
+                if (believable)
+                {
+                    lastPelvis[side] = BodyRig.Hips;
+                    lastHip[side] = leg.Hip;
+                    lastKnee[side] = leg.Knee;
+                    lastAnkle[side] = leg.Ankle;
+                    lastToes[side] = leg.Toes;
+                }
+                legBlend[side] = Mathf.MoveTowards(legBlend[side], believable ? 1f : 0f, dt / Mathf.Max(armFade, 0.01f));
+                float body = Ease(legBlend[side] * BodyRig.Blend);
+                if (body <= 0.01f) continue;
+                AddShadow(lastPelvis[side], lastHip[side], hipRadius.x, hipRadius.y, body, ShadowPart.Hip, left);
+                AddShadow(lastHip[side], lastKnee[side], thighRadius.x, thighRadius.y, body, ShadowPart.Thigh, left);
+                AddShadow(lastKnee[side], lastAnkle[side], shinRadius.x, shinRadius.y, body, ShadowPart.Shin, left);
+                AddShadow(lastAnkle[side], lastToes[side], footRadius.x, footRadius.y, body, ShadowPart.Foot, left);
+            }
+        }
+
+        /// <summary>
         /// Projects a hand mesh, as it is posed now, from the lamp onto the wall. Any vertex the lamp cannot cast onto
         /// the wall (behind the lamp or past the wall) drops this hand's shadow for the frame.
         /// </summary>
@@ -531,7 +612,8 @@ namespace MusicInYourHands
         {
             var e = echoes[nextEcho];
             nextEcho = (nextEcho + 1) % Echoes;
-            // The echo is the hands, forearms and head: upper arms and shoulders, grown and coloured, would fill the wall.
+            // The echo is the hands, forearms and head: upper arms, shoulders, trunk and legs, grown and coloured, would
+            // fill the wall.
             e.Count = 0;
             for (int i = 0; i < liveCount; i++)
                 if (live[i].Part == ShadowPart.Head || live[i].Part == ShadowPart.Forearm) e.Caps[e.Count++] = live[i];
@@ -678,22 +760,34 @@ namespace MusicInYourHands
             return strength * Mathf.Exp(-d * d * 1.6f) * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(1.25f, 0.8f, d));
         }
 
-        /// <summary>True when the shadow covers this point on the wall.</summary>
-        bool InShadow(Vector2 p)
+        /// <summary>
+        /// How the shadow covers this point on the wall: 2 where a part that rings the lights covers it (the hands, arms,
+        /// shoulders, neck or head), 1 where only the trunk or legs do, 0 where nothing does.
+        /// </summary>
+        int ShadowAt(Vector2 p)
         {
+            int at = 0;
             for (int i = 0; i < liveCount; i++)
             {
                 var c = live[i];
                 // A part only half faded in doesn't ring anything yet.
                 if (c.Strength < 0.5f) continue;
+                bool rings = Rings(c.Part);
+                if (at == 1 && !rings) continue;
                 var ab = c.B - c.A;
                 float h = Mathf.Clamp01(Vector2.Dot(p - c.A, ab) / Mathf.Max(ab.sqrMagnitude, 1e-8f));
-                if ((p - c.A - ab * h).magnitude < Mathf.Lerp(c.Radius + c.Soft * 0.3f, c.RadiusB + c.SoftB * 0.3f, h)) return true;
+                if ((p - c.A - ab * h).magnitude >= Mathf.Lerp(c.Radius + c.Soft * 0.3f, c.RadiusB + c.SoftB * 0.3f, h)) continue;
+                if (rings) return 2;
+                at = 1;
             }
             foreach (var s in handShadows)
-                if (InHandShadow(s, p)) return true;
-            return false;
+                if (InHandShadow(s, p)) return 2;
+            return at;
         }
+
+        // The trunk and legs darken the wall but ring nothing: they would cover the middle of the pool all the time, and
+        // the lights are the hands' to play.
+        static bool Rings(ShadowPart part) => part < ShadowPart.Trunk;
 
         static bool InHandShadow(HandShadow s, Vector2 p)
         {
@@ -737,7 +831,8 @@ namespace MusicInYourHands
                 n.Ring = Mathf.Max(0f, n.Ring - dt * 2.5f);
                 n.Rest -= dt;
 
-                bool covered = InShadow(n.Position);
+                int shade = ShadowAt(n.Position);
+                bool covered = shade == 2;
                 // While the menu is open the hands are choosing there: their shadows still fall, but ring nothing, and a
                 // light still covered when the menu closes rings only once it is uncovered and covered again.
                 if (covered && !n.Covered && n.Rest <= 0f && !MenuOpen)
@@ -763,7 +858,7 @@ namespace MusicInYourHands
                 float twinkle = 0.8f + 0.2f * Mathf.Sin(Now * 3f + n.Seed);
                 block.Clear();
                 block.SetColor(ColorId, Color.Lerp(lampColor, Color.white, 0.35f + n.Ring * 0.5f));
-                block.SetFloat(IntensityId, (0.25f + lit * 1.1f) * twinkle * (covered ? 0.35f : 1f) + n.Ring * 1.6f);
+                block.SetFloat(IntensityId, (0.25f + lit * 1.1f) * twinkle * (shade > 0 ? 0.35f : 1f) + n.Ring * 1.6f);
                 light.SetPropertyBlock(block);
             }
         }
@@ -858,6 +953,9 @@ namespace MusicInYourHands
 
         /// <summary>For the editor checks: whether a point on the wall is inside one hand's own shadow (0 left, 1 right).</summary>
         public bool PreviewInHandShadow(int side, Vector2 p) => InHandShadow(handShadows[side], p);
+
+        /// <summary>For the editor checks: 2 where the shadow would ring a light here, 1 where only the trunk or legs cover it, else 0.</summary>
+        public int PreviewShadowAt(Vector2 p) => ShadowAt(p);
 #endif
     }
 }
