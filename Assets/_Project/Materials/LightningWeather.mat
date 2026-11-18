@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Streak
-  m_Shader: {fileID: 4800000, guid: dc9fe9ea20e014b7ca4e464bfd6cc52b, type: 3}
+  m_Name: LightningWeather
+  m_Shader: {fileID: 4800000, guid: 07d6216eb88832d4aa48e897a75353c2, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -25,8 +25,7 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _Intensity: 1
-    m_Colors:
-    - _Color: {r: 0.5, g: 0.72, b: 1, a: 1}
+    - _Flash: 0
+    m_Colors: []
   m_BuildTextureStacks: []
   m_AllowLocking: 1

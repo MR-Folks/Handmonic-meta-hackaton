@@ -7,6 +7,9 @@ Shader "MusicInYourHands/Line"
         _Color ("Color", Color) = (1, 1, 1, 1)
         _Intensity ("Intensity", Float) = 1
         _Core ("White-hot core", Range(0, 1)) = 0.4
+        // How the colour meets what is behind: 1 (One) adds light, the glow every line has; 10 (OneMinusSrcAlpha)
+        // lays the colour over, so a line still shows against something bright, such as Lightning's snow.
+        [HideInInspector] _DstBlend ("Colour blend", Float) = 1
     }
 
     SubShader
@@ -19,7 +22,7 @@ Shader "MusicInYourHands/Line"
             Cull Off
             ZWrite Off
             ZTest LEqual
-            Blend SrcAlpha One, One OneMinusSrcAlpha
+            Blend SrcAlpha [_DstBlend], One OneMinusSrcAlpha
 
             HLSLPROGRAM
             #pragma vertex vert

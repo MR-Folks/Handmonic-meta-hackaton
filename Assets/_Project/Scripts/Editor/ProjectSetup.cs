@@ -597,7 +597,6 @@ namespace MusicInYourHands.EditorTools
         public const string OrbDotsMaterialPath = Root + "/Materials/OrbDots.mat";
         public const string LineMaterialPath = Root + "/Materials/Line.mat";
         public const string BubbleMaterialPath = Root + "/Materials/Bubble.mat";
-        public const string StreakMaterialPath = Root + "/Materials/Streak.mat";
         public const string GlowMaterialPath = Root + "/Materials/Glow.mat";
         public const string WaterMaterialPath = Root + "/Materials/Water.mat";
         public const string SilkMaterialPath = Root + "/Materials/Silk.mat";
@@ -605,7 +604,6 @@ namespace MusicInYourHands.EditorTools
         public const string PaintMaterialPath = Root + "/Materials/PaintStroke.mat";
         public const string RoomGridMaterialPath = Root + "/Materials/RoomGrid.mat";
         public const string TrailMaterialPath = Root + "/Materials/Trail.mat";
-        public const string PlateMaterialPath = Root + "/Materials/Plate.mat";
         public const string LetteringMaterialPath = Root + "/Materials/Lettering.mat";
         public const string RingMaterialPath = Root + "/Materials/Ring.mat";
         public const string ShellMaterialPath = Root + "/Materials/Shell.mat";

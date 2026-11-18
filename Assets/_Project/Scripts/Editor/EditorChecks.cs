@@ -50,7 +50,7 @@ namespace MusicInYourHands.EditorTools
             ok &= CheckShadowArms();
             ok &= CheckRibbonPreview();
             ok &= CheckStringsPreview();
-            ok &= CheckRainPreview();
+            ok &= CheckWeatherPreview();
             ok &= CheckSongs();
             ok &= CheckAudiusSongs();
             ok &= CheckLettering();
@@ -524,15 +524,18 @@ namespace MusicInYourHands.EditorTools
                 world.PreviewPluck(2, 0.02f);
             }, 0.6f, withSong: true);
 
-        static bool CheckRainPreview() => CheckWorldPreview<NoteRain>("Note rain preview", "Logs/preview-rain.png",
-            new[] { ("glowMaterial", ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow"), ("streakMaterial", ProjectSetup.StreakMaterialPath, "MusicInYourHands/Streak"),
-                    ("ringMaterial", ProjectSetup.RingMaterialPath, "MusicInYourHands/Ring") },
+        static bool CheckWeatherPreview() => CheckWorldPreview<Lightning>("Lightning weather preview", "Logs/preview-weather.png",
+            new[] { ("glowMaterial", ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow"), ("lineMaterial", ProjectSetup.LineMaterialPath, "MusicInYourHands/Line"),
+                    ("ringMaterial", ProjectSetup.RingMaterialPath, "MusicInYourHands/Ring"),
+                    ("weatherMaterial", "Assets/_Project/Materials/LightningWeather.mat", "MusicInYourHands/LightningWeather"),
+                    ("groundMaterial", "Assets/_Project/Materials/LightningGround.mat", "MusicInYourHands/LightningGround") },
             (hands, rig, world, camera) =>
             {
-                // Step back and look down at the floor, where the notes land.
+                // Step back and look down at the floor, where the snow settles.
                 camera.transform.position += new Vector3(0f, 0.1f, -0.6f);
                 camera.transform.rotation = Quaternion.Euler(42f, 0f, 0f);
                 camera.fieldOfView = 70f;
+                world.PreviewWeather(true, 30f);
             }, 2.6f, withSong: true);
 
 #if META_XR_CORE
