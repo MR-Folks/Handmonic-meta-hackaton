@@ -352,7 +352,6 @@ namespace MusicInYourHands
             ("WaveformRibbon", GhostMotion.TwoHandPinch),  // "Pinch with both hands and pull them apart"
             ("AirStrings", GhostMotion.Sweep),             // "Brush the strings, or play the drums and cymbals around you"
             ("SoundPool", GhostMotion.Dip),                // "Dip your hand into the pool and listen"
-            ("SoundWind", GhostMotion.SpreadFingers),      // "Put your hand in the school and spread your fingers"
             ("BubbleNotes", GhostMotion.OpenPalm),         // "...hold out a hand and the fish gather"
             ("BreathingRoom", GhostMotion.Push),           // "Push your palm towards a wall"
             ("LightTrails", GhostMotion.Pinch),            // "Pinch and move to draw; two fists clear it"
@@ -362,10 +361,10 @@ namespace MusicInYourHands
             ("SolarSystem", GhostMotion.Pinch),            // "Pinch a planet to move it..."
             ("FlowerDance", GhostMotion.OpenPalm),         // "Your hand is the sun: move it and the flowers lean after it"
             ("EarthAndWater", GhostMotion.BothFists),      // "...clench both fists to switch"
-            ("Graffiti", GhostMotion.Pinch),               // "Point at a wall and pinch to spray"
-            ("OrbitType", GhostMotion.Push),               // "Push the letters, flick a ring, or make a fist"
             ("WordDrift", GhostMotion.PointPoke),          // "Touch a word to hold it"
             ("RisingFloor", GhostMotion.Sweep)             // "Sweep your hand across the words"
+            // Hidden worlds ([HiddenWorld]) have no demo; put these back with the world: ("SoundWind",
+            // GhostMotion.SpreadFingers), ("Graffiti", GhostMotion.Pinch), ("OrbitType", GhostMotion.Push).
         };
 
         /// <summary>The motion a world's hint shows, or None to keep only its text.</summary>

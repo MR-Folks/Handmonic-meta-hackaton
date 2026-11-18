@@ -1268,59 +1268,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1153605161
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1153605163}
-  - component: {fileID: 1153605162}
-  m_Layer: 0
-  m_Name: SoundWind
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1153605162
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1153605161}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cac449c98bf1b4c9b8ee7c553f527bea, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.SoundWind
-  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
-  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
-  count: 360
-  orbit: 0.72
-  thickness: 0.22
-  height: -0.38
-  cruise: 0.32
-  tipRadius: 0.016
-  palmRadius: 0.04
---- !u!4 &1153605163
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1153605161}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1462377328}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!137 &1157063446 stripped
 SkinnedMeshRenderer:
   m_CorrespondingSourceObject: {fileID: 8661073797813907648, guid: deccf1bd75222ab419fef0130b2a4d9e, type: 3}
@@ -1828,68 +1775,6 @@ MonoBehaviour:
   knuckle: {fileID: 719480443}
   response: 12
   isLeft: 0
---- !u!1 &1456184136
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1456184138}
-  - component: {fileID: 1456184137}
-  m_Layer: 0
-  m_Name: OrbitType
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1456184137
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1456184136}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 13b353353b0e64982af0dbeb84f1f13d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.OrbitType
-  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
-  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
-  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
-  distance: 0.95
-  height: -0.08
-  letterHeight: 0.24
-  orbitLetterHeight: 0.075
-  depth: 0.16
-  ringRadii:
-  - 0.95
-  - 1.2
-  - 1.45
-  ringTilts:
-  - 12
-  - -18
-  - 26
-  pushRadius: 0.14
-  pullRadius: 0.7
---- !u!4 &1456184138
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1456184136}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1462377328}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1462377326
 GameObject:
   m_ObjectHideFlags: 0
@@ -1925,7 +1810,6 @@ MonoBehaviour:
   - {fileID: 790749978}
   - {fileID: 179923059}
   - {fileID: 2000780158}
-  - {fileID: 1153605162}
   - {fileID: 1715105674}
   - {fileID: 4160533}
   - {fileID: 1234591346}
@@ -1935,8 +1819,6 @@ MonoBehaviour:
   - {fileID: 403129349}
   - {fileID: 1410341793}
   - {fileID: 1710719217}
-  - {fileID: 1456184137}
-  - {fileID: 2124485061}
   - {fileID: 1970306282}
   - {fileID: 683420573}
   startWorld: 0
@@ -1958,7 +1840,6 @@ Transform:
   - {fileID: 790749979}
   - {fileID: 179923060}
   - {fileID: 2000780159}
-  - {fileID: 1153605163}
   - {fileID: 1715105675}
   - {fileID: 4160534}
   - {fileID: 1234591347}
@@ -1968,8 +1849,6 @@ Transform:
   - {fileID: 403129350}
   - {fileID: 1410341794}
   - {fileID: 1710719218}
-  - {fileID: 1456184138}
-  - {fileID: 2124485062}
   - {fileID: 1970306283}
   - {fileID: 683420574}
   m_Father: {fileID: 0}
@@ -2471,6 +2350,7 @@ MonoBehaviour:
   beatsPerElement: 32
   beatsAfterPick: 64
   fistSeconds: 0.35
+  oneFistSeconds: 0.6
   streamWidth: 0.032
   orbSpread: {x: 0.07, y: 0.55}
   rockCount: 6
@@ -2772,6 +2652,8 @@ MonoBehaviour:
   radiusPerSpread: 0.5
   forwardOffset: 0.1
   beatSwell: 0.12
+  palmRadius: 0.075
+  palmGap: 0.035
   petals: 030000000400000005000000060000000400000007000000
   push: 0.012
   spreadRange: {x: 0.12, y: 0.6}
@@ -3079,61 +2961,6 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2000780157}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1462377328}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &2124485060
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2124485062}
-  - component: {fileID: 2124485061}
-  m_Layer: 0
-  m_Name: Graffiti
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &2124485061
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2124485060}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 995b0d3ebfff349298e61ddd21767934, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.Graffiti
-  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
-  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
-  lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
-  ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
-  paintMaterial: {fileID: 2100000, guid: 9527ccac3e9d14c0d948501ee821f887, type: 2}
-  wallRadius: 1.6
-  tagHeight: 0.2
-  holdTime: 4
-  fadeTime: 1.5
-  maxTags: 10
-  maxStrokes: 8
---- !u!4 &2124485062
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2124485060}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}

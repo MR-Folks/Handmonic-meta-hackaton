@@ -11,7 +11,10 @@ namespace MusicInYourHands
     /// from your fingers with a hiss and leaves glowing strokes where you point. Your fingertip gets speckled with
     /// the paint colour. Tags land on your real walls once the room is scanned; until then the walls are an invisible
     /// ring around you.
+    /// Left out of the menu and the scene for now, to keep the menu to fewer worlds: take [HiddenWorld] off and run
+    /// Update Worlds in Main Scene to bring it back (and give it its ghost demo in GhostMotions.WorldTable again).
     /// </summary>
+    [HiddenWorld]
     public class Graffiti : World
     {
         public override string DisplayName => "Graffiti";
