@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
@@ -13,13 +12,6 @@ namespace MusicInYourHands.EditorTools
     public static partial class EditorChecks
     {
         const string AddedSongName = "Demo Band - Paper Boat";
-
-        // A reply from Audius in its own order: a track for sale, a label's track, an artist's own track, a deleted one.
-        const string SampleAudiusReply = "{\"data\":[" +
-            "{\"id\":\"b2\",\"title\":\"For Sale\",\"permalink\":\"/x/for-sale\",\"is_streamable\":true,\"is_available\":true,\"is_delete\":false,\"is_stream_gated\":true,\"access\":{\"stream\":false},\"user\":{\"name\":\"X\",\"handle\":\"x\"}}," +
-            "{\"id\":\"a1\",\"title\":\"Tide Lines - Harbour Lights\",\"permalink\":\"/demolabel/harbour-lights\",\"is_streamable\":true,\"is_available\":true,\"is_delete\":false,\"is_stream_gated\":false,\"duration\":200,\"bpm\":null,\"access\":{\"stream\":true,\"download\":false},\"user\":{\"name\":\"Demo Label\",\"handle\":\"demolabel\",\"is_verified\":true}}," +
-            "{\"id\":\"c3\",\"title\":\"Night Bus\",\"permalink\":\"/someone/night-bus\",\"is_streamable\":true,\"is_available\":true,\"is_delete\":false,\"is_stream_gated\":false,\"access\":{\"stream\":true},\"user\":{\"name\":\"Someone\",\"handle\":\"someone\"}}," +
-            "{\"id\":\"d4\",\"title\":\"Gone\",\"permalink\":\"/x/gone\",\"is_streamable\":true,\"is_available\":false,\"is_delete\":true,\"is_stream_gated\":false,\"access\":{\"stream\":false},\"user\":{\"name\":\"X\",\"handle\":\"x\"}}]}";
 
         /// <summary>
         /// Every built-in song has audio, lyrics and one melody note per sung word, all inside the song; and a song
@@ -113,90 +105,13 @@ namespace MusicInYourHands.EditorTools
             return ok;
         }
 
-        /// <summary>
-        /// Songs from Audius: the picked list reads, a reply from Audius becomes songs in the list's order with their
-        /// credits (leaving out tracks that are for sale or gone), and, when this computer is online, Audius sends the
-        /// picked songs and one streams in and decodes.
-        /// </summary>
-        static bool CheckAudiusSongs()
-        {
-            var order = AudiusSongs.ReadPicks("# a comment\nc3  https://audius.co/someone/night-bus\n\n  a1\thttps://audius.co/demolabel/harbour-lights\r\nb2\nd4\nc3\nmissing\n");
-            var found = AudiusSongs.Parse(SampleAudiusReply, order);
-            var own = found.Count == 2 ? found[0] : null;
-            var label = found.Count == 2 ? found[1] : null;
-            bool ok = string.Join(",", order) == "c3,a1,b2,d4,missing" && own != null && label != null &&
-                      own.title == "Night Bus" && own.artist == "Someone" && AudiusSongs.Byline(own) == "© Someone" &&
-                      label.title == "Harbour Lights" && label.artist == "Tide Lines" && label.owner == "Demo Label" &&
-                      AudiusSongs.Byline(label) == "Tide Lines  ·  © Demo Label" &&
-                      AudiusSongs.Credit(label) == "Harbour Lights by Tide Lines  ·  © Demo Label  ·  Audius Open Music License" &&
-                      AudiusSongs.ShortLink(label) == "audius.co/demolabel/harbour-lights" &&
-                      label.IsFromAudius && !label.IsAdded && label.LoadsOnDemand &&
-                      AudiusSongs.Parse("{}", order).Count == 0 && AudiusSongs.Parse("not json", order).Count == 0;
-            if (ok) Debug.Log("[Check] A reply from Audius becomes songs in the picked order, with their credits.");
-            else Debug.LogError($"[Check] Audius reply read wrongly: order {string.Join(",", order)}; songs " +
-                                string.Join("; ", found.Select(s => $"{s.title} by {s.artist} (© {s.owner}, {s.link})")) + ".");
-            foreach (var song in found) Object.DestroyImmediate(song);
-
-            var picks = AudiusSongs.Picks;
-            bool listed = picks.Count > 0 && picks.All(id => Regex.IsMatch(id, "^[A-Za-z0-9]+$"));
-            if (listed) Debug.Log($"[Check] Resources/AudiusSongs.txt picks {picks.Count} songs.");
-            else Debug.LogError("[Check] Resources/AudiusSongs.txt is missing, empty, or has a line that doesn't start with a track id.");
-            return ok && listed && CheckAudiusStream();
-        }
-
-        /// <summary>When this computer is online, Audius sends the picked songs and one streams in, without counting a play.</summary>
-        static bool CheckAudiusStream()
-        {
-            if (Application.internetReachability == NetworkReachability.NotReachable)
-            {
-                Debug.LogWarning("[Check] Offline, so skipped asking Audius for the picked songs.");
-                return true;
-            }
-            List<SongAsset> found = null;
-            RunRoutine(AudiusSongs.Fetch(songs => found = songs), 30);
-            if (found == null || found.Count == 0)
-            {
-                Debug.LogError("[Check] Audius didn't send any of the picked songs; see the [Audius] warning above.");
-                return false;
-            }
-            if (found.Count < AudiusSongs.Picks.Count)
-                Debug.LogWarning($"[Check] Only {found.Count} of the {AudiusSongs.Picks.Count} picked songs can play on Audius now; replace the others in Resources/AudiusSongs.txt.");
-            foreach (var each in found)
-                if (!TypeFace.Bold.Covers(each.title + each.artist + each.owner))
-                    Debug.LogWarning($"[Check] The lettering lacks some letters of {each.title} by {each.artist}; they will show as gaps.");
-
-            var song = found[found.Count - 1];
-            bool loaded = false;
-            double stall = RunRoutine(AudiusSongs.Load(song, success => loaded = success, countPlay: false), 120);
-            bool ok = loaded && song.clip != null && song.clip.length > 60f;
-            // Decoding a whole song as it arrived froze the headset for 0.7 s, so the audio stays compressed.
-            bool smooth = stall < 100;
-            if (ok && smooth) Debug.Log($"[Check] Audius sent {found.Count} picked songs, and {song.title} by {song.artist} streamed in: {song.clip.length:0.0} s at {song.clip.frequency} Hz, ready in {stall:0} ms.");
-            else if (ok) Debug.LogError($"[Check] {song.title} took {stall:0} ms to get ready after it streamed in, which would freeze the headset; keep streamed audio compressed (DownloadHandlerAudioClip.compressed).");
-            else Debug.LogError($"[Check] {song.title} by {song.artist} didn't stream in from Audius.");
-            AudiusSongs.Unload(song);
-            foreach (var each in found) Object.DestroyImmediate(each);
-            return ok && smooth;
-        }
-
-        /// <summary>
-        /// Runs a coroutine to its end by hand, waiting on its web requests for at most <paramref name="seconds"/> in
-        /// all. Returns the longest the coroutine ran in one go, in milliseconds: how long it would hold up a frame.
-        /// </summary>
-        static double RunRoutine(IEnumerator routine, double seconds)
+        /// <summary>Runs a coroutine to its end by hand, waiting on its web requests for at most <paramref name="seconds"/> in all.</summary>
+        static void RunRoutine(IEnumerator routine, double seconds)
         {
             var timer = Stopwatch.StartNew();
-            var step = new Stopwatch();
-            double longest = 0;
-            while (true)
-            {
-                step.Restart();
-                bool more = routine.MoveNext();
-                longest = System.Math.Max(longest, step.Elapsed.TotalMilliseconds);
-                if (!more) return longest;
+            while (routine.MoveNext())
                 if (routine.Current is AsyncOperation operation)
                     while (!operation.isDone && timer.Elapsed.TotalSeconds < seconds) System.Threading.Thread.Sleep(5);
-            }
         }
     }
 }

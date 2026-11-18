@@ -19,7 +19,7 @@ namespace MusicInYourHands
     /// anywhere else and it floats home. Putting in another pops the first one out, back to its place. The radio's
     /// keys play or pause, stop and eject, pressed with a fingertip like the menu's buttons. A blank cassette at the
     /// end of the ring adds a song from the headset (the file picker), and a button on the table opens the song list
-    /// for lyrics, removing songs and Audius credits. Close it with the table's close button or Meta's menu gesture;
+    /// for lyrics and removing songs. Close it with the table's close button or Meta's menu gesture;
     /// the world plays on behind it the whole time.
     /// Everything is built here from code and Resources (DeckParts); the world menu keeps the turntable's tuning.
     /// </summary>
@@ -119,7 +119,7 @@ namespace MusicInYourHands
         /// <summary>True from opening until it is closed (it then sinks back into the floor).</summary>
         public bool IsOpen { get; private set; }
 
-        /// <summary>Raised by the table's song list button: show the song page (lyrics, removing songs, credits).</summary>
+        /// <summary>Raised by the table's song list button: show the song page (lyrics, removing songs).</summary>
         public event Action SongListRequested;
 
         /// <summary>Raised when the blank cassette has opened the headset's file picker; the deck has stepped aside.</summary>
@@ -462,7 +462,7 @@ namespace MusicInYourHands
 
         /// <summary>
         /// Keeps one cassette per song, with the blank at the end, and the same cassette at the front when songs come or
-        /// go (Audius's songs arriving, a song added or removed). Cheap when nothing changed.
+        /// go (a song added or removed). Cheap when nothing changed.
         /// </summary>
         void ReadSongs(MusicBus bus)
         {
@@ -530,7 +530,7 @@ namespace MusicInYourHands
         }
 
         /// <summary>
-        /// Follows the music: when the song changes by other means (a song added on the page, Audius failing to stream,
+        /// Follows the music: when the song changes by other means (a song added on the page, a song failing to load,
         /// listening to the room), the radio swaps cassettes to match. With <paramref name="instant"/> (opening) the
         /// right cassette is simply in the radio.
         /// </summary>

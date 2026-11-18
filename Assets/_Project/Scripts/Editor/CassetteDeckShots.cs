@@ -11,16 +11,15 @@ namespace MusicInYourHands.EditorTools
 #if META_XR_CORE
         /// <summary>
         /// Screenshots of the cassette deck from a seated player's eyes (1.2 m up): 24a the deck just opened, a song in
-        /// the radio and a song from Audius at the front with its credit, the right hand reaching for it; 24b a cassette
-        /// pinched in the right hand over the radio's open door with the snap outline; 24c a song from Audius playing in
-        /// the radio, its credit above it, and a close-up of the radio (24c-close). Made-up songs stand in for your own
-        /// and Audius's, beside the four that come with the app.
+        /// the radio and one of your own at the front, the right hand reaching for it; 24b a cassette pinched in the
+        /// right hand over the radio's open door with the snap outline; 24c a song playing in the radio, and a close-up
+        /// of the radio (24c-close). Made-up songs stand in for your own, beside the ones that come with the app.
         /// </summary>
         static void DeckShots()
         {
             if (!Wanted("24a-deck-open") && !Wanted("24b-deck-held") && !Wanted("24c-deck-playing")) return;
             DeckParts.Forget();
-            // Songs, by their place in DeckPreviewSongs: 0-3 come with the app, 4-5 are your own, 6-10 from Audius.
+            // Songs, by their place in DeckPreviewSongs: 0-6 come with the app, 7-8 are your own.
             Shoot("24a-deck-open", 0, 7, 1.6f, (deck, rig, camera, hands, songs) =>
             {
                 // The right hand comes in over the front cassette, about to pinch it, so the cassette lights up.
@@ -79,8 +78,8 @@ namespace MusicInYourHands.EditorTools
 
         static SongAsset DeckFront(CassetteDeck deck) => deck.FrontSong;
 
-        /// <summary>The four songs that come with the app, two made-up songs of your own and five made-up songs from Audius.</summary>
-        static List<SongAsset> DeckPreviewSongs(out List<SongAsset> demo, out List<SongAsset> streamed, out List<SongAsset> own)
+        /// <summary>The songs that come with the app and two made-up songs of your own.</summary>
+        static List<SongAsset> DeckPreviewSongs(out List<SongAsset> demo, out List<SongAsset> own)
         {
             demo = AssetDatabase.FindAssets("t:SongAsset", new[] { "Assets/_Project/Songs" })
                 .Select(guid => AssetDatabase.LoadAssetAtPath<SongAsset>(AssetDatabase.GUIDToAssetPath(guid))).Where(s => s != null).OrderBy(s => s.name).ToList();
@@ -93,29 +92,10 @@ namespace MusicInYourHands.EditorTools
                 song.lyricsPath = lyrics ? title + ".lrc" : null;
                 return song;
             }
-            SongAsset Streamed(string title, string artist, string owner, string page)
-            {
-                var song = ScriptableObject.CreateInstance<SongAsset>();
-                song.title = title;
-                song.artist = artist;
-                song.owner = owner;
-                song.audiusId = page;
-                song.link = "https://audius.co/" + page;
-                return song;
-            }
             own = new List<SongAsset> { Own("Sunday Morning", "The Open Windows", true), Own("Harbour Lights", "", false) };
             // Made-up songs live only in this code, so keep them through scene changes.
             foreach (var song in own) song.hideFlags = HideFlags.DontSave;
-            streamed = new List<SongAsset>
-            {
-                Streamed("The Night Air Was Cool", "ATTLAS", "ATTLAS", "attlas/the-night-air-was-cool"),
-                Streamed("It's Okay", "Yasper", "Chillhop Music", "chillhopmusic/yasper-its-okay"),
-                Streamed("Soul Trouble", "Kevin McKay", "Kevin McKay", "kevinmckay/soul-trouble"),
-                Streamed("Crystals", "Fonts", "Critical Music", "CriticalMusic/fonts-crystals"),
-                Streamed("Overseas and Alone", "Ambulo", "Ambulo", "ambulo/overseas-and-alone")
-            };
-            foreach (var song in streamed) song.hideFlags = HideFlags.DontSave;
-            return demo.Concat(own).Concat(streamed).ToList();
+            return demo.Concat(own).ToList();
         }
 
         /// <summary>
@@ -128,7 +108,7 @@ namespace MusicInYourHands.EditorTools
             if (!Wanted(name)) return;
             BodyRig.Clear();
             var camera = StageRoom(34f);
-            var songs = DeckPreviewSongs(out _, out _, out _);
+            var songs = DeckPreviewSongs(out _, out _);
             var playing = playingIndex >= 0 ? songs[playingIndex] : null;
             var front = songs[frontIndex];
             camera.transform.position = new Vector3(0f, 1.2f, 0f);

@@ -26,8 +26,7 @@ namespace MusicInYourHands
         static readonly Color Soft = new Color(1f, 1f, 1f, 0.78f);
         static readonly Color Lyrics = new Color(0.55f, 0.95f, 0.7f);
         static readonly Color Warning = new Color(1f, 0.8f, 0.45f);
-        // Shell colours: warm for the songs that come with the app, fresh greens for your own, cool blues and violets
-        // for the songs from Audius.
+        // Shell colours: warm for the songs that come with the app, fresh greens for your own.
         static readonly Color[] Warm =
         {
             new Color(0.95f, 0.38f, 0.34f), new Color(0.98f, 0.66f, 0.22f), new Color(0.92f, 0.36f, 0.58f),
@@ -37,16 +36,11 @@ namespace MusicInYourHands
         {
             new Color(0.2f, 0.72f, 0.58f), new Color(0.46f, 0.78f, 0.3f), new Color(0.16f, 0.6f, 0.72f), new Color(0.62f, 0.82f, 0.36f)
         };
-        static readonly Color[] Cool =
-        {
-            new Color(0.34f, 0.5f, 0.96f), new Color(0.56f, 0.4f, 0.92f), new Color(0.26f, 0.66f, 0.92f),
-            new Color(0.72f, 0.42f, 0.86f), new Color(0.4f, 0.38f, 0.82f), new Color(0.3f, 0.82f, 0.9f)
-        };
         static readonly Color BlankShell = new Color(0.9f, 0.93f, 0.96f);
 
         const string BlankTitle = "+  Add a song";
         // The front cassette's words lie on a plate over the middle of the turntable, about 70 cm from your eyes.
-        const float TitleHeight = 0.021f, InfoHeight = 0.0135f, CreditHeight = 0.012f, HintHeight = 0.012f, StatusHeight = 0.011f;
+        const float TitleHeight = 0.021f, InfoHeight = 0.0135f, HintHeight = 0.012f, StatusHeight = 0.011f;
         /// <summary>How wide the words over the turntable may be (m), so the plate stays clear of the cassettes round it.</summary>
         const float PlateWidth = 0.18f;
         const string NoPicker = "The file picker opens on the headset";
@@ -54,7 +48,7 @@ namespace MusicInYourHands
         enum Status { Empty, Listening, Blank, NoPicker, Loading, Failed, Playing, Paused, Stopped }
         enum Hint { Pick, Edge, Turning, Carry, Drop, Blank }
 
-        TypeLabel title, info, credit, hint, status, statusCredit, tooltip, listLabel, closeLabel;
+        TypeLabel title, info, hint, status, tooltip, listLabel, closeLabel;
         TypeLabel[] steadyLabels;
         Renderer[] speakers;
         Renderer edgeGlow, floorShadow, frontPlate, radioPlate;
@@ -66,8 +60,8 @@ namespace MusicInYourHands
         Vector3 radioCaption;
         float captionFade, edgeAlpha, ghostAlpha, doorGlow = -1f, lastLight = -1f, lastSpeaker = -1f;
         Cassette shownFront;
-        bool shownInRadio, shownLyrics, shownCredit;
-        SongAsset shownStatusSong, shownCreditSong;
+        bool shownInRadio, shownLyrics;
+        SongAsset shownStatusSong;
         Status shownStatus = (Status)(-1);
         Hint shownHint = (Hint)(-1);
         int shownTooltip = -2;
@@ -112,10 +106,8 @@ namespace MusicInYourHands
             radioPlate = Effects.MakeQuad("Radio Plate", onTable, DeckParts.Material("Plate"));
             title = Caption("Front Title", TitleHeight);
             info = Caption("Front Info", InfoHeight);
-            credit = Caption("Front Credit", CreditHeight);
             hint = Caption("Hint", HintHeight);
             status = Caption("Radio Status", StatusHeight);
-            statusCredit = Caption("Radio Credit", CreditHeight);
             tooltip = Caption("Key Name", 0.0095f);
             listLabel = Caption("Song List Label", 0.0105f);
             listLabel.Text = "Song list";
@@ -161,7 +153,7 @@ namespace MusicInYourHands
             var key = song.title ?? "";
             for (int i = 0; i < key.Length; i++) hash = hash * 31 + key[i];
             hash &= 0x7fffffff;
-            var palette = song.IsFromAudius ? Cool : song.IsAdded ? Fresh : Warm;
+            var palette = song.IsAdded ? Fresh : Warm;
             return palette[hash % palette.Length];
         }
 
@@ -238,7 +230,7 @@ namespace MusicInYourHands
         /// <summary>
         /// Everything that shows state: each cassette's colour, label and glow (the front one lit, the one under a hand
         /// brighter), the snap outline, the door and light, the turntable's edge, the fingertip dots over the keys, and
-        /// the words: the front cassette's title, what it is and its credit, a hint, and what the radio is doing.
+        /// the words: the front cassette's title, what it is, a hint, and what the radio is doing.
         /// </summary>
         void StepLook(MusicBus bus, Camera view, float dt)
         {
@@ -411,9 +403,8 @@ namespace MusicInYourHands
         }
 
         /// <summary>
-        /// The words. Above the front cassette: its title, what it is (and whether it has lyrics), the credit a song
-        /// from Audius needs, and a hint for what to do next. Above the radio: what it is doing, with the credit of a
-        /// song from Audius while it plays. Each line is only rewritten when what it says changes.
+        /// The words. Above the front cassette: its title, what it is (and whether it has lyrics), and a hint for what
+        /// to do next. Above the radio: what it is doing. Each line is only rewritten when what it says changes.
         /// </summary>
         void StepCaptions(MusicBus bus, Camera view, float dt)
         {
@@ -428,8 +419,6 @@ namespace MusicInYourHands
             }
             if (!show)
             {
-                credit.GameObject.SetActive(false);
-                statusCredit.GameObject.SetActive(false);
                 tooltip.GameObject.SetActive(false);
                 return;
             }
@@ -452,13 +441,8 @@ namespace MusicInYourHands
                 infoScale = Mathf.Clamp(PlateWidth / Mathf.Max(TypeFace.Bold.Width(about) * InfoHeight, 1e-4f), 0.8f, 1f);
                 info.Text = Fit(about, InfoHeight * infoScale, PlateWidth);
                 info.Transform.localScale = Vector3.one * infoScale;
-                // A song from Audius carries the credit its license asks for across the lines: the title, then who
-                // made and owns it, then the license.
-                shownCredit = c != null && c.Song != null && c.Song.IsFromAudius;
-                if (shownCredit) credit.Text = AudiusSongs.License;
                 MeasureFront();
             }
-            if (credit.GameObject.activeSelf != shownCredit) credit.GameObject.SetActive(shownCredit);
 
             // The how-to line shows until the first cassette goes into the radio; the hints for what a hand is doing,
             // always.
@@ -487,17 +471,16 @@ namespace MusicInYourHands
             // The words stand on the middle of the turntable, a little towards the radio, leaning back to face your
             // eyes: seen from your seat they fill the gap between the front cassettes below them and the back of the
             // ring above, so they never cover a label you are choosing by, and they stay inside the narrow view.
-            float low = shownCredit ? -CreditHeight * 0.75f : -InfoHeight * 0.75f, y = 0f;
+            float low = -InfoHeight * 0.75f, y = 0f;
             float hintStep = 0.019f * hintFade;
             if (hintFade > 0.01f) low = Mathf.Lerp(low, -HintHeight * 0.75f, hintFade);
-            float creditY = hintStep, infoY = creditY + (shownCredit ? 0.0185f : 0f), titleY = infoY + 0.026f * Mathf.Lerp(0.85f, 1f, titleScale);
+            float infoY = hintStep, titleY = infoY + 0.026f * Mathf.Lerp(0.85f, 1f, titleScale);
             float high = titleY + TitleHeight * titleScale * 0.75f;
             var foot = onTable.TransformPoint(turntableAt + new Vector3(frontRight.x, 0f, frontRight.y) * PlateShift - new Vector3(front.x, 0f, front.y) * PlateBack
                 + Vector3.up * (platterTop + 0.007f));
             var facingYou = Facing(foot);
             var anchor = foot - facingYou * new Vector3(0f, low - 0.008f, 0f);
             if (hintFade > 0.01f) Line(hint, anchor, facingYou, y, new Color(1f, 1f, 1f, 0.66f * hintFade));
-            if (shownCredit) Line(credit, anchor, facingYou, creditY, new Color(1f, 1f, 1f, 0.74f));
             Line(info, anchor, facingYou, infoY, lyrics ? Color.Lerp(Soft, Lyrics, 0.55f) : Soft);
             Line(title, anchor, facingYou, titleY, c != null ? Color.Lerp(Color.white, c.Color, 0.25f) : Color.white);
             Plate(frontPlate, anchor, facingYou, low, high, Mathf.Lerp(frontWidthBare, frontWidth, hintFade));
@@ -514,8 +497,8 @@ namespace MusicInYourHands
                     Status.Playing => $"Playing  ·  {name}",
                     Status.Paused => $"Paused  ·  {name}",
                     Status.Stopped => $"Stopped  ·  {name}",
-                    Status.Loading => song != null && song.IsFromAudius ? $"Streaming {name} from Audius…" : $"Loading {name}…",
-                    Status.Failed => song != null && song.IsFromAudius ? $"Couldn't stream {name}. Is the headset online?" : $"Couldn't play {name}",
+                    Status.Loading => $"Loading {name}…",
+                    Status.Failed => $"Couldn't play {name}",
                     Status.Blank => "Choose a song on the headset…",
                     Status.NoPicker => NoPicker,
                     Status.Listening => "Listening to the room",
@@ -523,23 +506,12 @@ namespace MusicInYourHands
                 }, StatusHeight, 0.42f);
                 radioWidth = -1f;
             }
-            var playing = inserted != null && !inserted.Blank && inserted.Song != null && inserted.Song.IsFromAudius ? inserted.Song : null;
-            if (playing != shownCreditSong)
-            {
-                shownCreditSong = playing;
-                if (playing != null) statusCredit.Text = Fit(AudiusSongs.Credit(playing), CreditHeight, 0.44f);
-                radioWidth = -1f;
-            }
-            bool radioCredit = playing != null;
-            if (statusCredit.GameObject.activeSelf != radioCredit) statusCredit.GameObject.SetActive(radioCredit);
             if (radioWidth < 0f)
-                radioWidth = Mathf.Max(TypeFace.Bold.Width(status.Text) * StatusHeight, radioCredit ? TypeFace.Bold.Width(statusCredit.Text) * CreditHeight : 0f);
+                radioWidth = TypeFace.Bold.Width(status.Text) * StatusHeight;
             var radioAnchor = onTable.TransformPoint(radioCaption);
             var facingRadio = Facing(radioAnchor);
-            float ry = 0f;
-            if (radioCredit) Line(statusCredit, radioAnchor, facingRadio, ry, new Color(1f, 1f, 1f, 0.72f));
-            Line(status, radioAnchor, facingRadio, ry += radioCredit ? 0.0175f : 0f, now == Status.Failed || now == Status.NoPicker ? Warning : Color.white);
-            Plate(radioPlate, radioAnchor, facingRadio, radioCredit ? -CreditHeight * 0.75f : -StatusHeight * 0.75f, ry + StatusHeight * 0.75f, radioWidth);
+            Line(status, radioAnchor, facingRadio, 0f, now == Status.Failed || now == Status.NoPicker ? Warning : Color.white);
+            Plate(radioPlate, radioAnchor, facingRadio, -StatusHeight * 0.75f, StatusHeight * 0.75f, radioWidth);
 
             // The name of a radio key under a fingertip, just above it.
             int keyIndex = hands[0].Key >= 0 ? hands[0].Key : hands[1].Key;
@@ -570,7 +542,6 @@ namespace MusicInYourHands
         {
             var face = TypeFace.Bold;
             float w = Mathf.Max(face.Width(title.Text) * TitleHeight * titleScale, face.Width(info.Text) * InfoHeight * infoScale);
-            if (shownCredit) w = Mathf.Max(w, face.Width(credit.Text) * CreditHeight);
             frontWidthBare = w;
             frontWidth = Mathf.Max(w, face.Width(hint.Text) * HintHeight * hintScale);
         }
@@ -611,10 +582,9 @@ namespace MusicInYourHands
             if (c.Blank) return "Put it in the radio, then choose a song file";
             var song = c.Song;
             if (song == null) return "";
-            string what = song.IsFromAudius ? AudiusSongs.Byline(song)
-                : !string.IsNullOrEmpty(song.artist) ? song.artist
+            string what = !string.IsNullOrEmpty(song.artist) ? song.artist
                 : song.IsAdded ? "Your song" : "Comes with the app";
-            string words = song.IsFromAudius ? "" : lyrics ? "  ·  with lyrics" : "  ·  no lyrics";
+            string words = lyrics ? "  ·  with lyrics" : "  ·  no lyrics";
             return inRadio ? $"In the radio  ·  {what}{words}" : what + words;
         }
 
