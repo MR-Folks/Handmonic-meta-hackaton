@@ -548,6 +548,12 @@ namespace MusicInYourHands.EditorTools
             SetReferences(menu, ("bubbleMaterial", EnsureMaterial(BubbleMaterialPath, "MusicInYourHands/Bubble")), ("glowMaterial", glow),
                 ("lineMaterial", line), ("panelMaterial", EnsureMaterial(PanelMaterialPath, "MusicInYourHands/Panel")));
 
+            // Journey mode: the worlds follow each song's sections, with its wave, song map and end card.
+            var journey = Object.FindAnyObjectByType<JourneyMode>(FindObjectsInactive.Include);
+            if (journey == null) journey = new GameObject("Journey", typeof(JourneyMode)).GetComponent<JourneyMode>();
+            SetReferences(journey, ("bubbleMaterial", EnsureMaterial(BubbleMaterialPath, "MusicInYourHands/Bubble")), ("glowMaterial", glow),
+                ("lineMaterial", line), ("waveMaterial", EnsureMaterial(JourneyWaveMaterialPath, "MusicInYourHands/JourneyWave")));
+
             // Thumb tap and thumb swipes pause, play and step the songs in every world.
             var gestures = Object.FindAnyObjectByType<MusicGestures>(FindObjectsInactive.Include);
             if (gestures == null) gestures = new GameObject("MusicGestures", typeof(MusicGestures)).GetComponent<MusicGestures>();
@@ -628,6 +634,7 @@ namespace MusicInYourHands.EditorTools
         public const string RingMaterialPath = Root + "/Materials/Ring.mat";
         public const string ShellMaterialPath = Root + "/Materials/Shell.mat";
         public const string LivingWallsMaterialPath = Root + "/Materials/LivingWalls.mat";
+        public const string JourneyWaveMaterialPath = Root + "/Materials/JourneyWave.mat";
 
         public static Material EnsureHandMaterial() => EnsureMaterial(HandMaterialPath, "MusicInYourHands/Hand");
 
