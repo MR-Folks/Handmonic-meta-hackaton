@@ -116,7 +116,7 @@ Shader "MusicInYourHands/Bubble"
                 }
                 else if (icon < 4.5)
                 {
-                    // Note rain: drops with tails.
+                    // Free since Note rain joined Lightning: drops with tails.
                     [unroll] for (int k = 0; k < 5; k++)
                     {
                         float x = -0.44 + k * 0.22;
@@ -312,7 +312,7 @@ Shader "MusicInYourHands/Bubble"
                 }
                 else if (icon < 21.5)
                 {
-                    // Word snow: little words and flakes falling.
+                    // Free since Word snow joined Lightning: little words and flakes falling.
                     [unroll] for (int k = 0; k < 6; k++)
                     {
                         float x = -0.5 + k * 0.2;
@@ -490,11 +490,21 @@ Shader "MusicInYourHands/Bubble"
                 else if (icon < 29.5)
                 {
                     // BEGIN emblem 29 (Lightning)
-                    // A bolt striking down, flickering, a ring spreading where it lands.
+                    // A bolt striking down, flickering, a ring spreading where it lands; round it rain falls, then snow,
+                    // in turn.
                     float d = min(min(Segment(p, float2(0.12, 0.6), float2(-0.12, 0.08)), Segment(p, float2(-0.12, 0.08), float2(0.14, 0.02))),
                                   Segment(p, float2(0.14, 0.02), float2(-0.08, -0.6)));
                     e = Line(d, 0.06) * (0.75 + 0.25 * step(0.5, frac(t * 7)));
                     e += Line(abs(length(float2(p.x * 0.6, (p.y + 0.62) * 2.5)) - 0.25 - 0.1 * frac(t)), 0.03) * (1 - frac(t));
+                    float snow = step(0.5, frac(t * 0.125));
+                    [unroll] for (int k = 0; k < 4; k++)
+                    {
+                        float x = k < 2 ? -0.56 + k * 0.17 : 0.39 + (k - 2) * 0.17;
+                        float y = 0.55 - frac(t * lerp(0.9, 0.3, snow) + k * 0.37) * 1.1;
+                        float2 q = p - float2(x + snow * 0.04 * sin(t * 2 + k), y);
+                        float drop = exp(-dot(q, q) * 500) + Line(abs(q.x), 0.018) * saturate(1 - q.y / 0.18) * step(0, q.y) * 0.5;
+                        e += lerp(drop, exp(-dot(q, q) * 300), snow) * 0.8;
+                    }
                     // END emblem 29
                 }
                 else

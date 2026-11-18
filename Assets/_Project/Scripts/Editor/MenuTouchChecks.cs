@@ -21,7 +21,7 @@ namespace MusicInYourHands.EditorTools
             var worlds = new World[]
             {
                 MakePreviewWorld<HeartbeatOrb>(managerGo.transform),
-                MakePreviewWorld<NoteRain>(managerGo.transform),
+                MakePreviewWorld<Lightning>(managerGo.transform),
                 MakePreviewWorld<BubbleNotes>(managerGo.transform),
                 MakePreviewWorld<SoundPool>(managerGo.transform)
             };

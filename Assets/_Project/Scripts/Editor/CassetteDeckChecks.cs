@@ -108,7 +108,7 @@ namespace MusicInYourHands.EditorTools
             camera.transform.SetPositionAndRotation(new Vector3(0f, 1.2f, 0f), Quaternion.Euler(20f, 0f, 0f));
             var rig = new GameObject("HandRig").AddComponent<HandRig>();
             var managerGo = new GameObject("Worlds");
-            var worlds = new World[] { MakePreviewWorld<HeartbeatOrb>(managerGo.transform), MakePreviewWorld<NoteRain>(managerGo.transform) };
+            var worlds = new World[] { MakePreviewWorld<HeartbeatOrb>(managerGo.transform), MakePreviewWorld<Lightning>(managerGo.transform) };
             var manager = managerGo.AddComponent<WorldManager>();
             var mso = new SerializedObject(manager);
             var list = mso.FindProperty("worlds");

@@ -7,9 +7,10 @@ namespace MusicInYourHands
     /// your fingertips, more when the music is loud. Close a fist and lightning strikes from the ceiling to the floor in
     /// front of you, with a flash that lights the room, a ring burnt into the floor and thunder. Pinch and a bolt leaps
     /// from your pinch to where you point, ringing a note where it lands; keep pinching and it strikes again on every
-    /// beat. The sung word flashes where the last bolt landed.
+    /// beat. All the while it rains or it snows, one at a time, with the sung words falling among the drops or flakes;
+    /// hold a fist for a couple of seconds to turn the rain to snow or the snow to rain (see Lightning.Weather.cs).
     /// </summary>
-    public class Lightning : World
+    public partial class Lightning : World
     {
         public override string DisplayName => "Lightning";
 
@@ -19,7 +20,7 @@ namespace MusicInYourHands
 
         public override int MenuIcon => 29;
 
-        public override string Hint => "Make a fist for thunder; pinch and point to zap";
+        public override string Hint => "Fist for thunder, hold it to switch snow and rain; pinch and point to zap";
 
         public override HandTheme Theme => new HandTheme
         {
@@ -34,6 +35,10 @@ namespace MusicInYourHands
         [SerializeField] Material lineMaterial;
         [SerializeField] Material ringMaterial;
         [SerializeField] Material veilMaterial;
+        [Tooltip("The falling snow and rain, the flakes that have settled and the drops' ripples (Materials/LightningWeather).")]
+        [SerializeField, WorldMaterial("LightningWeather")] Material weatherMaterial;
+        [Tooltip("The snow and the water on the floor and the furniture (Materials/LightningGround).")]
+        [SerializeField, WorldMaterial("LightningGround")] Material groundMaterial;
 
         [Header("Storm")]
         [Tooltip("How dark the room gets (0 not at all, 1 black).")]
@@ -88,13 +93,13 @@ namespace MusicInYourHands
         MaterialPropertyBlock block;
         ParticleSystem sparks;
         AudioPool voices;
-        Vector3 lastImpact;
-        float lastImpactTime = -99f, flash, cooldown;
+        float flash, cooldown;
         int nextMark;
 
-        protected override int SungWordCount => 4;
+        // The sung words fall with the weather (OnWord in Lightning.Weather.cs).
+        protected override int SungWordCount => 24;
 
-        protected override float SungWordHeight => 0.034f;
+        protected override float SungWordHeight => 0.05f;
 
         protected override void OnBuild()
         {
@@ -131,13 +136,15 @@ namespace MusicInYourHands
             sparks = Effects.MakeSparkSystem("Bolt Sparks", transform, glowMaterial);
             var main = sparks.main;
             main.gravityModifier = 0.25f;
-            voices = new AudioPool(transform, 8);
+            voices = new AudioPool(transform, 10);
+            BuildWeather();
         }
 
         protected override void OnEnter()
         {
             flash = 0f;
             wasFist[0] = wasFist[1] = false;
+            EnterWeather();
         }
 
         protected override void OnExit()
@@ -146,12 +153,17 @@ namespace MusicInYourHands
             foreach (var b in bolts) { b.Active = false; b.Line.SetVisible(false); }
             foreach (var m in marks) { m.Age = 99f; m.Ring.gameObject.SetActive(false); m.Glow.gameObject.SetActive(false); }
             foreach (var t in tipLights) t.gameObject.SetActive(false);
+            ExitWeather();
         }
 
         void OnDestroy()
         {
             if (veilInstance != null) Discard(veilInstance);
+            DestroyWeather();
         }
+
+        /// <summary>The snow and the puddles are laid out on the floor around you, and on the furniture once the room is scanned.</summary>
+        protected override void OnPlace(Camera view) => PlaceGround(view);
 
         /// <summary>A pinch zaps where you point.</summary>
         protected override void OnPinch(HandRig.Hand hand, bool left)
@@ -183,14 +195,17 @@ namespace MusicInYourHands
             if (rig != null)
                 for (int side = 0; side < 2; side++) Hand(rig.Get(side == 0), side, music, view, energy, dt);
             else
+            {
                 foreach (var t in tipLights) t.gameObject.SetActive(false);
+                for (int side = 0; side < 2; side++) HideCharge(side);
+            }
             if (previewStorm) PreviewNow(rig, music, view);
 
             UpdateBolts(view, dt);
             UpdateMarks(music, view, dt);
             flash = Mathf.Max(0f, flash - dt * 3f);
+            StepWeather(rig, music, view, dt);
             DrawVeil(view, music);
-            Sing(music, view, dt);
         }
 
         void Hand(HandRig.Hand hand, int side, MusicFrame music, Camera view, float energy, float dt)
@@ -200,7 +215,8 @@ namespace MusicInYourHands
             bool open = tracked && hand.Fist < 0.4f && hand.Pinch < 0.6f;
 
             // Closing a fist calls the big strike, but not while the hands are choosing in the menu; a fist still closed
-            // when the menu goes has to open first. The fingertips crackle either way.
+            // when the menu goes has to open first. The fingertips crackle either way. A fist kept closed strikes once,
+            // then builds up a change of weather (Hold).
             if (fist && !wasFist[side] && cooldown <= 0f && !MenuOpen)
             {
                 Strike(hand, music, view);
@@ -208,6 +224,7 @@ namespace MusicInYourHands
                 Acted("strike");
             }
             wasFist[side] = fist || (wasFist[side] && tracked && hand.Fist > 0.5f);
+            Hold(hand, side, tracked, music, view, dt);
 
             // Crackling fingertips: more sparks the louder the music.
             charge[side] = Mathf.MoveTowards(charge[side], open ? 0.3f + energy * 0.7f : fist ? 1f : 0.2f, dt * 3f);
@@ -247,7 +264,8 @@ namespace MusicInYourHands
 
         /// <summary>
         /// The fist's strike: from the ceiling to the floor a little way in front of you, in the direction of the fist
-        /// (kept inside the room's walls), with branches, a flash, a burn ring and thunder.
+        /// (kept inside the room's walls), with branches, a flash, a burn ring and thunder. In the snow it melts a round
+        /// hole into the settled snow; in the rain it throws up a big splash.
         /// </summary>
         void Strike(HandRig.Hand hand, MusicFrame music, Camera view)
         {
@@ -274,16 +292,16 @@ namespace MusicInYourHands
             flash = 1f;
             AddMark(ground + Vector3.up * 0.005f, Vector3.up, 1.1f, StrikeColor, 2.5f);
             Burst(ground + Vector3.up * 0.05f, 60, StrikeColor, 1.2f);
+            WeatherImpact(ground, Vector3.up, 0.5f, true);
             voices.Play(Thunder(), ground, 1f);
             // The song's note underneath, low, so the thunder belongs to the music.
             Musical.Play(voices, music, 45, ground, 0.5f);
-            lastImpact = ground + Vector3.up * 0.5f;
-            lastImpactTime = Clock;
         }
 
         /// <summary>
         /// A bolt from the pinch to where you point: along a ray from your shoulder through the pinch, to the first
-        /// wall, floor or ceiling it meets, or <see cref="reach"/> metres away. It rings a note where it lands, higher up the wall for higher notes.
+        /// wall, floor or ceiling it meets, or <see cref="reach"/> metres away. It rings a note where it lands, higher up
+        /// the wall for higher notes, and on the floor it melts a little snow or splashes the water.
         /// </summary>
         void Zap(Vector3 from, int side, MusicFrame music, Camera view)
         {
@@ -319,14 +337,13 @@ namespace MusicInYourHands
                 Spawn(at, at + branch * length, 3, length * 0.4f, 0.01f, 0.22f, ZapColor, 1.1f);
             }
             if (hit) AddMark(to + normal * 0.005f, normal, 0.25f, ZapColor, 1.2f);
+            if (hit && normal.y > 0.7f) WeatherImpact(to, normal, 0.14f, false);
             Burst(to + normal * 0.03f, 18, ZapColor, 0.5f);
             flash = Mathf.Max(flash, 0.25f);
             voices.Play(ZapSound(), to, 0.5f);
             // Higher on the wall, higher the note.
             int wanted = 57 + Mathf.RoundToInt(Mathf.Clamp01((to.y - floor) / 2.4f) * 22f);
             Musical.Play(voices, music, wanted, to, 0.45f, pluck: true);
-            lastImpact = to + normal * 0.15f;
-            lastImpactTime = Clock;
         }
 
         /// <summary>Starts a bolt between two points.</summary>
@@ -473,29 +490,6 @@ namespace MusicInYourHands
             // The dark breathes a little with the bass, like a storm rolling.
             veilInstance.SetFloat(DarkId, darkness * (0.92f + 0.08f * music.Band(0)));
             veilInstance.SetFloat(FlashId, flash);
-        }
-
-        /// <summary>The sung word flashes where the last bolt landed, or in front of you.</summary>
-        protected override void OnWord(string word, bool newLine)
-        {
-            var eye = View.transform.position;
-            bool recent = Clock - lastImpactTime < 1.5f && Vector3.Distance(lastImpact, eye) < 3.5f;
-            var w = SungWords.Add(word, Color.Lerp(StrikeColor, Color.white, 0.4f), 1.8f, alone: true);
-            w.Position = recent ? lastImpact : eye + Effects.FlatForward(View) * 0.65f + Vector3.down * 0.1f;
-            w.Velocity = Vector3.up * 0.03f;
-            w.Size = recent ? 1.6f : 1f;
-        }
-
-        void Sing(MusicFrame music, Camera view, float dt)
-        {
-            var eye = view.transform.position;
-            foreach (var w in SungWords.Words)
-            {
-                if (!w.Active) continue;
-                w.Position += w.Velocity * dt;
-                w.Rotation = WordLayer.Facing(w.Position, eye);
-                w.Halo = 0.4f + flash * 0.8f;
-            }
         }
 
         /// <summary>For previews: on the next step, a strike from the left fist and a zap from the right pinch.</summary>

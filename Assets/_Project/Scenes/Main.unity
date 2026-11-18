@@ -295,65 +295,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &122405006
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 122405008}
-  - component: {fileID: 122405007}
-  m_Layer: 0
-  m_Name: NoteRain
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &122405007
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 122405006}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4823f3cda12e2469dbac910f638f567a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.NoteRain
-  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
-  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
-  streakMaterial: {fileID: 2100000, guid: 141076a49ca5548e9a16f7ac49f7d207, type: 2}
-  ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
-  areaWidth: 0.9
-  areaDepth: 0.4
-  distance: 0.5
-  spawnHeight: 0.35
-  fallTime: 1.8
-  catchRadius: 0.075
-  maxDrops: 120
-  drizzleRate: 30
-  dropsPerBeat: 3
-  onsetRise: 0.16
-  onsetLevel: 0.45
---- !u!4 &122405008
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 122405006}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1462377328}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &176874510
 GameObject:
   m_ObjectHideFlags: 0
@@ -546,56 +487,6 @@ Transform:
   m_Children:
   - {fileID: 62205579}
   m_Father: {fileID: 1512639470}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &377810159
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 377810161}
-  - component: {fileID: 377810160}
-  m_Layer: 0
-  m_Name: WordSnow
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &377810160
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 377810159}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: aec8a76d2e5d2473e93d18c1b818673b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.WordSnow
-  letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
-  glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
-  letterHeight: 0.075
-  fallSpeed: 0.22
-  lieTime: 25
-  maxWords: 48
---- !u!4 &377810161
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 377810159}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1462377328}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &403129348
 GameObject:
@@ -949,9 +840,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: MusicInYourHands.Runtime::MusicInYourHands.Lightning
   letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
+  holdSeconds: 2
+  snowRate: {x: 55, y: 65}
+  rainRate: {x: 90, y: 110}
+  weatherReach: 2.5
+  headRoom: 0.35
+  wordLieSeconds: 6
+  snowBudget: 2600
   lineMaterial: {fileID: 2100000, guid: 1564f1007819e4988bc7a29c5c9e89f8, type: 2}
   ringMaterial: {fileID: 2100000, guid: 26597b64c246a4c9f832375e9f15a303, type: 2}
   veilMaterial: {fileID: 2100000, guid: 6bba94ec3a9ca4a65a365090b5f3b653, type: 2}
+  weatherMaterial: {fileID: 2100000, guid: 25c4ccfa0f29d474381c818902fb6a57, type: 2}
+  groundMaterial: {fileID: 2100000, guid: 60fa801b67403ff4d803a70c77d6b24e, type: 2}
   darkness: 0.45
   strikeDistance: 1.6
   reach: 4
@@ -1965,7 +1865,6 @@ MonoBehaviour:
   - {fileID: 1788851835}
   - {fileID: 790749978}
   - {fileID: 179923059}
-  - {fileID: 122405007}
   - {fileID: 2000780158}
   - {fileID: 1153605162}
   - {fileID: 1715105674}
@@ -1983,7 +1882,6 @@ MonoBehaviour:
   - {fileID: 2026124819}
   - {fileID: 1970306282}
   - {fileID: 683420573}
-  - {fileID: 377810160}
   startWorld: 0
 --- !u!4 &1462377328
 Transform:
@@ -2002,7 +1900,6 @@ Transform:
   - {fileID: 1788851836}
   - {fileID: 790749979}
   - {fileID: 179923060}
-  - {fileID: 122405008}
   - {fileID: 2000780159}
   - {fileID: 1153605163}
   - {fileID: 1715105675}
@@ -2020,7 +1917,6 @@ Transform:
   - {fileID: 2026124820}
   - {fileID: 1970306283}
   - {fileID: 683420574}
-  - {fileID: 377810161}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1492539440
