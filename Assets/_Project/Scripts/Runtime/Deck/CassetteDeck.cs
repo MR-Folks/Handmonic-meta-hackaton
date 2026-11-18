@@ -830,6 +830,9 @@ namespace MusicInYourHands
 
         public Transform Root => root;
 
+        /// <summary>The radio standing on the table (for measuring how much of your view the deck takes up).</summary>
+        public Transform Radio => radio;
+
         /// <summary>The song of the cassette at the front of the turntable (null for the blank).</summary>
         public SongAsset FrontSong => ring.Count > 0 && turning.Front >= 0 ? ring[turning.Front].Song : null;
 

@@ -44,6 +44,8 @@ namespace MusicInYourHands.EditorTools
             ok &= CheckMenuPreview();
             ok &= CheckMenuTouch();
             ok &= CheckPopSound();
+            ok &= CheckMenuFieldOfView();
+            ok &= CheckMenuFollow();
             ok &= CheckCassetteDeck();
             ok &= CheckMenuHands();
             ok &= CheckMusicGestures();
@@ -422,8 +424,9 @@ namespace MusicInYourHands.EditorTools
             wso.FindProperty("glowMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow");
             wso.FindProperty("lineMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.LineMaterialPath, "MusicInYourHands/Line");
             wso.ApplyModifiedPropertiesWithoutUndo();
-            // Lower the hands out of the way, as if the player had just opened the menu.
-            foreach (var hand in hands) { hand.Root.transform.position += Vector3.down * 0.3f; PushHand(rig, hand); }
+            // Lower the hands out of the way, as if the player had just opened the menu, and see all of it.
+            camera.fieldOfView = 60f;
+            foreach (var hand in hands) { hand.Root.transform.position += Vector3.down * 0.45f; PushHand(rig, hand); }
             menu.Step(rig, manager, null, camera, 0f);
             menu.Open(camera);
             for (int i = 0; i < 20; i++) menu.Step(rig, manager, null, camera, 0.05f);

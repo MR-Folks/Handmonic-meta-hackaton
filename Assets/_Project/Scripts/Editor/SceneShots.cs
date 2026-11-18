@@ -434,8 +434,33 @@ namespace MusicInYourHands.EditorTools
             menu.Step(rig, manager, null, camera, 0f);
             menu.Open(camera);
             for (int i = 0; i < 24; i++) menu.Step(rig, manager, null, camera, 0.05f);
+            // The right index fingertip 3 cm in front of the lyrics bubble, about to touch it: the dot under the
+            // fingertip, the bubble swelling and its name over the menu.
+            var root = menu.transform.Find("Menu");
+            var rightBones = hands[1].Root.GetComponentsInChildren<Transform>();
+            Vector3 Tip(string name) => rightBones.First(t => t.name == name).position;
+            var reach = root.Find("Bubble Lyrics").position - root.forward * 0.03f - Tip("XRHand_IndexTip");
+            hands[1].Root.transform.position += reach;
+            PushHand(rig, hands[1]);
+            for (int i = 0; i < 12; i++) menu.Step(rig, manager, null, camera, 0.05f);
             foreach (var hand in hands) hand.Root.GetComponent<HandSkin>().Apply();
             File.WriteAllBytes($"{ShotFolder}/7-menu.png", Render(camera, 1600, 900).EncodeToPNG());
+            hands[1].Root.transform.position -= reach;
+            PushHand(rig, hands[1]);
+
+            // Pointing at a bubble from arm's length, the hand open: the ray lands on it, it swells and its name shows
+            // over the menu. The point between thumb and index fingertips goes on the line from the shoulder to the bubble.
+            var aimed = root.Find($"Bubble {Mathf.Min(8, worlds.Length - 1)}").position;
+            var side = Vector3.Cross(Vector3.up, Vector3.ProjectOnPlane(camera.transform.forward, Vector3.up).normalized).normalized;
+            var shoulder = camera.transform.position + Vector3.down * 0.17f + side * 0.17f;
+            reach = shoulder + (aimed - shoulder) * 0.55f - (Tip("XRHand_ThumbTip") + Tip("XRHand_IndexTip")) * 0.5f;
+            hands[1].Root.transform.position += reach;
+            PushHand(rig, hands[1]);
+            for (int i = 0; i < 12; i++) menu.Step(rig, manager, null, camera, 0.05f);
+            foreach (var hand in hands) hand.Root.GetComponent<HandSkin>().Apply();
+            File.WriteAllBytes($"{ShotFolder}/7h-menu-hover.png", Render(camera, 1600, 900).EncodeToPNG());
+            hands[1].Root.transform.position -= reach;
+            PushHand(rig, hands[1]);
 
             // The song library's pages, with made-up songs.
             SongAsset Song(string title, string artist, bool lyrics)
@@ -462,6 +487,51 @@ namespace MusicInYourHands.EditorTools
             Page("7b-library-empty", new SongAsset[0], 0);
             Page("7c-library-ask-lyrics", songs, 1);
             Page("7d-library-remove", songs, 2);
+
+            // For the Devpost: the menu where it opens in front of a standing player looking straight ahead (as
+            // CheckMenuFieldOfView measures it), the hands lowered, and the outline of Meta's
+            // recommended design area round the middle of the view.
+            menu.Close();
+            camera.transform.rotation = Quaternion.identity;
+            foreach (var hand in hands)
+            {
+                hand.Root.transform.position += Vector3.down * 0.45f;
+                PushHand(rig, hand);
+            }
+            menu.Open(camera);
+            for (int i = 0; i < 24; i++) menu.Step(rig, manager, null, camera, 0.05f);
+            var outline = DrawDesignArea(camera);
+            File.WriteAllBytes($"{ShotFolder}/7v-menu-design-area.png", Render(camera, 1600, 900).EncodeToPNG());
+            Object.DestroyImmediate(outline);
+        }
+
+        /// <summary>
+        /// For the screenshots only: the outline of Meta's recommended design area as the camera's eye sees it, 58°
+        /// across and 54° high round the middle of the view, drawn on a frame 0.9 m away (behind the menu) and labelled
+        /// under it.
+        /// </summary>
+        static GameObject DrawDesignArea(Camera camera)
+        {
+            var overlay = new GameObject("Design Area Outline");
+            var line = ProjectSetup.EnsureMaterial(ProjectSetup.LineMaterialPath, "MusicInYourHands/Line");
+            var eye = camera.transform;
+            const float depth = 0.9f;
+            float x = depth * Mathf.Tan(WorldMenu.DesignArea.x * 0.5f * Mathf.Deg2Rad), y = depth * Mathf.Tan(WorldMenu.DesignArea.y * 0.5f * Mathf.Deg2Rad);
+            var corners = new[] { new Vector3(-x, -y, depth), new Vector3(x, -y, depth), new Vector3(x, y, depth), new Vector3(-x, y, depth) };
+            var color = new Color(1f, 0.82f, 0.4f, 0.95f);
+            var points = new Vector3[2];
+            for (int i = 0; i < 4; i++)
+            {
+                var edge = new LineStrip($"Edge {i}", overlay.transform, line, 2);
+                points[0] = eye.TransformPoint(corners[i]);
+                points[1] = eye.TransformPoint(corners[(i + 1) % 4]);
+                edge.Set(points, 2, 0.006f, color, eye.position, false);
+            }
+            var label = new TypeLabel("Design Area Label", overlay.transform, 0.026f, 1f);
+            label.Text = $"Meta's recommended design area, {WorldMenu.DesignArea.x:0}° × {WorldMenu.DesignArea.y:0}°";
+            label.Transform.SetPositionAndRotation(eye.TransformPoint(new Vector3(0f, -y - 0.016f, depth)), eye.rotation);
+            label.Color = color;
+            return overlay;
         }
 #endif
     }
