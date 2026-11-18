@@ -52,7 +52,7 @@ namespace MusicInYourHands.EditorTools
 
         /// <summary>
         /// The music gestures, driven with made-up microgestures: a thumb tap pauses and plays and swipes step to the
-        /// previous and next song, with either hand; forward and backward swipes do nothing; a hand that pinches (or has
+        /// previous and next song, with either hand; a backward swipe does nothing; a hand that pinches (or has
         /// just let go), makes Meta's menu gesture, makes a fist or isn't tracked is ignored while the other hand still
         /// works; nothing happens while the menu is open, nor a second command within the cooldown; while listening to
         /// the room the song is left alone; a song that streams in keeps its caption until it plays, or says it couldn't;
@@ -131,8 +131,7 @@ namespace MusicInYourHands.EditorTools
             cooled &= music.Index == 1;
             Wait();
 
-            // Forward and backward swipes do nothing, not even start the cooldown.
-            Do(false, Microgesture.SwipeForward);
+            // A backward swipe does nothing, not even start the cooldown (a forward one is the menu's: CheckOneHanded).
             Do(false, Microgesture.SwipeBackward);
             bool unused = music.Index == 1 && music.Playing && Tap(false);
             Wait();
@@ -242,7 +241,7 @@ namespace MusicInYourHands.EditorTools
                               "Meta's menu gesture, a fist, a lost hand, the open menu and the cooldown block them; listening " +
                               "leaves the song alone; a streaming song keeps its caption; idle frames allocate nothing.");
             else Debug.LogError($"[Check] Music gestures: tap pauses {paused}, tap plays {played}, swipe right next {next}, " +
-                                $"swipe left previous {previous}, cooldown {cooled}, forward/backward unused {unused}, menu blocks {menuBlocks}, " +
+                                $"swipe left previous {previous}, cooldown {cooled}, backward unused {unused}, menu blocks {menuBlocks}, " +
                                 $"pinch blocks {pinchBlocks}, system gesture blocks {systemBlocks}, fist blocks {fistBlocks}, " +
                                 $"lost hand blocks {lostBlocks}, listening {listening}, streaming caption {streaming}, hidden by menu {hidden}, " +
                                 $"allocations in idle frames {idle}, in frames with a caption {showing} (probe {probe}).");

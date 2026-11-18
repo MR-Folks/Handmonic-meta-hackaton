@@ -33,6 +33,9 @@ namespace MusicInYourHands
     /// small bubble with the emblem of the menu's matching button, and a soft note in the song's key sounds from your
     /// thumb. A song that still has to load keeps its caption until it plays, or says it couldn't. While you listen to
     /// the room there is no song to pause or change, so the caption says "Listening" and nothing changes.
+    /// A swipe forward, along the finger towards its tip, opens or closes the world menu with either hand, beside Meta's
+    /// own left-hand menu gesture: it passes the same gates, except that it also works while the menu is open (to close
+    /// it), though not while the file picker is.
     /// To avoid accidents a hand is ignored while it isn't tracked, makes Meta's menu gesture, pinches or makes a fist,
     /// and for a moment after; every gesture is ignored while the world menu (with its song page and file picker) is
     /// open; and two commands are at least half a second apart.
@@ -124,6 +127,10 @@ namespace MusicInYourHands
         readonly float[] quietUntil = new float[2];
         readonly string[] quietReason = { "", "" };
         float clock, lastCommand = -99f, menuQuietUntil;
+        bool pickerOpen;
+
+        /// <summary>For the editor checks: how many times a forward swipe has asked the menu to open or close.</summary>
+        public int MenuToggles { get; private set; }
 
         Transform root, content;
         TypeLabel label;
@@ -157,7 +164,8 @@ namespace MusicInYourHands
         {
             var menu = WorldMenu.Instance;
             // The song page lives inside the menu; the file picker it opens closes the menu but is still part of it.
-            bool menuOpen = (menu != null && menu.IsOpen) || SongPicker.Waiting;
+            pickerOpen = SongPicker.Waiting;
+            bool menuOpen = (menu != null && menu.IsOpen) || pickerOpen;
             bus.Bus = MusicBus.Instance;
             Step(HandRig.Instance, bus.Bus != null ? bus : null, menuOpen, Camera.main, Time.deltaTime);
         }
@@ -189,7 +197,12 @@ namespace MusicInYourHands
                 int gesture = pending[s];
                 pending[s] = -1;
                 if (gesture < 0) continue;
-                string held = music == null ? "no music" : clock < quietUntil[s] ? quietReason[s] + " (or just before)"
+                // A forward swipe is the menu's own, so it needs no music and works with the menu open; the rest are the song's.
+                bool forMenu = gesture == (int)Microgesture.SwipeForward;
+                string held = forMenu
+                    ? clock < quietUntil[s] ? quietReason[s] + " (or just before)" : pickerOpen ? "file picker open"
+                    : clock - lastCommand < cooldown ? "cooldown" : null
+                    : music == null ? "no music" : clock < quietUntil[s] ? quietReason[s] + " (or just before)"
                     : clock < menuQuietUntil ? "menu open (or just closed)" : clock - lastCommand < cooldown ? "cooldown" : null;
                 if (LogGestures)
                 {
@@ -197,6 +210,15 @@ namespace MusicInYourHands
                     Debug.Log($"[Gestures] {(s == 0 ? "left" : "right")} {(Microgesture)gesture}: {held ?? "acted"} (pinch {(h != null ? h.Pinch : -1f):0.00}, fist {(h != null ? h.Fist : -1f):0.00})");
                 }
                 if (held != null) continue;
+                if (forMenu)
+                {
+                    // The thumb and index light; the menu lights the whole hand and chimes as it opens or closes.
+                    GestureFeedback.Light(s == 0, Fingers.Thumb | Fingers.Index);
+                    WorldMenu.RequestToggle(s == 0);
+                    MenuToggles++;
+                    lastCommand = clock;
+                    continue;
+                }
                 if (!Act((Microgesture)gesture, music, rig.Get(s == 0), s == 0)) continue;
                 lastCommand = clock;
                 Used?.Invoke(s == 0, (Microgesture)gesture);
@@ -212,7 +234,7 @@ namespace MusicInYourHands
         bool Act(Microgesture gesture, IMusicRemote music, HandRig.Hand hand, bool left)
         {
             int step = gesture == Microgesture.SwipeRight ? 1 : gesture == Microgesture.SwipeLeft ? -1 : 0;
-            // Forward and backward swipes are left free.
+            // Backward swipes are left free (forward ones open the menu, in Step).
             if (step == 0 && gesture != Microgesture.ThumbTap) return false;
             awaited = null;
             var thumb = hand.TipJoints[0] != null ? hand.TipJoints[0].position : hand.Tips[0];

@@ -10,6 +10,7 @@ namespace MusicInYourHands
     /// trails of light wind around it with comets racing along them, energy threads flow from your fingertips into
     /// it, and motes drift off its surface. Your hands glow with heat on the side facing it, each kick nudges your
     /// visible hands apart (fake resistance), and spreading your hands turns the music up.
+    /// With only one hand up, the orb rests just over that open palm instead, and turning the hand turns it.
     /// </summary>
     public class HeartbeatOrb : World
     {
@@ -46,6 +47,10 @@ namespace MusicInYourHands
         [Tooltip("How far beyond the palms, away from the player's face, the orb floats (m).")]
         [SerializeField] float forwardOffset = 0.1f;
         [SerializeField] float beatSwell = 0.12f;
+        [Tooltip("The orb's radius while it rests on one open palm (m).")]
+        [SerializeField] float palmRadius = 0.075f;
+        [Tooltip("How far above the palm, out of it, the orb's surface floats while it rests on one hand (m).")]
+        [SerializeField] float palmGap = 0.035f;
         [Tooltip("Petal counts the shell steps through, one every eight beats.")]
         [SerializeField] int[] petals = { 3, 4, 5, 6, 4, 7 };
 
@@ -116,7 +121,13 @@ namespace MusicInYourHands
         Vector3 angularVelocity;
         float radius, visibility, moteDebt, morph = -1f, energy, waveAge = 9f;
         int beats;
-        bool hasCenter, hasAxis, wasHolding;
+        bool hasCenter, hasAxis, hasPalm;
+        // How the orb is held: 0 not, 2 between both hands, -1 or 1 on the left or right palm.
+        int heldMode;
+        // How long (s) since both hands last held the orb, so a hand that blinks out for a moment doesn't drop it onto
+        // the other palm.
+        float sinceBoth = 10f;
+        Quaternion lastPalm = Quaternion.identity;
         float savedVolume = -1f;
 
         protected override int SungWordCount => 3;
@@ -134,7 +145,9 @@ namespace MusicInYourHands
         {
             if (MusicBus.Instance != null && savedVolume >= 0f) MusicBus.Instance.Volume = savedVolume;
             savedVolume = -1f;
-            hasCenter = hasAxis = wasHolding = false;
+            hasCenter = hasAxis = hasPalm = false;
+            heldMode = 0;
+            sinceBoth = 10f;
             visibility = 0f;
             if (HandRig.Instance != null)
             {
@@ -157,16 +170,34 @@ namespace MusicInYourHands
             var left = rig.Left;
             var right = rig.Right;
             // While the menu is open the hands are choosing there: the orb lets go (and the volume stays put) until it closes.
-            bool holding = left.IsTracked && right.IsTracked && !MenuOpen;
+            bool both = left.IsTracked && right.IsTracked && !MenuOpen;
+            // With one hand up, open, the orb rests on its palm.
+            var palmHand = left.IsTracked != right.IsTracked ? (left.IsTracked ? left : right) : null;
+            sinceBoth = both ? 0f : sinceBoth + dt;
+            // Just after both hands held it, the orb waits a moment for the missing hand before settling on one palm.
+            bool waiting = !both && sinceBoth < 0.35f && !MenuOpen;
+            bool onPalm = !both && !waiting && palmHand != null && !MenuOpen && palmHand.Fist < 0.5f && !palmHand.InSystemGesture;
+            bool holding = both || onPalm;
+            int mode = both ? 2 : onPalm ? (palmHand == left ? -1 : 1) : 0;
             float spread = 0f;
-            // Both hands light up as they take hold of the orb, with a soft tick between them.
-            if (holding && !wasHolding)
+            // The hands light up as they take hold of the orb (or it settles on a palm), with a soft tick.
+            if (holding && mode != heldMode)
             {
-                Feedback(GestureKind.Touch, true, (PalmPosition(left) + PalmPosition(right)) * 0.5f, 0.8f, true, Fingers.All);
-                GestureFeedback.Light(false, Fingers.All, 0.8f);
+                if (both)
+                {
+                    Feedback(GestureKind.Touch, true, (PalmPosition(left) + PalmPosition(right)) * 0.5f, 0.8f, true, Fingers.All);
+                    GestureFeedback.Light(false, Fingers.All, 0.8f);
+                }
+                else Feedback(GestureKind.Touch, palmHand == left, PalmPosition(palmHand), 0.8f, true, Fingers.All);
             }
-            wasHolding = holding;
-            if (holding)
+            if (!waiting) heldMode = holding ? mode : 0;
+            if (onPalm)
+            {
+                Acted("orb on a palm");
+                RestOnPalm(palmHand, dt);
+            }
+            else hasPalm = false;
+            if (both)
             {
                 Acted("hold orb");
                 var a = PalmPosition(left);
@@ -187,9 +218,9 @@ namespace MusicInYourHands
             }
             else
             {
-                // Let go: the orb keeps spinning for a moment and slows down.
-                angularVelocity *= Mathf.Exp(-dt * 1.5f);
                 hasAxis = false;
+                // Let go: the orb keeps spinning for a moment and slows down.
+                if (!onPalm) angularVelocity *= Mathf.Exp(-dt * 1.5f);
             }
             spin = Quaternion.Euler(angularVelocity * (Mathf.Rad2Deg * dt)) * spin;
 
@@ -230,7 +261,8 @@ namespace MusicInYourHands
             Sing(music, view, size);
 
             var bus = music.Bus;
-            if (bus != null && holding)
+            // Only two hands set the volume, by how far apart they are.
+            if (bus != null && both)
             {
                 float t = Mathf.InverseLerp(spreadRange.x, spreadRange.y, spread);
                 bus.Volume = Mathf.Lerp(bus.Volume, Mathf.Lerp(volumeRange.x, volumeRange.y, t), 1f - Mathf.Exp(-5f * dt));
@@ -251,6 +283,36 @@ namespace MusicInYourHands
                 w.Halo = 0.1f;
             }
         }
+
+        /// <summary>
+        /// The orb resting on one open palm: it floats just out of the palm, whichever way the palm faces, at a set size,
+        /// and turns as the hand turns (its turn rate kept as angular velocity, so it spins on when the hand goes).
+        /// </summary>
+        void RestOnPalm(HandRig.Hand hand, float dt)
+        {
+            var normal = hand.PalmNormal.sqrMagnitude > 0.5f ? hand.PalmNormal.normalized : Vector3.up;
+            var target = PalmPosition(hand) + normal * (palmRadius + palmGap);
+            center = hasCenter ? Vector3.Lerp(center, target, 1f - Mathf.Exp(-18f * dt)) : target;
+            hasCenter = true;
+            radius = radius <= 0f ? palmRadius : Mathf.Lerp(radius, palmRadius, 1f - Mathf.Exp(-10f * dt));
+            var rotation = hand.PalmJoint != null ? hand.PalmJoint.rotation : hand.Palm.rotation;
+            if (hasPalm && dt > 0f)
+            {
+                var delta = rotation * Quaternion.Inverse(lastPalm);
+                delta.ToAngleAxis(out float degrees, out var rotationAxis);
+                if (degrees > 180f) degrees -= 360f;
+                var turn = rotationAxis * (degrees * Mathf.Deg2Rad / dt);
+                if (float.IsNaN(turn.x) || float.IsInfinity(turn.x)) turn = Vector3.zero;
+                angularVelocity = Vector3.Lerp(angularVelocity, turn + Vector3.up * 0.25f, 1f - Mathf.Exp(-12f * dt));
+            }
+            lastPalm = rotation;
+            hasPalm = true;
+        }
+
+        /// <summary>Whether the orb rests on one palm now (for the editor checks), and where its middle is.</summary>
+        public bool OnPalm => heldMode == -1 || heldMode == 1;
+        public Vector3 Centre => center;
+        public Vector3 Spin => angularVelocity;
 
         /// <summary>
         /// Turns the orb the way the line between the palms turns, like holding a ball, plus a slow idle spin.
