@@ -76,6 +76,9 @@ namespace MusicInYourHands
         /// </summary>
         public static bool LogGestures;
 
+        /// <summary>A thumb tap or swipe was carried out (left hand?, which one). The onboarding's thumb lesson listens.</summary>
+        public static event System.Action<bool, Microgesture> Used;
+
         static readonly int ColorId = Shader.PropertyToID("_Color");
         static readonly int IconId = Shader.PropertyToID("_Icon");
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
@@ -193,7 +196,9 @@ namespace MusicInYourHands
                     Debug.Log($"[Gestures] {(s == 0 ? "left" : "right")} {(Microgesture)gesture}: {held ?? "acted"} (pinch {(h != null ? h.Pinch : -1f):0.00}, fist {(h != null ? h.Fist : -1f):0.00})");
                 }
                 if (held != null) continue;
-                if (Act((Microgesture)gesture, music, rig.Get(s == 0))) lastCommand = clock;
+                if (!Act((Microgesture)gesture, music, rig.Get(s == 0))) continue;
+                lastCommand = clock;
+                Used?.Invoke(s == 0, (Microgesture)gesture);
             }
             Await(music);
             Draw(music, menuOpen, view, dt);

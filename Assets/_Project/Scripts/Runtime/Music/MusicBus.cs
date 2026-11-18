@@ -60,6 +60,8 @@ namespace MusicInYourHands
         float listenTime;
         bool listenPaused, waitingForPermission;
         volatile bool permissionDenied;
+        // The volume worlds set, and the opening fade-in on top of it.
+        float volume = 1f, fade = 1f, fadeSpeed;
 
         public MusicSource Source { get; private set; }
         public bool IsListening => Source == MusicSource.Listen;
@@ -121,8 +123,28 @@ namespace MusicInYourHands
         /// <summary>Playback volume, 0-1. Worlds may change it (Heartbeat orb does) and should restore it.</summary>
         public float Volume
         {
-            get => source != null ? source.volume : 1f;
-            set { if (source != null) source.volume = Mathf.Clamp01(value); }
+            get => volume;
+            set
+            {
+                volume = Mathf.Clamp01(value);
+                ApplyVolume();
+            }
+        }
+
+        /// <summary>
+        /// Fades the music in from silence over <paramref name="seconds"/>, on top of Volume (the first launch's opening
+        /// song). Starting it before the song plays keeps the song silent until then.
+        /// </summary>
+        public void FadeIn(float seconds)
+        {
+            fadeSpeed = seconds > 0f ? 1f / seconds : 0f;
+            fade = seconds > 0f ? 0f : 1f;
+            ApplyVolume();
+        }
+
+        void ApplyVolume()
+        {
+            if (source != null) source.volume = volume * fade * fade * (3f - 2f * fade);
         }
 
         /// <summary>
@@ -145,6 +167,7 @@ namespace MusicInYourHands
             Instance = this;
             source = GetComponent<AudioSource>();
             source.playOnAwake = false;
+            volume = source.volume;
             // The song is a plain stereo bed: not spatialized and not in the room's reverb (that is for SpatialAudio's sounds).
             source.spatialBlend = 0f;
             source.spatialize = false;
@@ -332,6 +355,11 @@ namespace MusicInYourHands
         void Update()
         {
             float dt = Time.deltaTime;
+            if (fade < 1f)
+            {
+                fade = Mathf.MoveTowards(fade, 1f, dt * fadeSpeed);
+                ApplyVolume();
+            }
             UpdatePermission();
             bool heard;
             if (IsListening)
