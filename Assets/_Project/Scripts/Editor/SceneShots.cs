@@ -146,11 +146,17 @@ namespace MusicInYourHands.EditorTools
                 block.SetColor("_BaseColor", color);
                 r.SetPropertyBlock(block);
             }
-            Panel("Floor", new Vector3(0f, 0f, 1f), new Vector3(90f, 0f, 0f), new Vector2(6f, 6f), new Color(0.36f, 0.32f, 0.28f));
-            if (scanned)
+            if (MediaClipFrames > 0)
+                // Store and demo media: a lit, furnished room instead of the grey stand-in (see SceneMediaRoom).
+                BuildMediaRoom(scanned);
+            else if (scanned)
+            {
+                Panel("Floor", new Vector3(0f, 0f, 1f), new Vector3(90f, 0f, 0f), new Vector2(6f, 6f), new Color(0.36f, 0.32f, 0.28f));
                 Furnish(Panel, material, block);
+            }
             else
             {
+                Panel("Floor", new Vector3(0f, 0f, 1f), new Vector3(90f, 0f, 0f), new Vector2(6f, 6f), new Color(0.36f, 0.32f, 0.28f));
                 Panel("Back Wall", new Vector3(0f, 1.5f, 2.6f), Vector3.zero, new Vector2(6f, 3f), new Color(0.55f, 0.51f, 0.46f));
                 Panel("Left Wall", new Vector3(-1.9f, 1.5f, 1f), new Vector3(0f, -90f, 0f), new Vector2(6f, 3f), new Color(0.5f, 0.46f, 0.42f));
                 Panel("Right Wall", new Vector3(1.9f, 1.5f, 1f), new Vector3(0f, 90f, 0f), new Vector2(6f, 3f), new Color(0.5f, 0.46f, 0.42f));
@@ -343,6 +349,7 @@ namespace MusicInYourHands.EditorTools
             {
                 while (clock.Time < until)
                 {
+                    MediaHands?.Invoke(clock.Time);
                     holdPose?.Invoke(rig);
                     world.Step(rig, clock.Advance(dt), camera, dt);
                     world.SimulateParticles(dt);
@@ -355,7 +362,7 @@ namespace MusicInYourHands.EditorTools
             }
             Play(ChorusStart + 0.09f + extra);
             File.WriteAllBytes($"{ShotFolder}/{name}.png", Render(camera, 1600, 900).EncodeToPNG());
-            if (MediaClipFrames > 0) CaptureMedia(name, camera, Play, () => clock.Time);
+            if (MediaClipFrames > 0) CaptureMedia(name, camera, Play, () => clock.Time, hands, rig);
             if (closeUp == null) return;
 
             camera.fieldOfView = 34f;

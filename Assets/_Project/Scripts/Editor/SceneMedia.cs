@@ -8,9 +8,10 @@ using Object = UnityEngine.Object;
 namespace MusicInYourHands.EditorTools
 {
     /// <summary>
-    /// Store and submission media from the same staged scenes as the screenshots (see SceneShots): for each shot, a
-    /// 2560x1440 still (the Meta Horizon Store's screenshot size) and a clip of 960x540 frames at 15 fps, played on
-    /// from the shot's moment, for a GIF. Writes Logs/media/&lt;shot&gt;.png and Logs/media/&lt;shot&gt;/f000.png...
+    /// Store and demo media from the same staged scenes as the screenshots (see SceneShots), shot in a lit, furnished
+    /// room (SceneMediaRoom) instead of the grey stand-in: for each shot, a 2560x1440 still (the Meta Horizon Store's
+    /// screenshot size) and a clip of 960x540 frames at 15 fps, played on from the shot's moment with the hands
+    /// moving, for a GIF. Writes Logs/media/&lt;shot&gt;.png and Logs/media/&lt;shot&gt;/f000.png...
     /// Batch mode (needs graphics, so no -nographics):
     /// -executeMethod MusicInYourHands.EditorTools.EditorChecks.CaptureMediaBatch
     /// with SHOTS to pick the shots (as for the screenshots) and CLIP_SECONDS for the clip length (default 4).
@@ -34,21 +35,54 @@ namespace MusicInYourHands.EditorTools
             EditorApplication.Exit(ok ? 0 : 1);
         }
 
-        /// <summary>The still and the clip for one shot; <paramref name="play"/> runs the world on to a song time.</summary>
-        static void CaptureMedia(string name, Camera camera, Action<float> play, Func<float> now)
+        // Called by Shot before every simulation step while a clip plays, to move the hands (song time in seconds).
+        static Action<float> MediaHands;
+
+#if META_XR_CORE
+        /// <summary>
+        /// The still and the clip for one shot; <paramref name="play"/> runs the world on to a song time. During the
+        /// clip the hands play: they drift apart and together and rise and fall a little, the way people move them to
+        /// music, and are back where they started when the clip ends, so the GIF loops without a jump.
+        /// </summary>
+        static void CaptureMedia(string name, Camera camera, Action<float> play, Func<float> now,
+            System.Collections.Generic.List<PreviewHand> hands, HandRig rig)
         {
             Directory.CreateDirectory(MediaFolder);
             SavePng(camera, 2560, 1440, $"{MediaFolder}/{name}.png");
             var frames = $"{MediaFolder}/{name}";
             if (Directory.Exists(frames)) Directory.Delete(frames, true);
             Directory.CreateDirectory(frames);
-            for (int i = 0; i < MediaClipFrames; i++)
+
+            float start = now(), length = MediaClipFrames / ClipFps;
+            var basePositions = hands.ConvertAll(h => h.Root.transform.position);
+            MediaHands = songTime =>
             {
-                play(now() + 1f / ClipFps);
-                SavePng(camera, 960, 540, $"{frames}/f{i:000}.png");
+                float phase = Mathf.Clamp01((songTime - start) / length) * Mathf.PI * 2f;
+                for (int i = 0; i < hands.Count; i++)
+                {
+                    float outward = hands[i].Left ? -1f : 1f;
+                    var offset = new Vector3(outward * 0.07f * Mathf.Sin(phase),
+                        0.04f * Mathf.Sin(phase * 2f + (hands[i].Left ? 0f : Mathf.PI)),
+                        0.03f * Mathf.Sin(phase));
+                    hands[i].Root.transform.position = basePositions[i] + offset;
+                    PushHand(rig, hands[i]);
+                }
+            };
+            try
+            {
+                for (int i = 0; i < MediaClipFrames; i++)
+                {
+                    play(now() + 1f / ClipFps);
+                    SavePng(camera, 960, 540, $"{frames}/f{i:000}.png");
+                }
+            }
+            finally
+            {
+                MediaHands = null;
             }
             Debug.Log($"[Media] {name}: a still and {MediaClipFrames} frames");
         }
+#endif
 
         // Like Render, but anti-aliased, and it frees the textures: a clip renders hundreds of frames.
         static void SavePng(Camera camera, int width, int height, string path)
