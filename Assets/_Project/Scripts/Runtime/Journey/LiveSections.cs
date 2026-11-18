@@ -3,8 +3,8 @@ using UnityEngine;
 namespace MusicInYourHands
 {
     /// <summary>
-    /// Finds sections in music as it plays, for songs with neither a sections file nor lyrics (songs from Audius,
-    /// added songs without an .lrc) and for music heard in the room. It keeps its own beat clock, locked to the beats
+    /// Finds sections in music as it plays, for songs with neither a sections file nor lyrics (added songs
+    /// without an .lrc) and for music heard in the room. It keeps its own beat clock, locked to the beats
     /// the music bus detects and carried on through quiet parts, counts phrases of eight beats, and at the end of each
     /// phrase compares how loud the music was and how often the kick came with the section so far. A clear change
     /// starts a new section right there, on the phrase's downbeat, once the current one has run at least

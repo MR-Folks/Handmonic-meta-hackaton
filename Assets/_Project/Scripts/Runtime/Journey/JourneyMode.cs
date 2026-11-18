@@ -110,7 +110,7 @@ namespace MusicInYourHands
         [Header("End card")]
         [Tooltip("Seconds the end card waits for a choice before the next song's journey starts by itself.")]
         [SerializeField] float choiceSeconds = 10f;
-        [Tooltip("Seconds a chosen song may take to start (streaming) before the journey moves on to the one after.")]
+        [Tooltip("Seconds a chosen song may take to start (an added song is read from storage first) before the journey moves on to the one after.")]
         [SerializeField] float loadPatience = 20f;
         [SerializeField] JourneyEndCard.Tuning card = new JourneyEndCard.Tuning();
 
@@ -394,20 +394,20 @@ namespace MusicInYourHands
             }
             else if (awaiting != null)
             {
-                // Waiting for the song chosen at the end card to start (one from Audius streams in first).
+                // Waiting for the song chosen at the end card to start (an added song's audio is read in first).
                 WatchChosenSong(music, dt);
                 lastTime = time;
                 return;
             }
             else
             {
-                // The song jumped: looped round, restarted, or skipped ahead or back.
+                // The song jumped: looped round, restarted, or skipped ahead or back. (A stop near the end isn't a loop.)
                 float expected = lastTime + (playing ? dt : 0f);
-                bool wrapped = !music.IsListening && music.Length > 0f && lastTime > music.Length - 2f && time < 2f;
+                bool wrapped = playing && !music.IsListening && music.Length > 0f && lastTime > music.Length - 2f && time < 2f;
                 if (wrapped && plan.Count > 0)
                 {
                     lastTime = time;
-                    EndSong(music, view);
+                    EndSong(music, menuOpen, view);
                     return;
                 }
                 if (Mathf.Abs(time - expected) > 1f)
@@ -431,6 +431,8 @@ namespace MusicInYourHands
                 {
                     live.Begin(plan, music.IsListening ? 0f : music.Length, time, music.IsListening);
                     ResetPicks();
+                    // The fresh map starts again at its first section, which comes in below like any new one.
+                    lastIndex = -1;
                 }
                 AssignLive(manager, music);
             }
@@ -441,7 +443,7 @@ namespace MusicInYourHands
             // The music is over: the end card.
             if (!music.IsListening && playing && plan.Count > 0 && IsOver(time, music))
             {
-                EndSong(music, view);
+                EndSong(music, menuOpen, view);
                 return;
             }
 
@@ -495,7 +497,7 @@ namespace MusicInYourHands
             {
                 float toGo = plan[index + 1].Start - time;
                 float bar = plan.BarSeconds(music.BeatInterval);
-                if (buildUp && toGo < bar) gather = 1f - toGo / bar;
+                if (buildUp && toGo < bar && !waveView.Blooming) gather = 1f - toGo / bar;
                 if (toGo <= waveLead && launchedFor != index + 1) Launch(index + 1, view, false);
             }
 
@@ -545,15 +547,23 @@ namespace MusicInYourHands
             if (index >= 0) launchedFor = index;
             if (view == null) view = lastView;
             if (view == null) return;
-            waveView.Launch(view, index >= 0 ? ColorOf(index) : Color.white, finale);
+            // A change during the finale's bloom comes in under it, so the bloom isn't cut short by a wave of its own.
+            if (finale || !waveView.Blooming) waveView.Launch(view, index >= 0 ? ColorOf(index) : Color.white, finale);
             var head = view.transform.position;
             JourneySounds.Play(voices, head + Effects.FlatForward(view) * 0.4f + Vector3.down * 0.9f, plan, finale, volume);
         }
 
         // ---- The end of a song ----
 
-        void EndSong(IJourneyMusic music, Camera view)
+        void EndSong(IJourneyMusic music, bool menuOpen, Camera view)
         {
+            // With the menu or the deck open nobody is looking for a card: the next song plays on, as its own journey,
+            // rather than the music stopping until the menu closes.
+            if (menuOpen)
+            {
+                NextSong(music, 1);
+                return;
+            }
             music.Stop();
             state = State.Card;
             cardFor = 0f;
@@ -593,20 +603,20 @@ namespace MusicInYourHands
             {
                 cardView.Close();
                 state = State.Running;
-                NextSong(music);
+                NextSong(music, 1);
             }
         }
 
-        void NextSong(IJourneyMusic music)
+        void NextSong(IJourneyMusic music, int step)
         {
-            var next = music.SongAt(1);
-            music.StepSong(1);
+            var next = music.SongAt(step);
+            music.StepSong(step);
             awaiting = next;
             awaitingFor = 0f;
         }
 
         /// <summary>
-        /// After moving on to the next song, if it can't play (no internet for a song from Audius) or takes too long, the
+        /// After moving on to the next song, if it can't play (an added song whose file won't load) or takes too long, the
         /// journey moves on to the one after, so a demo never stalls in silence.
         /// </summary>
         void WatchChosenSong(IJourneyMusic music, float dt)
@@ -616,6 +626,8 @@ namespace MusicInYourHands
             {
                 awaiting = null;
                 retries = 0;
+                // Its journey starts from the top, even when it's the song that just ended (a song list of one).
+                planned = false;
                 return;
             }
             awaitingFor += dt;
@@ -624,10 +636,13 @@ namespace MusicInYourHands
             if (++retries > 8)
             {
                 awaiting = null;
+                retries = 0;
                 planned = false;
                 return;
             }
-            NextSong(music);
+            // Songs are counted from the one still loading, else the one playing. After a failed load that's still the
+            // song that ended, so each try steps one song further on rather than trying the same one again.
+            NextSong(music, music.Loading != null ? 1 : 1 + retries);
         }
 
         // ---- Plans: sections and their worlds ----
@@ -639,6 +654,7 @@ namespace MusicInYourHands
             planListening = music.IsListening;
             planSongIndex = music.SongIndex;
             bloomed = false;
+            retries = 0;
             var song = music.Song;
             float length = music.IsListening ? 0f : music.Length;
             live.End();

@@ -67,6 +67,9 @@ namespace MusicInYourHands
         /// <summary>Seconds since the last wave left.</summary>
         public float Age => age;
 
+        /// <summary>The finale's bloom is still spreading.</summary>
+        public bool Blooming => bloom && age < tuning.life * 1.3f;
+
         public JourneyWave(Transform parent, Material material, Material glow, Tuning tuning)
         {
             this.tuning = tuning;

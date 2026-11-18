@@ -481,6 +481,19 @@ namespace MusicInYourHands.EditorTools
             now = journey.Sections.IndexAt(music.Clock);
             if (manager.Current != journey.WorldOf(now)) problems.Add($"after a jump to {Stamp(110f)} the world isn't {journey.Sections[now].Label}'s");
 
+            // The menu open as the song ends: no card behind it and no silence, the next song plays on as its own journey.
+            int songBefore = music.Index, stopsBefore = music.Stops;
+            menuOpen = true;
+            for (float t = 0f; t < 120f && music.Index == songBefore; t += dt) Frame();
+            Run(0.5f);
+            bool playedOn = music.Index == (songBefore + 1) % music.List.Count && music.Playing && music.Stops == stopsBefore && !journey.CardOpen &&
+                            journey.IsActive && journey.Sections.IndexAt(music.Clock) == 0;
+            menuOpen = false;
+            Run(2f);
+            if (!playedOn || manager.Current != journey.WorldOf(0))
+                problems.Add($"with the menu open as the song ended, the music stopped or a card opened (song {music.Index}, stops {music.Stops - stopsBefore}, " +
+                             $"card {journey.CardOpen}), or the next song's first world didn't come in when it closed");
+
             // A song without a sections file plays a journey from its lyrics; one without lyrics either, from the audio.
             var bare = Object.Instantiate(music.List[2]);
             bare.name = "Bare";
@@ -551,7 +564,7 @@ namespace MusicInYourHands.EditorTools
                       $"), none twice; the menu held the {plan[missed].Label} change until the next section; {songOneWaves} waves and one bloom; " +
                       "the end card showed as the music ended and moved on to the next song by itself after 10 s, whose worlds differ; picking a " +
                       "world turned the journey off with its caption and nothing changed after; the Journey bubble and a jump brought the right " +
-                      "world in; a song without a sections file followed its lyrics (changing on a beat near each boundary), one without lyrics its " +
+                      "world in; with the menu open as a song ended the next one played on with no card; a song without a sections file followed its lyrics (changing on a beat near each boundary), one without lyrics its " +
                       "audio, and listening never ended in a " +
                       "card; frames between changes allocate nothing. The built-in songs' journeys:" + journeys);
             return true;

@@ -249,10 +249,6 @@ namespace MusicInYourHands
                 if (final < 0) final = Sections.Count - 1;
                 Promote(final, false);
             }
-            // The finale blooms on the final chorus's last downbeat: a bar before it ends (section starts are downbeats).
-            float finalEnd = EndOf(final);
-            FinaleTime = float.IsInfinity(finalEnd) ? -1f
-                : Mathf.Max(Sections[final].Start + 1f, finalEnd - (Bpm > 0f ? BarSeconds(0f) : 2.5f));
 
             for (int guard = 0; guard < 64 && Sections.Count > 1; guard++)
             {
@@ -267,6 +263,13 @@ namespace MusicInYourHands
                 if (shortest == 0) SetStart(0, 0f);
                 if (gone.Role == SectionRole.FinalChorus) Promote(taker, false);
             }
+
+            // The finale blooms on the final chorus's last downbeat: a bar before it ends (section starts are downbeats).
+            // Placed once short sections have folded in, so a short outro taken into the final chorus moves it to the end.
+            final = FinalIndex;
+            float finalEnd = final >= 0 ? EndOf(final) : float.PositiveInfinity;
+            FinaleTime = float.IsInfinity(finalEnd) ? -1f
+                : Mathf.Max(Sections[final].Start + 1f, finalEnd - (Bpm > 0f ? BarSeconds(0f) : 2.5f));
         }
 
         void SetStart(int index, float start)
