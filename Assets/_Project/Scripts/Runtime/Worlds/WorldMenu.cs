@@ -112,6 +112,10 @@ namespace MusicInYourHands
             public float Pinch;
             public Vector3 Hit;
             public Vector3 Origin;
+            /// <summary>Where the ray passes through the hand, held in the palm's frame so a closing pinch doesn't move it.</summary>
+            public Vector3 AimOffset;
+            /// <summary><see cref="AimOffset"/> belongs to this hand's current pointing (not yet reset by a touch or loss).</summary>
+            public bool Aiming;
             public int Target = -1;
             public int Aimed = -1;
             public Vector2 AimedAt;
@@ -134,6 +138,10 @@ namespace MusicInYourHands
         // A touch presses when the index fingertip reaches the surface (Meta's touch specs model the fingertip as a 5 mm
         // sphere), and the next press needs the finger 2 cm back out first, so a resting or trembling finger presses once.
         const float TouchContact = 0.005f, TouchRearm = 0.02f;
+        /// <summary>How quickly (per second) the ray's point in the open hand follows the hand's shape (see Pointer.AimOffset).</summary>
+        const float AimSettle = 1.5f;
+        /// <summary>Thumb to index fingertip (m) beyond which the hand counts as open, so its shape may still settle the aim.</summary>
+        const float OpenSpread = 0.06f;
         // The song page sits this far behind the bubbles.
         const float PageDepth = 0.003f;
         const string ChooseHint = "Touch or pinch a bubble to choose";
@@ -560,7 +568,7 @@ namespace MusicInYourHands
                 if (!open || hand == null || !hand.IsTracked || hand.InSystemGesture)
                 {
                     // A lost hand's ray or dot goes at once rather than lingering where the hand was.
-                    p.Touching = p.TouchArmed = false;
+                    p.Touching = p.TouchArmed = p.Aiming = false;
                     p.Visibility = 0f;
                     continue;
                 }
@@ -586,20 +594,34 @@ namespace MusicInYourHands
                     // A pinch made while touching mustn't select once the hand pulls back and points.
                     p.Armed = false;
                     p.Pinch = 0f;
+                    p.Aiming = false;
                 }
                 else
                 {
                     var thumb = hand.TipJoints[0] != null ? hand.TipJoints[0].position : hand.Tips[0];
                     var pinchPoint = (thumb + tip) * 0.5f;
                     var shoulder = head + Vector3.down * 0.17f + side * (s == 0 ? -0.17f : 0.17f);
-                    var ray = new Ray(shoulder, pinchPoint - shoulder);
+                    float pinch = p.Pinch = hand.Pinch;
+                    // The ray aims through the point between thumb and index, but that point drops as the index comes
+                    // down to the thumb, which pulled the cursor off the bubble just as it was pinched. So the point is
+                    // held in the palm's frame: it follows the hand's shape only slowly and only while the hand is
+                    // clearly open, so the ray moves with the hand, not with the closing fingers.
+                    var palm = hand.Palm;
+                    var offset = Quaternion.Inverse(palm.rotation) * (pinchPoint - palm.position);
+                    if (!p.Aiming) p.AimOffset = offset;
+                    else if (Vector3.Distance(thumb, tip) > OpenSpread)
+                        p.AimOffset = Vector3.Lerp(p.AimOffset, offset, 1f - Mathf.Exp(-AimSettle * dt));
+                    p.Aiming = true;
+                    var aimPoint = palm.position + palm.rotation * p.AimOffset;
+                    var ray = new Ray(shoulder, aimPoint - shoulder);
                     p.Active = plane.Raycast(ray, out float enter);
                     var hit = ray.GetPoint(enter);
-                    // Smooth the cursor a little; hand tracking jitters more than a controller.
-                    p.Hit = pointed ? Vector3.Lerp(p.Hit, hit, 1f - Mathf.Exp(-25f * dt)) : hit;
+                    // Smooth the cursor a little, and a little more while pinching; hand tracking jitters more than a
+                    // controller.
+                    float settle = pinch > 0f ? 12f : 25f;
+                    p.Hit = pointed ? Vector3.Lerp(p.Hit, hit, 1f - Mathf.Exp(-settle * dt)) : hit;
                     p.Origin = pinchPoint;
 
-                    float pinch = p.Pinch = hand.Pinch;
                     if (pinch < pinchThresholds.y) p.Armed = true;
                     if (p.Armed && pinch >= pinchThresholds.x)
                     {
