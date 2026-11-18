@@ -74,6 +74,7 @@ namespace MusicInYourHands.EditorTools
         {
             if (!Application.isBatchMode && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
             var scene = EditorSceneManager.OpenScene(MainScenePath, OpenSceneMode.Single);
+            EnsureSongSections();
             EnsureWorlds();
 #if META_XR_CORE
             foreach (var feed in Object.FindObjectsByType<OVRHandFeed>(FindObjectsSortMode.None)) ApplyHandLook(feed.gameObject);
@@ -294,7 +295,26 @@ namespace MusicInYourHands.EditorTools
                 if (song.lyrics == null) Debug.LogWarning($"[Setup] {file}.lrc was not found, so {title} has no lyrics.");
                 songs[i] = song;
             }
+            EnsureSongSections();
             return songs;
+        }
+
+        /// <summary>
+        /// Gives each built-in song its sections file (Audio/{file}.sections.txt, written by Tools/song_sections.py), where
+        /// Journey mode changes world. Part of Update Worlds, so a new sections file is picked up without the full setup.
+        /// </summary>
+        static void EnsureSongSections()
+        {
+            foreach (var (file, title) in DemoSongs)
+            {
+                var song = AssetDatabase.LoadAssetAtPath<SongAsset>($"{Root}/Songs/{file}.asset");
+                if (song == null) continue;
+                var sections = AssetDatabase.LoadAssetAtPath<TextAsset>($"{Root}/Audio/{file}.sections.txt");
+                if (sections == null) Debug.LogWarning($"[Setup] {file}.sections.txt was not found, so {title}'s journey follows its lyrics.");
+                if (song.sections == sections) continue;
+                song.sections = sections;
+                EditorUtility.SetDirty(song);
+            }
         }
 
         static void EnsureMainScene(SongAsset[] songs, bool rebuild)

@@ -1,0 +1,14 @@
+# Turn It Up to Light: where each section starts (m:ss.xx) and what it is. Journey mode changes world at each one.
+# Written by Tools/song_sections.py; edit the song there.
+bpm 118
+beats 4
+key Ab major
+0:00.00 intro
+0:16.29 verse 1
+0:36.63 chorus
+1:01.04 verse 2
+1:19.34 chorus
+1:43.75 bridge
+2:00.02 final chorus
+2:16.29 outro
+2:28.00 end

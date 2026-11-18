@@ -20,6 +20,10 @@ namespace MusicInYourHands
         [Tooltip("Seconds added to the song time before looking up lyrics. Use it to nudge an LRC that is slightly early or late.")]
         public float lyricsOffset;
 
+        [Tooltip("Optional sections (.sections.txt: a start time and a label per line, such as \"0:16.29 verse 1\"), where " +
+                 "Journey mode changes world. Without it the sections come from the lyrics, or from the audio as it plays.")]
+        public TextAsset sections;
+
         /// <summary>
         /// For a song the person added on the headset: its audio file, loaded only while it plays, and its lyrics
         /// file, read each time it starts. Empty for the songs built into the app.
