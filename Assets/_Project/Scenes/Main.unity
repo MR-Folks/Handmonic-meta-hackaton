@@ -891,8 +891,8 @@ MonoBehaviour:
   letteringMaterial: {fileID: 2100000, guid: d3937808b91e74c6fb3bcbcbde75cfae, type: 2}
   glowMaterial: {fileID: 2100000, guid: 1b51a3ac0bf2b473380f017649cacde9, type: 2}
   holdSeconds: 2
-  snowRate: {x: 55, y: 65}
-  rainRate: {x: 90, y: 110}
+  snowRate: {x: 28, y: 32}
+  rainRate: {x: 45, y: 55}
   weatherReach: 2.5
   headRoom: 0.35
   wordLieSeconds: 6
@@ -2471,6 +2471,7 @@ MonoBehaviour:
   beatsPerElement: 32
   beatsAfterPick: 64
   fistSeconds: 0.35
+  oneFistSeconds: 0.6
   streamWidth: 0.032
   orbSpread: {x: 0.07, y: 0.55}
   rockCount: 6
@@ -2772,6 +2773,8 @@ MonoBehaviour:
   radiusPerSpread: 0.5
   forwardOffset: 0.1
   beatSwell: 0.12
+  palmRadius: 0.075
+  palmGap: 0.035
   petals: 030000000400000005000000060000000400000007000000
   push: 0.012
   spreadRange: {x: 0.12, y: 0.6}

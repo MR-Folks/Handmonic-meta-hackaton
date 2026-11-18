@@ -14,13 +14,14 @@ namespace MusicInYourHands
     /// their notes. The sung words fall with the rain in front of you, land with a splash and a soft note in the song's
     /// key, and lie in their puddle for a while.</item>
     /// <item><b>Snow</b>: flakes drift down, swaying, and stick where they land: the floor and the furniture whiten in
-    /// patches, then under a blanket that builds up (to a cap; past it the snow melts back). Melody flakes glint gold.
+    /// patches after some seconds, then, over about a minute, under a blanket that builds up (to a cap; past it the snow
+    /// melts back). Melody flakes glint gold.
     /// The sung words drift down among the flakes, turned to you, and settle on the snow, readable, before they fade.</item>
     /// <item>Hold out an open palm, palm up: flakes gather on it (turn it over and they fall off) and melt away, drops
     /// splash in it and a melody drop rings its note, and a sung word that lands there lies on your palm for a moment.</item>
     /// <item>Keep a fist closed after its strike: a ring fills round it in the next weather's colour while frost or
-    /// water gathers in, and after about two seconds the rain turns to snow (the puddles freeze over) or the snow to rain
-    /// (the settled snow melts into wet ground), with a caption. Open the hand before the next change.</item>
+    /// water gathers in, and after about two seconds the rain turns to snow (the puddles slowly frost over) or the snow
+    /// to rain (the settled snow melts into wet ground), with a caption. Open the hand before the next change.</item>
     /// </list>
     /// Nothing is done for the hands while the menu is open.
     /// </summary>
@@ -30,9 +31,9 @@ namespace MusicInYourHands
         [Tooltip("Seconds a fist must stay closed to change the weather (rain to snow, snow to rain).")]
         [SerializeField] float holdSeconds = 2f;
         [Tooltip("Snowflakes per second in quiet moments (x), and extra at full treble (y).")]
-        [SerializeField] Vector2 snowRate = new Vector2(55f, 65f);
+        [SerializeField] Vector2 snowRate = new Vector2(28f, 32f);
         [Tooltip("Raindrops per second in quiet moments (x), and extra when the music is loud (y).")]
-        [SerializeField] Vector2 rainRate = new Vector2(90f, 110f);
+        [SerializeField] Vector2 rainRate = new Vector2(45f, 55f);
         [Tooltip("How far round you the weather falls (m).")]
         [SerializeField] float weatherReach = 2.5f;
         [Tooltip("How close to your head, sideways, anything falls (m): nothing falls into your eyes.")]
@@ -54,6 +55,11 @@ namespace MusicInYourHands
         // The charge shows only after this long, so a quick fist (a strike) shows none; a hand counts as open below OpenHand.
         const float HoldShow = 0.3f, OpenHand = 0.4f;
         const float CatchRadius = 0.07f, CaptionSeconds = 1.8f;
+        // How much snow a flake leaves where it lands: at snowRate, a patchy dusting ahead of you in about fifteen
+        // seconds and a white blanket in about a minute.
+        const float FlakeSnow = 0.5f;
+        // How fast drops fall (m/s), from the slowest to the fastest.
+        const float DropSlow = 2f, DropFast = 2.6f;
         const int ArcPoints = 49;
         // The kinds of quad in the weather mesh (LightningWeather shader).
         const float FlakeKind = 0f, DropKind = 1f, RingKind = 2f, DotKind = 3f;
@@ -311,7 +317,7 @@ namespace MusicInYourHands
             else
             {
                 float loud = Mathf.Clamp01((music.Band(1) + music.Band(2) + music.Band(3)) / 3f * 1.2f + music.Kick * 0.3f);
-                rainDebt = Mathf.Min(rainDebt + (rainRate.x + rainRate.y * loud) * ramp * dt + (music.Beat ? 8f * ramp : 0f), 24f);
+                rainDebt = Mathf.Min(rainDebt + (rainRate.x + rainRate.y * loud) * ramp * dt + (music.Beat ? 4f * ramp : 0f), 24f);
             }
             float debt = snowing ? snowDebt : rainDebt;
             while (debt >= 1f)
@@ -360,7 +366,7 @@ namespace MusicInYourHands
             f.Seed = Random.value;
             f.Size = Random.Range(0.7f, 1.3f);
             f.Morph = rain ? 1f : 0f;
-            f.Velocity = Vector3.down * (rain ? 3.5f : 0.4f);
+            f.Velocity = Vector3.down * (rain ? (DropSlow + DropFast) * 0.5f : 0.4f);
             f.Age = 0f;
             return i;
         }
@@ -440,7 +446,7 @@ namespace MusicInYourHands
                 else
                 {
                     float m = f.Morph * f.Morph;
-                    float speed = Mathf.Lerp(Mathf.Lerp(0.32f, 0.5f, f.Seed), Mathf.Lerp(3.2f, 4.2f, f.Seed), m);
+                    float speed = Mathf.Lerp(Mathf.Lerp(0.32f, 0.5f, f.Seed), Mathf.Lerp(DropSlow, DropFast, f.Seed), m);
                     var sway = new Vector3(Mathf.Sin(t * 1.3f + f.Seed * 20f), 0f, Mathf.Cos(t * 1.1f + f.Seed * 31f)) * (0.07f * (1f - f.Morph));
                     f.Velocity = Vector3.down * speed + sway + wind * (1f - 0.6f * f.Morph);
                     f.Position += f.Velocity * dt;
@@ -464,7 +470,7 @@ namespace MusicInYourHands
             bool melody = f.Midi >= 0;
             if (f.Morph < 0.5f)
             {
-                AddGround(at, (melody ? 0.6f : 0.32f) * f.Size, 0f);
+                AddGround(at, FlakeSnow * (melody ? 1.9f : 1f) * f.Size, 0f);
                 if (melody || Random.value < 0.6f) AddSettled(at + Vector3.up * (GroundLift + 0.004f), melody ? 1.6f : f.Size);
                 if (melody) Glint(at, MelodyFlakeColor, 6);
             }
@@ -1149,7 +1155,7 @@ namespace MusicInYourHands
             {
                 if (!Spot(headRoom, weatherReach, out var at)) continue;
                 at.y = Room.GroundBelow(new Vector3(at.x, spawnTop, at.z), floorY);
-                AddGround(at, snowing ? 0.32f : 0f, snowing ? 0f : 0.4f);
+                AddGround(at, snowing ? FlakeSnow : 0f, snowing ? 0f : 0.4f);
             }
         }
 

@@ -8,7 +8,8 @@ namespace MusicInYourHands
     /// point. Snow builds up where the flakes land, thin and patchy at first, then a white blanket (up to a cap: past it
     /// the snow melts back); rain wets the floor and the water runs together into puddles in its low spots (a fixed
     /// pattern per room). When the rain comes, the snow melts into water over a few seconds; when the snow comes, the
-    /// puddles freeze over white and the rest dries. A strike melts a round hole into the snow. Each grid is a small
+    /// puddles slowly frost over and the rest dries, so the white cover comes from the flakes and builds up over time.
+    /// A strike melts a round hole into the snow. Each grid is a small
     /// texture laid over its surface on one quad, drawn by the LightningGround shader.
     /// </summary>
     public partial class Lightning
@@ -40,6 +41,8 @@ namespace MusicInYourHands
         const float GroundLift = 0.003f;
         // The ground is worked out and drawn this often (per second), not every frame.
         const float GroundRate = 24f;
+        // How long after the snow comes the puddles go on freezing (s): a thin frost, never a sudden white floor.
+        const float FreezeSeconds = 15f;
 
         static readonly int CoverId = Shader.PropertyToID("_Cover");
         readonly Patch[] patches = new Patch[1 + TopPatches];
@@ -278,7 +281,7 @@ namespace MusicInYourHands
             float over = Mathf.Max(0f, snowTotal / Mathf.Max(snowBudget, 1f) - 1f);
             // Rain melts a thick cover in about four seconds; in the snow it only creeps away (faster when past the cap).
             float melt = snowing ? (0.004f + over * 0.6f) * step : 0.6f * step;
-            bool freezing = snowing && changeAge < 3f;
+            bool freezing = snowing && changeAge < FreezeSeconds;
             float total = 0f;
             foreach (var p in patches)
             {
@@ -296,10 +299,11 @@ namespace MusicInYourHands
                     {
                         if (freezing)
                         {
-                            // The puddles freeze over: their water turns to a white crust, the deepest first.
-                            float f = Mathf.Min(w, (0.25f + p.Low[i]) * 0.6f * step);
+                            // The puddles frost over slowly, the deepest first: some of their water turns to a thin
+                            // white crust. The snow cover itself comes from the flakes.
+                            float f = Mathf.Min(w, (0.25f + p.Low[i]) * (1.8f / FreezeSeconds) * step);
                             w -= f;
-                            s += f * (0.6f + p.Low[i]);
+                            s += f * (0.15f + p.Low[i] * 0.35f);
                         }
                         else w -= (snowing ? 0.05f : 0.004f) * step;
                     }
