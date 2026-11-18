@@ -43,6 +43,7 @@ namespace MusicInYourHands.EditorTools
             ok &= CheckOrbPreview();
             ok &= CheckMenuPreview();
             ok &= CheckMenuTouch();
+            ok &= CheckPopSound();
             ok &= CheckCassetteDeck();
             ok &= CheckMenuHands();
             ok &= CheckMusicGestures();
@@ -169,6 +170,53 @@ namespace MusicInYourHands.EditorTools
             Debug.Log(sb.ToString());
         }
 #endif
+
+        /// <summary>
+        /// The pop that a pressed menu bubble and a popped bubble play. A sound can't be heard here, so its samples are
+        /// measured: 40 to 80 ms long, its loudest sample between 0.3 and 0.8 (clear, never clipping), starting and
+        /// ending on silence and fading in and out (no click at either end), centred on zero, and made once and kept.
+        /// </summary>
+        static bool CheckPopSound()
+        {
+            const int rate = 48000;
+            var data = Synth.PopSamples(rate);
+            float ms = data.Length * 1000f / rate;
+            float peak = 0f, sum = 0f, start = 0f, end = 0f;
+            for (int i = 0; i < data.Length; i++)
+            {
+                peak = Mathf.Max(peak, Mathf.Abs(data[i]));
+                sum += data[i];
+            }
+            // The loudest sample in the first and the last millisecond.
+            int edge = rate / 1000;
+            for (int i = 0; i < edge && i < data.Length; i++)
+            {
+                start = Mathf.Max(start, Mathf.Abs(data[i]));
+                end = Mathf.Max(end, Mathf.Abs(data[data.Length - 1 - i]));
+            }
+            float first = data.Length > 0 ? Mathf.Abs(data[0]) : 1f, last = data.Length > 0 ? Mathf.Abs(data[data.Length - 1]) : 1f;
+            float mean = data.Length > 0 ? sum / data.Length : 1f;
+
+            // The clip the menu plays holds the same sound, at the output's rate.
+            var clip = Synth.Pop();
+            bool kept = clip != null && ReferenceEquals(Synth.Pop(), clip);
+            float clipMs = clip != null ? clip.samples * 1000f / clip.frequency : 0f;
+            var stored = new float[clip != null ? clip.samples : 0];
+            bool read = clip != null && clip.channels == 1 && clip.GetData(stored, 0);
+            float storedPeak = 0f;
+            foreach (float s in stored) storedPeak = Mathf.Max(storedPeak, Mathf.Abs(s));
+            bool storedEnds = read && stored.Length > 0 && Mathf.Abs(stored[0]) < 0.001f && Mathf.Abs(stored[stored.Length - 1]) < 0.001f;
+
+            bool ok = ms >= 40f && ms <= 80f && peak >= 0.3f && peak <= 0.8f && first < 0.001f && last < 0.001f &&
+                      start < peak * 0.2f && end < peak * 0.02f && Mathf.Abs(mean) < 0.01f &&
+                      kept && clipMs >= 40f && clipMs <= 80f && storedEnds && Mathf.Abs(storedPeak - peak) < 0.02f;
+            string measures = $"{ms:0} ms, peak {peak:0.00}, first and last samples {first:0.0000} and {last:0.0000}, " +
+                              $"loudest in the first and last millisecond {start:0.000} and {end:0.0000}, mean {mean:0.0000}; " +
+                              $"the clip: {clipMs:0} ms at {(clip != null ? clip.frequency : 0)} Hz, peak {storedPeak:0.00}, kept {kept}, read {read}";
+            if (ok) Debug.Log($"[Check] The bubble pop is short, clear and starts and ends without a click ({measures}).");
+            else Debug.LogError($"[Check] The bubble pop isn't right: {measures}.");
+            return ok;
+        }
 
         static bool CheckDebugMaterial(out Material material)
         {

@@ -48,7 +48,17 @@ namespace MusicInYourHands.EditorTools
                     Debug.LogError($"[Check] Song {song.name} has lyrics after its {song.clip.length:0.0} s of audio.");
                     ok = false;
                 }
-                if (song.notes == null) continue;
+                if (song.notes == null)
+                {
+                    // Without a melody file MusicBus makes one note per sung word; those are checked like a melody.
+                    notes = NoteTrack.FromLyrics(lyrics, song.lyricsOffset);
+                    if (notes.IsEmpty || !notes.IsFromLyrics)
+                    {
+                        Debug.LogError($"[Check] Song {song.name} has no melody file and no notes could be made from its lyrics.");
+                        ok = false;
+                        continue;
+                    }
+                }
                 var lastNote = notes.Notes[notes.Notes.Count - 1];
                 if (words != notes.Notes.Count)
                 {
@@ -66,7 +76,7 @@ namespace MusicInYourHands.EditorTools
                 Debug.LogError($"[Check] Expected the seven built-in songs in Assets/_Project/Songs, found {songs.Count}.");
                 ok = false;
             }
-            if (ok) Debug.Log($"[Check] {songs.Count} songs have audio and lyrics, and those with melody notes a note for every sung word.");
+            if (ok) Debug.Log($"[Check] {songs.Count} songs have audio, lyrics and a note for every sung word (from a melody file or made from the lyrics).");
             return CheckAddedSong() && ok;
         }
 

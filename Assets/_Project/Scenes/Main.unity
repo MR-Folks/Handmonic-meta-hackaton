@@ -1294,6 +1294,14 @@ MonoBehaviour:
   followAngle: 44
   pinchThresholds: {x: 0.85, y: 0.5}
   touchZone: {x: 0.15, y: 0.2}
+  turntable:
+    friction: 0.35
+    stopFriction: 0.45
+    topSpeed: 6
+    softCoupling: 5
+    catchBraking: 9
+    gripSmoothing: 0.05
+    settleSpeed: 1
 --- !u!4 &1126936837
 Transform:
   m_ObjectHideFlags: 0

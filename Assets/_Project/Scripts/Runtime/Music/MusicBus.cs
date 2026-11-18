@@ -209,7 +209,8 @@ namespace MusicInYourHands
             StopListening();
             CurrentSong = song;
             Lyrics = song.lyrics != null ? LyricsTrack.Parse(song.lyrics.text) : LyricsTrack.Empty;
-            Notes = song.notes != null ? NoteTrack.Parse(song.notes.text) : NoteTrack.Empty;
+            // A song without a melody file gets notes from its sung words, so the note-driven worlds follow the singing.
+            Notes = song.notes != null ? NoteTrack.Parse(song.notes.text) : NoteTrack.FromLyrics(Lyrics, song.lyricsOffset);
             Lyric = new LyricsTrack.State(-1, -1);
             for (int i = 0; i < BandCount; i++) bandPeak[i] = 0.0001f;
             source.clip = song.clip;

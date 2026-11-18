@@ -474,7 +474,7 @@ namespace MusicInYourHands
                     Hint.Carry => "Bring it to the radio's door",
                     Hint.Drop => "Let go to put it in",
                     Hint.Edge => "Pinch the edge and drag to turn",
-                    Hint.Turning => "Let go and it settles",
+                    Hint.Turning => "Let go mid-turn to spin it",
                     Hint.Blank => "Put it in the radio to add a song",
                     _ => "Pinch a cassette to pick it up"
                 };

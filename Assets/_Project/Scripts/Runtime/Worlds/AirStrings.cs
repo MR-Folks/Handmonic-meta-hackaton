@@ -350,7 +350,8 @@ namespace MusicInYourHands
         void Retune(MusicFrame music)
         {
             int sung = -1;
-            if (music.Notes != null)
+            // Notes made from the lyrics don't carry the sung pitch, so no string hums along with them.
+            if (music.Notes != null && !music.Notes.IsFromLyrics)
             {
                 foreach (var note in music.Notes.Notes)
                 {
