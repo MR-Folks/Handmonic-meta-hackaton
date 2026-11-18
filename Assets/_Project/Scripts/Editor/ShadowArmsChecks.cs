@@ -17,13 +17,21 @@ namespace MusicInYourHands.EditorTools
         static readonly Vector3 PreviewNeck = new Vector3(0f, 1.47f, -0.09f);
         static readonly Vector3 PreviewHeadJoint = new Vector3(0f, 1.55f, -0.07f);
         static readonly Vector3 PreviewChest = new Vector3(0f, 1.3f, -0.06f);
+        static readonly Vector3 PreviewHips = new Vector3(0f, 0.98f, -0.06f);
+        // The right leg's joints, standing: hip, knee, ankle and the ball of the foot (the left leg mirrors them).
+        static readonly Vector3 PreviewHip = new Vector3(0.09f, 0.93f, -0.05f);
+        static readonly Vector3 PreviewKnee = new Vector3(0.1f, 0.5f, 0f);
+        static readonly Vector3 PreviewAnkle = new Vector3(0.1f, 0.08f, -0.03f);
+        static readonly Vector3 PreviewToes = new Vector3(0.11f, 0.02f, 0.1f);
 
         /// <summary>
         /// Feeds BodyRig, as BodyFeed would, a body that fits the preview hands: shoulders below and behind the eyes, and
         /// each elbow where an upper arm and a forearm of the given lengths meet between the shoulder and the hand's wrist,
-        /// bending out and down. The body's wrist sits a centimetre or two from the hand's, as Meta's does.
+        /// bending out and down. The body's wrist sits a centimetre or two from the hand's, as Meta's does. The hips sit
+        /// under the chest, and with <paramref name="legs"/> (full-body tracking) the legs stand straight down from them.
         /// </summary>
-        static void PreviewBody(HandRig rig, float dt, float forearm = PreviewForearm, float upperArm = PreviewUpperArm, float confidence = 1f)
+        static void PreviewBody(HandRig rig, float dt, float forearm = PreviewForearm, float upperArm = PreviewUpperArm, float confidence = 1f,
+            bool legs = true)
         {
             for (int side = 0; side < 2; side++)
             {
@@ -33,12 +41,17 @@ namespace MusicInYourHands.EditorTools
                 var wrist = hand.Mesh != null && hand.Mesh.rootBone != null ? hand.Mesh.rootBone.position : hand.Palm.position;
                 var elbow = Elbow(shoulder, wrist, upperArm, forearm, new Vector3(left ? -0.6f : 0.6f, -1f, -0.3f));
                 BodyRig.SetArm(left, true, shoulder, elbow, wrist + new Vector3(0.012f, -0.008f, -0.01f));
+                BodyRig.SetLeg(left, legs, PreviewLegAt(PreviewHip, left), PreviewLegAt(PreviewKnee, left),
+                    PreviewLegAt(PreviewAnkle, left), PreviewLegAt(PreviewToes, left));
             }
             BodyRig.SetSpine(true, PreviewChest, PreviewNeck, PreviewHeadJoint);
+            BodyRig.SetHips(true, PreviewHips);
             BodyRig.Push(confidence, dt);
         }
 
         static Vector3 PreviewShoulderAt(bool left) => new Vector3(left ? -PreviewShoulder.x : PreviewShoulder.x, PreviewShoulder.y, PreviewShoulder.z);
+
+        static Vector3 PreviewLegAt(Vector3 right, bool left) => new Vector3(left ? -right.x : right.x, right.y, right.z);
 
         /// <summary>
         /// Where the elbow is when an upper arm of length <paramref name="upper"/> from the shoulder and a forearm of length
@@ -58,9 +71,12 @@ namespace MusicInYourHands.EditorTools
         /// <summary>
         /// Shadow play's arms, driven with made-up body joints: with the elbows bent, each arm's shadow is a forearm from the
         /// hand's own wrist (inside the hand's shadow) to the elbow and an upper arm from that same elbow to the shoulder,
-        /// tapered, with the shoulders and neck joining them; a straight arm casts a straight shadow; a fist moves neither
+        /// tapered, with the shoulders and neck joining them; the trunk runs from the chest to the hips and each leg from the
+        /// hips through the knee to the toes, tapering, ringing no lights, and with the upper body only the legs fade while
+        /// the trunk stays; a straight arm casts a straight shadow; a fist moves neither
         /// the body's arm nor the hands-only estimate; without a body, or with one whose forearm is too long to believe,
-        /// only the estimated forearm is left; the arms fade between the two with no jumps; entering the world wants the
+        /// only the estimated forearm is left; the arms fade between the two with no jumps; a sung word rides just above a
+        /// light as it drifts and fades slowly away once that light rings; entering the world wants the
         /// body and leaving it lets it go; and frames allocate nothing. Also: the main scene has the body feed, its
         /// OVRManager doesn't ask for body tracking at startup, and Meta's project config has body tracking Supported.
         /// </summary>
@@ -121,11 +137,11 @@ namespace MusicInYourHands.EditorTools
                     lastStrength[s] = strength;
                 }
             }
-            void Run(float seconds, bool body, float forearm = PreviewForearm)
+            void Run(float seconds, bool body, float forearm = PreviewForearm, bool legs = true)
             {
                 for (float t = 0f; t < seconds; t += dt)
                 {
-                    if (body) PreviewBody(rig, dt, forearm);
+                    if (body) PreviewBody(rig, dt, forearm, legs: legs);
                     else BodyRig.Lose(dt);
                     world.Step(rig, frame, camera, dt);
                     if (tracking) Watch(false);
@@ -173,6 +189,39 @@ namespace MusicInYourHands.EditorTools
             }
             Expect(Capsule(world, ShadowPlay.ShadowPart.Neck, false, out _, out _, out _, out _, out _), "no neck with the body tracked");
             Expect(Capsule(world, ShadowPlay.ShadowPart.Head, false, out _, out _, out _, out _, out _), "no head");
+
+            // The trunk, from the chest to the hips, and each leg from the hips through the hip, knee and ankle to the toes,
+            // joined and tapering down; they darken the wall but ring no lights.
+            bool trunk = Capsule(world, ShadowPlay.ShadowPart.Trunk, false, out var ta, out var tb, out _, out _, out var ts);
+            world.PreviewProject(PreviewChest, out var chestOnWall);
+            world.PreviewProject(PreviewHips, out var hipsOnWall);
+            Expect(trunk && ts > 0.99f && (ta - chestOnWall).magnitude < 0.002f && (tb - hipsOnWall).magnitude < 0.002f,
+                $"no full trunk from the chest to the hips with the body tracked ({trunk}, {ts:0.00} dark)");
+            for (int s = 0; s < 2; s++)
+            {
+                bool left = s == 0;
+                string side = left ? "left" : "right";
+                bool hip = Capsule(world, ShadowPlay.ShadowPart.Hip, left, out var ha, out var hb, out _, out var hrb, out _);
+                bool thigh = Capsule(world, ShadowPlay.ShadowPart.Thigh, left, out var tha, out var thb, out var thra, out var thrb, out var ths);
+                bool shin = Capsule(world, ShadowPlay.ShadowPart.Shin, left, out var sa, out var sb, out var sra, out var srb, out _);
+                bool foot = Capsule(world, ShadowPlay.ShadowPart.Foot, left, out var fta, out _, out var ftra, out _, out _);
+                Expect(hip && thigh && shin && foot, $"{side} leg: hips {hip}, thigh {thigh}, shin {shin}, foot {foot}");
+                if (!hip || !thigh || !shin || !foot) continue;
+                world.PreviewProject(PreviewLegAt(PreviewKnee, left), out var knee);
+                Expect((ha - hipsOnWall).magnitude < 0.002f && (hb - tha).magnitude < 1e-4f && (thb - sa).magnitude < 1e-4f
+                       && (sb - fta).magnitude < 1e-4f && (thb - knee).magnitude < 0.002f,
+                    $"{side} leg: its parts don't join from the hips to the toes through the knee");
+                Expect(ths > 0.99f && thra < hrb + 1e-4f && thrb < thra && sra < thrb && srb < sra && ftra <= srb + 1e-4f,
+                    $"{side} leg: not fully dark, or not tapering from the hips to the foot");
+                Expect(world.PreviewShadowAt((sa + sb) * 0.5f) == 1, $"{side} leg: the shin's shadow would ring a light");
+            }
+            // With the upper body only, the trunk stays and the legs fade away.
+            Run(1f, true, legs: false);
+            Expect(Capsule(world, ShadowPlay.ShadowPart.Trunk, false, out _, out _, out _, out _, out _) &&
+                   !Capsule(world, ShadowPlay.ShadowPart.Thigh, true, out _, out _, out _, out _, out _) &&
+                   !Capsule(world, ShadowPlay.ShadowPart.Shin, false, out _, out _, out _, out _, out _),
+                "with the upper body only the legs are still drawn, or the trunk is gone");
+            Run(1f, true);
             var bodyForearm = new Vector2[4];
             for (int s = 0; s < 2; s++) Capsule(world, ShadowPlay.ShadowPart.Forearm, s == 0, out bodyForearm[s * 2], out bodyForearm[s * 2 + 1], out _, out _, out _);
 
@@ -194,6 +243,9 @@ namespace MusicInYourHands.EditorTools
                     $"without a body the {(left ? "left" : "right")} upper arm or shoulder is still drawn");
             }
             Expect(!Capsule(world, ShadowPlay.ShadowPart.Neck, false, out _, out _, out _, out _, out _), "without a body the neck is still drawn");
+            Expect(!Capsule(world, ShadowPlay.ShadowPart.Trunk, false, out _, out _, out _, out _, out _) &&
+                   !Capsule(world, ShadowPlay.ShadowPart.Thigh, true, out _, out _, out _, out _, out _),
+                "without a body the trunk or legs are still drawn");
 
             // 3. A fist moves neither the estimated forearm nor (4) the body's.
             foreach (var hand in hands)
@@ -262,6 +314,26 @@ namespace MusicInYourHands.EditorTools
             Run(0.5f, false);
             int without = AllocationsIn(() => Run(1.5f, false));
             allocationProbe = null;
+
+            // 8. A sung word lands on a light and rides just above it as the light drifts; once that light rings, the word
+            // fades slowly away as the ring spreads. The menu is still open, so no shadow rings the light first.
+            world.PreviewSing("light");
+            Run(0.6f, true);
+            bool riding = world.PreviewWord(out var wordAt, out var lightAt, out float shown);
+            int rideAllocations = AllocationsIn(() => Run(1f, true));
+            bool still = world.PreviewWord(out var wordLater, out var lightLater, out _);
+            Expect(riding && still && shown > 0.9f && (wordAt - lightAt).magnitude < 0.06f
+                   && ((wordLater - lightLater) - (wordAt - lightAt)).magnitude < 0.002f && (lightLater - lightAt).magnitude > 0.01f,
+                $"a sung word doesn't ride on a light (on one {riding}, still {still}, {shown:0.00} shown, " +
+                $"{(wordAt - lightAt).magnitude:0.000} m from it)");
+            Expect(rideAllocations == 0, $"frames with a word on a light allocate ({rideAllocations} times in 1 s)");
+            world.PreviewRingWord();
+            Run(0.5f, true);
+            world.PreviewWord(out _, out _, out float fading);
+            Run(1.6f, true);
+            bool gone = !world.PreviewWord(out _, out _, out _);
+            Expect(fading > 0.2f && fading < 0.95f && gone,
+                $"a rung light's word doesn't fade slowly away ({fading:0.00} shown 0.5 s after the ring, gone after 2.1 s {gone})");
             RunMessage(menu, "OnDisable");
             Expect(probe > 0 && withBody == 0 && without == 0,
                 $"frames allocate: {withBody} times in 1.5 s with the body, {without} without (probe {probe})");
@@ -274,8 +346,11 @@ namespace MusicInYourHands.EditorTools
             BodyRig.Wanted = wantedBefore;
             if (failures.Count == 0)
                 Debug.Log("[Check] Shadow play arms: with the body, a tapered forearm from the hand's wrist to the elbow and an upper arm on " +
-                          "to the shoulder, joined by the shoulders and neck; a straight arm casts a straight shadow; a fist swings no " +
-                          "arm; without a believable body only the estimated forearm stays; the fades don't pop; leaving lets the body " +
+                          "to the shoulder, joined by the shoulders and neck; the trunk from the chest to the hips and each leg from the " +
+                          "hips through the knee to the toes, tapering and ringing no lights, the legs gone with the upper body only; " +
+                          "a straight arm casts a straight shadow; a fist swings no " +
+                          "arm; without a believable body only the estimated forearm stays; the fades don't pop; a sung word rides " +
+                          "on a light and fades slowly away once the light rings; leaving lets the body " +
                           "go; no allocations. The main scene has the body feed and asks for nothing at startup. " +
                           $"(Elbows bent {string.Join(" and ", bends.Select(b => $"{b:0}"))} degrees on the wall; a fade's largest " +
                           $"frame step {worstStep:P0} of its way; a fist moved an elbow end {fistDrift * 1000f:0.0} mm.)");
@@ -291,7 +366,7 @@ namespace MusicInYourHands.EditorTools
         static bool Capsule(ShadowPlay world, ShadowPlay.ShadowPart part, bool left, out Vector2 a, out Vector2 b, out float radiusA,
             out float radiusB, out float strength)
         {
-            bool sided = part == ShadowPlay.ShadowPart.Forearm || part == ShadowPlay.ShadowPart.UpperArm || part == ShadowPlay.ShadowPart.Shoulder;
+            bool sided = part != ShadowPlay.ShadowPart.Head && part != ShadowPlay.ShadowPart.Neck && part != ShadowPlay.ShadowPart.Trunk;
             for (int i = 0; i < world.PreviewCapsuleCount; i++)
             {
                 world.PreviewCapsule(i, out var p, out bool l, out a, out b, out radiusA, out radiusB, out strength);
