@@ -63,6 +63,7 @@ namespace MusicInYourHands.EditorTools
             ok &= CheckPickerResults();
             ok &= CheckSpatialAudio();
             ok &= CheckOnboarding();
+            ok &= CheckJourney();
             Debug.Log(ok ? "[Check] All checks passed." : "[Check] Some checks FAILED.");
             return ok;
         }
