@@ -28,6 +28,7 @@ Material:
     - _Alpha: 1
     - _Hover: 0
     - _Radius: 0.015
+    - _Soft: 0
     m_Colors:
     - _Color: {r: 0.05, g: 0.055, b: 0.09, a: 0.74}
     - _Edge: {r: 1, g: 1, b: 1, a: 0.16}

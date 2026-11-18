@@ -6,8 +6,8 @@ namespace MusicInYourHands
     /// <summary>
     /// The Earth and water world: your bare hands command earth and water, one at a time. Now and then the music hands
     /// over from one to the other by itself, at the start of a sung line; clench both fists for a moment to switch over
-    /// yourself. Each change bursts out in the new element's colours, dresses your hands for it, and a short caption
-    /// names it and says what to do.
+    /// yourself. Each change bursts out in the new element's colours, dresses your hands for it, and a caption names it
+    /// in one word.
     /// <list type="bullet">
     /// <item><b>Earth</b>: rocks push up out of the floor around you (or out of your table). Lift your palms, palms up, to
     /// raise the rocks in front of that hand; push down, palms down, to sink them. They rumble and shake on the beat, the
@@ -39,12 +39,6 @@ namespace MusicInYourHands
         public override HandTheme Theme => Themes[current];
 
         static readonly string[] Names = { "Water", "Earth" };
-
-        static readonly string[] HowTo =
-        {
-            "Sweep your hands; palms facing make an orb",
-            "Lift palms up to raise rocks, push down to sink"
-        };
 
         // Each element's colours: its main colour, a second one and a bright one, for bursts, words and lights.
         static readonly Color[] MainColors = { new Color(0.25f, 0.66f, 1f), new Color(0.78f, 0.56f, 0.3f) };
@@ -168,7 +162,7 @@ namespace MusicInYourHands
         Vector3 flashAt;
         Color flashColor;
         Transform captionRoot;
-        TypeLabel captionTitle, captionLine;
+        TypeLabel captionTitle;
         float captionAge = 99f;
         bool captionDue = true, captionPlaced;
         Color captionColor;
@@ -246,8 +240,8 @@ namespace MusicInYourHands
             Show(charge, false);
             captionRoot = new GameObject("Caption").transform;
             captionRoot.SetParent(transform, false);
-            captionTitle = new TypeLabel("Caption Title", captionRoot, 0.026f);
-            captionLine = new TypeLabel("Caption Line", captionRoot, 0.017f);
+            // One word, on a soft dark backing so it reads over a bright room.
+            captionTitle = new TypeLabel("Caption Title", captionRoot, 0.03f) { Backing = 1f, IsCaption = true };
             captionRoot.gameObject.SetActive(false);
 
             path = new Vector3[StreamPoints];
@@ -621,7 +615,6 @@ namespace MusicInYourHands
         void ShowCaption(int e)
         {
             captionTitle.Text = Names[e];
-            captionLine.Text = HowTo[e];
             captionColor = Color.Lerp(Color.white, MainColors[e], 0.55f);
             // The world's own hint shows for its first few seconds: wait for it to go.
             captionAge = Mathf.Min(0f, Clock - 4.8f);
@@ -644,10 +637,8 @@ namespace MusicInYourHands
             captionRoot.SetPositionAndRotation(Vector3.Lerp(captionRoot.position, target, follow), Quaternion.Slerp(captionRoot.rotation, rotation, follow));
             captionPlaced = true;
             float alpha = Mathf.Clamp01(Mathf.Min(captionAge / 0.3f, (3.2f - captionAge) / 0.7f));
-            captionTitle.Transform.localPosition = new Vector3(0f, 0.026f, 0f);
-            captionLine.Transform.localPosition = new Vector3(0f, -0.008f, 0f);
+            captionTitle.Transform.localPosition = new Vector3(0f, 0.012f, 0f);
             captionTitle.Color = new Color(captionColor.r, captionColor.g, captionColor.b, alpha);
-            captionLine.Color = new Color(1f, 1f, 1f, alpha * 0.92f);
         }
 
         /// <summary>The hands take on the element's look, blending over from the last one, and its effect inputs.</summary>
@@ -1308,6 +1299,17 @@ namespace MusicInYourHands
             HandSkin.Theme = Themes[current];
             if (act && current == Earth) previewLift = 0.95f;
         }
+
+        /// <summary>For previews and the caption checks: the element's caption shows at once, as after a change.</summary>
+        public void PreviewCaption()
+        {
+            Build();
+            ShowCaption(current);
+            captionAge = 0.5f;
+        }
+
+        /// <summary>The caption showing now, or an empty string (for the editor checks).</summary>
+        public string Caption => captionRoot != null && captionRoot.gameObject.activeSelf ? captionTitle.Text : "";
 
         // ---- Meshes and sounds, made once ----
 

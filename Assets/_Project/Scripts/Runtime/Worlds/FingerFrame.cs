@@ -220,7 +220,8 @@ namespace MusicInYourHands
             window.gameObject.SetActive(false);
             sparks = Effects.MakeSparkSystem("Window Sparks", transform, glowMaterial);
             voices = new AudioPool(transform, 6);
-            caption = new TypeLabel("Caption", transform, 0.014f);
+            // The view's name, on a soft dark backing so it reads over whatever the window shows.
+            caption = new TypeLabel("Caption", transform, 0.018f) { Backing = 1f, IsCaption = true };
             caption.GameObject.SetActive(false);
         }
 
@@ -715,6 +716,9 @@ namespace MusicInYourHands
             var tint = Color.Lerp(Color.white, ScenePalette[Scene][0], 0.35f);
             caption.Color = new Color(tint.r, tint.g, tint.b, alpha);
         }
+
+        /// <summary>For previews and the caption checks: the name of the view showing comes up under the window.</summary>
+        public void PreviewCaption() => Say(SceneNames[Scene], 1.8f);
 
         /// <summary>For previews: opens the window at a place, as if framed by hands, on a given view.</summary>
         public void PreviewWindow(Vector3 at, Quaternion rotation, Vector2 windowSize, int world)

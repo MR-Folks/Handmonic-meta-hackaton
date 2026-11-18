@@ -28,10 +28,11 @@ namespace MusicInYourHands
     /// <summary>
     /// Music controls in every world, on Meta's most reliable hand gestures: tap your thumb on the side of your index
     /// finger to pause or play, or swipe it along the finger to the left for the previous song and to the right for the
-    /// next one, with either hand. A short caption low in your view says what happened ("Paused", "Next: Neon Tide"),
-    /// beside a small bubble with the emblem of the menu's matching button, and a soft note in the song's key sounds from
-    /// your thumb. A song that still has to load keeps its caption until it plays, or says it couldn't. While you listen to
-    /// the room there is no song to pause or change, so the caption says "Listening to the room" and nothing changes.
+    /// next one, with either hand. A short caption low in your view says what happened in a word or two ("Paused",
+    /// "Playing", or the title of the song it changed to), on a soft dark backing so it reads over a bright room, beside a
+    /// small bubble with the emblem of the menu's matching button, and a soft note in the song's key sounds from your
+    /// thumb. A song that still has to load keeps its caption until it plays, or says it couldn't. While you listen to
+    /// the room there is no song to pause or change, so the caption says "Listening" and nothing changes.
     /// To avoid accidents a hand is ignored while it isn't tracked, makes Meta's menu gesture, pinches or makes a fist,
     /// and for a moment after; every gesture is ignored while the world menu (with its song page and file picker) is
     /// open; and two commands are at least half a second apart.
@@ -220,7 +221,7 @@ namespace MusicInYourHands
             {
                 // The microphone follows music playing in the room, which these controls can't pause or change. No note
                 // either, so the microphone doesn't pick it up; the fingers still light, so you know it was seen.
-                Show("Listening to the room", ListenIcon, false, ListenColor, 0);
+                Show("Listening", ListenIcon, false, ListenColor, 0);
                 GestureFeedback.Light(left, GestureFeedback.FingersFor(kind));
                 return true;
             }
@@ -280,7 +281,8 @@ namespace MusicInYourHands
             }
         }
 
-        string StepText(int step, SongAsset song, bool loading) => Fit(step > 0 ? "Next: " : "Previous: ", Title(song), loading ? "…" : "");
+        /// <summary>A swipe's caption: the title it changed to (the emblem says which way), with "…" while it loads.</summary>
+        string StepText(int step, SongAsset song, bool loading) => Fit("", Title(song), loading ? "…" : "");
 
         static string Title(SongAsset song) => string.IsNullOrEmpty(song.title) ? "song" : song.title;
 
@@ -377,7 +379,7 @@ namespace MusicInYourHands
             root.SetParent(transform, false);
             content = new GameObject("Content").transform;
             content.SetParent(root, false);
-            label = new TypeLabel("Caption", content, letterHeight, 0.5f, left: true);
+            label = new TypeLabel("Caption", content, letterHeight, 0.5f, left: true) { Backing = 1f, IsCaption = true };
             var material = bubbleMaterial;
             if (material == null)
             {

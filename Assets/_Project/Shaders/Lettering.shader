@@ -2,6 +2,7 @@
 // fall away from it on either side. That keeps edges sharp at any size, and every effect below reads the same one
 // texture sample, so nothing ever picks up the neighbouring letters in the atlas.
 // - _Rim adds a soft dark edge, so words stay readable over a bright room.
+// - _Shade adds a wider, soft dark halo round the letters, for captions that must read over a bright real room.
 // - _Frame crops the text softly to a rectangle in a "frame" space (_FrameMatrix: world to frame), so giant
 //   letters can run off the edge like a cropped poster (Orbit type).
 // - _Spray turns the glyphs into spray paint: a speckled overspray halo and a slightly rough edge (Graffiti).
@@ -16,6 +17,7 @@ Shader "MusicInYourHands/Lettering"
         _Color ("Color", Color) = (1, 1, 1, 1)
         _Glow ("Extra brightness", Float) = 0
         _Rim ("Dark edge 0-1", Float) = 0.4
+        _Shade ("Dark soft halo 0-1", Float) = 0
         _Spray ("Spray paint 0-1", Float) = 0
         _Reveal ("Reveal 0-1", Float) = 1
         _Extent ("Text extent in object space (min x, max x)", Vector) = (-1, 1, 0, 0)
@@ -51,6 +53,7 @@ Shader "MusicInYourHands/Lettering"
                 float4 _Color;
                 float _Glow;
                 float _Rim;
+                float _Shade;
                 float _Spray;
                 float _Reveal;
                 float4 _Extent;
@@ -115,6 +118,14 @@ Shader "MusicInYourHands/Lettering"
                     float rim = smoothstep(0.32, 0.47, field) * (1 - ink) * _Rim * saturate(1 - _Halo * 2);
                     color = lerp(color * 0.12, color, ink);
                     alpha = saturate(ink + rim);
+                }
+
+                if (_Shade > 0.001)
+                {
+                    // A soft dark halo reaching nearly as far as the atlas's field does (it is zero at the quad's edge).
+                    float shade = smoothstep(0.05, 0.47, field) * (1 - ink) * _Shade;
+                    color = lerp(float3(0.015, 0.015, 0.025), color, ink);
+                    alpha = max(alpha, shade * 0.85);
                 }
 
                 if (_Spray > 0.001)

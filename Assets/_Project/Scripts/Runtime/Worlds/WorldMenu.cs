@@ -780,7 +780,7 @@ namespace MusicInYourHands
 
         /// <summary>
         /// The name of the bubble you point at, large above the honeycomb (or the current world's when you point at
-        /// none), with a soft shadow so it reads over any room. Two small lines under the song row say how to choose.
+        /// none), on a soft dark backing so it reads over any room. Two small lines under the song row say how to choose.
         /// Words too wide for the menu are shortened, so nothing reaches past the bubbles. Each is only worked out again
         /// when what it says changes.
         /// </summary>
@@ -1020,6 +1020,9 @@ namespace MusicInYourHands
             caption = new TypeLabel("Caption", root, CaptionSize, 0f);
             hint = new TypeLabel("Hint", root, HintSize, 0f);
             gestures = new TypeLabel("Hint 2", root, HintSize, 0f);
+            // The name above the honeycomb sits on a soft dark backing, so it reads over a bright room.
+            caption.Backing = 1f;
+            caption.IsCaption = hint.IsCaption = gestures.IsCaption = true;
             captioned = null;
             captionedState = -1;
             hinted = false;

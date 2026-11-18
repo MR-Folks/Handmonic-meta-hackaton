@@ -183,7 +183,8 @@ namespace MusicInYourHands
                 arcs[side] = new LineStrip($"Charge Ring {side}", transform, lineMaterial, ArcPoints);
                 arcs[side].SetVisible(false);
             }
-            caption = new TypeLabel("Weather Caption", transform, 0.04f);
+            // "Snow" or "Rain", on a soft dark backing so it reads over the white snow and a bright room.
+            caption = new TypeLabel("Weather Caption", transform, 0.04f) { Backing = 1f, IsCaption = true };
             caption.GameObject.SetActive(false);
             BuildGround();
         }
@@ -1132,6 +1133,12 @@ namespace MusicInYourHands
         }
 
         float previewSeconds = -1f;
+
+        /// <summary>For previews and the caption checks: the weather's caption shows over <paramref name="at"/>, as after a change.</summary>
+        public void PreviewCaption(Vector3 at) => ShowCaption(snowing ? "Snow" : "Rain", at, snowing ? SnowColor : RainColor);
+
+        /// <summary>Whether it snows now (else it rains), for the editor checks.</summary>
+        public bool Snowing => snowing;
 
         /// <summary>For previews: the ground as so many seconds of this weather would leave it (on the next step, once placed).</summary>
         void Prefill()

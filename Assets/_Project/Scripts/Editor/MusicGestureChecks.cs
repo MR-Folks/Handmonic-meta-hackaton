@@ -117,10 +117,10 @@ namespace MusicInYourHands.EditorTools
             bool played = music.Playing && gestures.Caption == "Playing";
             Wait();
             Do(false, Microgesture.SwipeRight);
-            bool next = music.Index == 1 && gestures.Caption == "Next: Neon Tide";
+            bool next = music.Index == 1 && gestures.Caption == "Neon Tide";
             Wait();
             Do(true, Microgesture.SwipeLeft);
-            bool previous = music.Index == 0 && gestures.Caption == "Previous: Glass Room";
+            bool previous = music.Index == 0 && gestures.Caption == "Glass Room";
 
             // A second command within the cooldown does nothing; after it, it works.
             Run(0.2f);
@@ -185,7 +185,7 @@ namespace MusicInYourHands.EditorTools
             // Listening to the room, the gestures only say so.
             music.Listening = true;
             Do(false, Microgesture.SwipeRight);
-            bool listening = music.Index == 1 && gestures.Caption == "Listening to the room";
+            bool listening = music.Index == 1 && gestures.Caption == "Listening";
             Wait();
             listening &= !Tap(false);
             music.Listening = false;
@@ -195,10 +195,10 @@ namespace MusicInYourHands.EditorTools
             music.OnDemand = music.Songs[2];
             Do(false, Microgesture.SwipeRight);
             Run(2.5f);
-            bool streaming = music.Index == 1 && gestures.Caption == "Next: Rainy Window…";
+            bool streaming = music.Index == 1 && gestures.Caption == "Rainy Window…";
             music.FinishLoading(true);
             Run(0.1f);
-            streaming &= music.Index == 2 && gestures.Caption == "Next: Rainy Window";
+            streaming &= music.Index == 2 && gestures.Caption == "Rainy Window";
             Run(1.2f);
             streaming &= gestures.Caption == "";
             music.OnDemand = music.Songs[0];
