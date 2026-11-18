@@ -29,6 +29,10 @@
 # Builds
 *.apk
 *.aab
+
+# Signing keys never go into git (see Tools/release)
+*.keystore
+*.jks
 *.unitypackage
 crashlytics-build.properties
 
