@@ -47,8 +47,11 @@ namespace MusicInYourHands
     /// It is on by default: every song that starts begins its journey. Picking a world in the menu turns it off (a short
     /// caption says so) and the menu's Journey bubble turns it back on. While the menu or the cassette deck is open no
     /// world changes; a change that falls then waits for the next section. Pausing the song pauses the journey.
+    /// On first launch the onboarding's opening world plays the opening song's first section (<see cref="OpenWith"/>);
+    /// the demo tour and a world asked for at launch turn the journey off.
     /// The menu, the onboarding and others use <see cref="Instance"/>, <see cref="Begin"/>, <see cref="Stop"/>,
-    /// <see cref="Toggle"/>, <see cref="IsActive"/> and the <see cref="ActiveChanged"/> and <see cref="SectionChanged"/> events.
+    /// <see cref="Toggle"/>, <see cref="OpenWith"/>, <see cref="IsActive"/> and the <see cref="ActiveChanged"/> and
+    /// <see cref="SectionChanged"/> events.
     /// </summary>
     [DefaultExecutionOrder(140)]
     public class JourneyMode : MonoBehaviour
@@ -233,6 +236,9 @@ namespace MusicInYourHands
         float lastTime, pendingFor, menuClosedFor = 99f, cardFor, awaitingFor, gather;
         SongAsset awaiting;
         int retries;
+        // The onboarding's opening world, for the section playing when its song's journey starts (see OpenWith).
+        int openWith = -1;
+        SongAsset openWithSong;
         WorldManager boundManager;
         Transform visuals;
         JourneyWave waveView;
@@ -257,6 +263,9 @@ namespace MusicInYourHands
 
         void Start()
         {
+            // Watching the worlds from the start, so a world asked for at launch (DemoTour) or the onboarding's opening
+            // world is seen before the first song's journey brings in a world of its own.
+            Bind(WorldManager.Instance);
             if (startOn) Begin();
         }
 
@@ -312,6 +321,18 @@ namespace MusicInYourHands
             if (state != State.Off) TurnOff(OffCaption);
         }
 
+        /// <summary>
+        /// The onboarding's opening: when <paramref name="song"/>'s journey starts (any song's, if null) the section playing
+        /// then gets <paramref name="world"/> and the song's other sections other worlds, so the journey goes on from the
+        /// world the app opened in. Switching to it is not the player choosing, so it doesn't turn the journey off.
+        /// </summary>
+        public void OpenWith(int world, SongAsset song)
+        {
+            openWith = world;
+            openWithSong = song;
+            planned = false;
+        }
+
         void TurnOff(string caption)
         {
             if (state == State.Off) return;
@@ -319,6 +340,7 @@ namespace MusicInYourHands
             if (state == State.Card) musicOn = true;
             offSong = planSong;
             awaiting = null;
+            openWith = -1;
             state = State.Off;
             pending = false;
             armedFor = -1;
@@ -332,7 +354,7 @@ namespace MusicInYourHands
 
         void OnWorldChanged(int index)
         {
-            if (ourSwitch || state == State.Off) return;
+            if (ourSwitch || state == State.Off || index == openWith) return;
             TurnOff(OffCaption);
         }
 
@@ -368,7 +390,9 @@ namespace MusicInYourHands
             int count = state != State.Off ? Mathf.Min(plan.Count, SongMap.MaxDots) : 0;
             int future = state != State.Off && plan.Source == SectionSource.Audio && plan.Length > 0f && music != null
                 ? Mathf.Clamp(Mathf.RoundToInt((plan.Length - music.Time) / 40f), 0, SongMap.MaxDots - count) : 0;
-            mapView.Step(count, lastIndex, future, colors, labels, music != null ? music.Kick : 0f, view, mapHidden, dt);
+            // The dots' beat pulse is a beat flash too: a quarter of it with Less flashing.
+            float kick = music != null ? music.Kick * ComfortOptions.FlashScale : 0f;
+            mapView.Step(count, lastIndex, future, colors, labels, kick, view, mapHidden, dt);
         }
 
         void Follow(HandRig rig, WorldManager manager, IJourneyMusic music, bool menuOpen, Camera view, float dt)
@@ -670,9 +694,16 @@ namespace MusicInYourHands
             if (!known) live.Begin(plan, length, time, music.IsListening);
 
             ResetPicks();
+            // The world the app opened in plays the section playing now, and no other section of this song.
+            int now = plan.IndexAt(time);
+            if (openWith >= 0 && (openWithSong == null || openWithSong == song))
+            {
+                if (now >= 0 && openWith < manager.Worlds.Count && manager.Worlds[openWith] != null && Take(openWith)) worldOf[now] = openWith;
+                openWith = -1;
+            }
             if (plan.Source == SectionSource.Audio) AssignLive(manager, music);
             else AssignAll(manager);
-            lastIndex = plan.IndexAt(time);
+            lastIndex = now;
             bloomed = plan.FinaleTime >= 0f && time > plan.FinaleTime + 1f;
         }
 
@@ -691,7 +722,12 @@ namespace MusicInYourHands
             {
                 int k = 0;
                 for (int i = 0; i < plan.Count; i++)
-                    if (plan[i].Role == role) worldOf[i] = Pick(manager, role, k++, i);
+                {
+                    if (plan[i].Role != role) continue;
+                    // A section given its world already (the opening world) keeps it.
+                    if (worldOf[i] < 0) worldOf[i] = Pick(manager, role, k, i);
+                    k++;
+                }
             }
             for (int i = 0; i < plan.Count; i++) Remember(manager, i);
         }
@@ -709,7 +745,7 @@ namespace MusicInYourHands
             {
                 int k = 0;
                 for (int j = 0; j < i; j++) if (plan[j].Role == plan[i].Role) k++;
-                worldOf[i] = Pick(manager, plan[i].Role, k, i);
+                if (worldOf[i] < 0) worldOf[i] = Pick(manager, plan[i].Role, k, i);
                 Remember(manager, i);
             }
             livePicked = plan.Count;

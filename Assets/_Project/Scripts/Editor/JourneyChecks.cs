@@ -554,6 +554,35 @@ namespace MusicInYourHands.EditorTools
                 if (picked.Distinct().Count() != picked.Count) problems.Add($"a world repeats in {playlist.List[s].title}'s journey");
             }
 
+            // The onboarding's opening: Flower dance, switched to as Turn It Up to Light starts, plays the song's first
+            // section; the switch doesn't turn the journey off, the other sections get other worlds, and the journey goes on.
+            int flower = Enumerable.Range(0, worlds.Length).FirstOrDefault(w => worlds[w] != null && worlds[w].GetType().Name == "FlowerDance");
+            var opening = new StandInJourney();
+            opening.List.Add(music.List[0]);
+            opening.Play(0, 118f, 0.02f);
+            journey.Stop();
+            manager.Switch(flower == 0 ? 1 : 0);
+            journey.Begin();
+            journey.OpenWith(flower, opening.List[0]);
+            manager.Switch(flower);
+            void Open(float seconds)
+            {
+                for (float t = 0f; t < seconds; t += dt)
+                {
+                    opening.Advance(dt);
+                    journey.Step(rig, manager, opening, false, camera, dt);
+                }
+            }
+            Open(1f);
+            var openingPicks = Enumerable.Range(0, journey.Sections.Count).Select(journey.WorldOf).ToList();
+            bool openedIn = journey.IsActive && manager.Current == flower && journey.WorldOf(0) == flower &&
+                            openingPicks.Count == 8 && openingPicks.Distinct().Count() == openingPicks.Count;
+            Open(17.5f);
+            bool wentOn = journey.IsActive && journey.WorldOf(1) != flower && manager.Current == journey.WorldOf(1);
+            if (!openedIn || !wentOn)
+                problems.Add($"opening in Flower dance: journey on {journey.IsActive}, world {worlds[manager.Current].DisplayName} at {Stamp(opening.Clock)}, " +
+                             $"sections' worlds {string.Join(", ", openingPicks)} (Flower dance is {flower})");
+
             if (problems.Count > 0)
             {
                 Debug.LogError("[Check] Journey run: " + string.Join("; ", problems) + ".");
@@ -566,7 +595,9 @@ namespace MusicInYourHands.EditorTools
                       "world turned the journey off with its caption and nothing changed after; the Journey bubble and a jump brought the right " +
                       "world in; with the menu open as a song ended the next one played on with no card; a song without a sections file followed its lyrics (changing on a beat near each boundary), one without lyrics its " +
                       "audio, and listening never ended in a " +
-                      "card; frames between changes allocate nothing. The built-in songs' journeys:" + journeys);
+                      "card; the onboarding's opening world (Flower dance) played Turn It Up to Light's intro and the journey went on from it " +
+                      $"({string.Join(", ", openingPicks.Select(w => worlds[w].DisplayName))}); " +
+                      "frames between changes allocate nothing. The built-in songs' journeys:" + journeys);
             return true;
         }
     }

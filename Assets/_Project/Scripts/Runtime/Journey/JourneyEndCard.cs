@@ -239,7 +239,12 @@ namespace MusicInYourHands
                     if (p.TouchArmed && p.Depth > TouchContact && depth <= TouchContact)
                     {
                         p.TouchArmed = false;
-                        if (ready && p.Target >= 0 && chosen < 0) chosen = p.Target;
+                        if (ready && p.Target >= 0 && chosen < 0)
+                        {
+                            chosen = p.Target;
+                            // The finger that pressed lights up, as at the menu.
+                            GestureFeedback.Light(s == 0, Fingers.Index);
+                        }
                     }
                     p.PinchArmed = false;
                 }
@@ -258,7 +263,11 @@ namespace MusicInYourHands
                     if (p.PinchArmed && hand.Pinch >= tuning.pinchThresholds.x)
                     {
                         p.PinchArmed = false;
-                        if (ready && p.Aimed >= 0 && chosen < 0) chosen = p.Aimed;
+                        if (ready && p.Aimed >= 0 && chosen < 0)
+                        {
+                            chosen = p.Aimed;
+                            GestureFeedback.Light(s == 0, Fingers.Thumb | Fingers.Index);
+                        }
                     }
                     if (!hits) p.Target = -1;
                 }
