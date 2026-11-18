@@ -9,7 +9,10 @@ namespace MusicInYourHands
     /// beat a flash runs through the school and it surges forward. Put your hand in their way and the school splits
     /// around your fingers and palm and pours through the gaps, then closes up again behind you. Light streams over
     /// your skin with them.
+    /// Left out of the menu and the scene for now, to keep the menu to fewer worlds: take [HiddenWorld] off and run
+    /// Update Worlds in Main Scene to bring it back (and give it its ghost demo in GhostMotions.WorldTable again).
     /// </summary>
+    [HiddenWorld]
     public class SoundWind : World
     {
         public override string DisplayName => "Sound wind";

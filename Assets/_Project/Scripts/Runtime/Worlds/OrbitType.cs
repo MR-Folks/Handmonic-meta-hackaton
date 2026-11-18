@@ -10,7 +10,10 @@ namespace MusicInYourHands
     /// builds up circling your head like planets, and when the line ends its words dissolve. Three tilted orbit rings
     /// with turning beads circle the room. Push the letters with your fingers, flick a ring to spin it, or make a fist
     /// to pull the word towards your hand. Your hands are printed in halftone dots.
+    /// Left out of the menu and the scene for now, to keep the menu to fewer worlds: take [HiddenWorld] off and run
+    /// Update Worlds in Main Scene to bring it back (and give it its ghost demo in GhostMotions.WorldTable again).
     /// </summary>
+    [HiddenWorld]
     public class OrbitType : World
     {
         public override string DisplayName => "Orbit type";

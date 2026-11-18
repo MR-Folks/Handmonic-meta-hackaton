@@ -134,6 +134,8 @@ To add one:
 
 Nothing else keeps a list of worlds: the menu, the hints, the demo tour and the menu previews pick a new world up by themselves.
 
+To leave a world out without deleting it, mark its class `[HiddenWorld]`, take its line out of `GhostMotions.WorldTable` and run **Update Worlds in Main Scene**: it leaves the menu, the demo tour and the scene. Orbit type, Graffiti and Sound wind are hidden this way for now, to keep the menu to fewer worlds; take the mark off (and put their demo lines back) to bring them back.
+
 ## Adding built-in songs
 1. Put the audio file and its `.lrc` lyrics in `Assets/_Project/Audio`.
 2. Create a song with **Create > Music In Your Hands > Song** and assign both.

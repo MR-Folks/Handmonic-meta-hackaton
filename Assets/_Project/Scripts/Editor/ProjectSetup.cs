@@ -508,12 +508,17 @@ namespace MusicInYourHands.EditorTools
         /// MenuOrder, each with its Material fields filled from Materials/ by name; then the bubble WorldMenu, the music
         /// gestures (thumb tap and swipes) and the menu button, microgesture and body feeds. Existing objects are kept and only
         /// their references are refreshed, so a new world needs nothing but its class: run Configure Project (or Rebuild
-        /// Main Scene) and it joins the scene and the menu.
+        /// Main Scene) and it joins the scene and the menu. A world marked [HiddenWorld] leaves the scene (its class
+        /// stays, so taking the mark off brings it back).
         /// </summary>
         internal static void EnsureWorlds()
         {
             var manager = Object.FindAnyObjectByType<WorldManager>(FindObjectsInactive.Include);
             if (manager == null) manager = new GameObject("Worlds", typeof(WorldManager)).GetComponent<WorldManager>();
+
+            // WorldManager only switches off the worlds in its list, so a hidden world left in the scene would keep running.
+            foreach (var world in Object.FindObjectsByType<World>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                if (world.GetType().IsDefined(typeof(HiddenWorldAttribute), false)) Object.DestroyImmediate(world.gameObject);
 
             var worlds = new List<World>();
             foreach (var type in WorldCatalog.Types())
