@@ -12,11 +12,14 @@ namespace MusicInYourHands.EditorTools
     {
         /// <summary>
         /// The cassette deck: its four models (exported or stand-in) have their parts at the right sizes and pivots,
-        /// and the whole flow works with moved hands: the song bubble opens the deck within reach and view, dragging
-        /// the turntable's edge brings another cassette to the front, a pinched cassette carried to the radio shows the
-        /// snap outline and plays when let go, a second one pops the first back to the turntable, Eject sends it home,
-        /// the song list button opens the song page and its Back button returns, the close button and Meta's menu
-        /// gesture close it, a sweep of an open hand turns it, and a frame of the deck allocates no memory.
+        /// and the whole flow works with moved hands: the song bubble opens the deck within reach and view. The
+        /// turntable: a pinch-drag on its edge follows the hand closely and smooths away jitter, and brings another
+        /// cassette to the front; let go mid-turn it spins on; a hand put back into it catches it with a smooth brake;
+        /// a slow slide of an open hand nudges it gently and a quick one flicks it into a glide, which a pinch on the
+        /// edge catches too; and every turn ends settled on a cassette. Then a pinched cassette carried to the radio
+        /// shows the snap outline and plays when let go, a second one pops the first back to the turntable, Eject sends
+        /// it home, the song list button opens the song page and its Back button returns, the close button and Meta's
+        /// menu gesture close it, and a frame of the deck allocates no memory (a hand resting, brushing or holding).
         /// </summary>
         static bool CheckCassetteDeck() => CheckDeckModels() & CheckDeckFlow();
 
@@ -168,6 +171,31 @@ namespace MusicInYourHands.EditorTools
                     tip + new Vector3(-0.03f, -0.055f, -0.065f), tip + new Vector3(-0.04f, -0.06f, -0.07f)
                 };
                 rig.Push(false, true, new Pose(tip + new Vector3(-0.02f, -0.04f, -0.09f), Quaternion.identity), Vector3.left, tips);
+            }
+            // The right hand open and flat, palm down at `palm` with its fingers spread, moving at `velocity` (HandRig
+            // works out a hand's speed between frames, which these checks don't have, so it is given). It allocates
+            // nothing, so the frames it drives can be measured.
+            var openTips = new Vector3[5];
+            void OpenHand(Vector3 palm, Vector3 velocity)
+            {
+                openTips[0] = palm + new Vector3(-0.06f, 0.02f, 0.03f);
+                openTips[1] = palm + new Vector3(-0.03f, 0.03f, 0.09f);
+                openTips[2] = palm + new Vector3(0f, 0.03f, 0.1f);
+                openTips[3] = palm + new Vector3(0.02f, 0.03f, 0.09f);
+                openTips[4] = palm + new Vector3(0.04f, 0.02f, 0.07f);
+                rig.Push(false, true, new Pose(palm, Quaternion.identity), Vector3.down, openTips);
+                rig.Right.Velocity = velocity;
+            }
+            // Slides the open hand in a straight line, one frame at a time, calling `each` after every frame.
+            void Slide(Vector3 from, Vector3 to, int frames, System.Action each)
+            {
+                var velocity = (to - from) / (frames * Frame);
+                for (int i = 1; i <= frames; i++)
+                {
+                    OpenHand(Vector3.Lerp(from, to, i / (float)frames), velocity);
+                    menu.Step(rig, manager, bus, camera, Frame);
+                    each?.Invoke();
+                }
             }
             void Step()
             {
@@ -326,23 +354,166 @@ namespace MusicInYourHands.EditorTools
                 Expect(widest <= 26f, $"everything to touch within the narrow view (widest: {widestName} at {widest:0.0}°)");
                 Expect(Mathf.Abs(tableTop - 0.68f) < 0.003f, $"table top at 0.68 m for a seated player (at {tableTop:0.000} m)");
 
-                // Turn the turntable: pinch its edge to the right of the front and drag it round to the left.
+                // ---- The turntable ----
+                float pitch = deck.TurnPitch;
+                Vector3 Over(float degrees) => deck.EdgePoint(degrees) + Vector3.up * 0.05f;
+                bool OnCassette() => Mathf.Abs(deck.TurnPosition - Mathf.Round(deck.TurnPosition)) < 0.002f;
+                // Lets it come to rest, the hand held still well above it; true if it settled with a cassette at the front.
+                bool Settles(float seconds)
+                {
+                    Hand(deck.EdgePoint(0f) + Vector3.up * 0.4f, Open);
+                    for (float t = 0f; t < seconds && deck.Turning; t += Frame) Step();
+                    return !deck.Turning && OnCassette();
+                }
+
+                // The hard area: pinch the edge to the right of the front and drag it slowly round to the left. It
+                // follows the hand closely; held still, hand tracking's jitter barely moves it; let go, it settles
+                // with another cassette at the front.
                 Move(deck.EdgePoint(25f) + Vector3.up * 0.08f, 12, Open);
                 Move(deck.EdgePoint(25f), 10, Open);
                 Pinch(true);
-                for (int i = 1; i <= 24; i++)
+                float gripFrom = deck.TurnPosition;
+                for (int i = 1; i <= 72; i++)
                 {
-                    Hand(deck.EdgePoint(25f - 70f * i / 24f), Closed);
+                    Hand(deck.EdgePoint(25f - 70f * i / 72f), Closed);
                     menu.Step(rig, manager, bus, camera, Frame);
                 }
+                float dragged = deck.TurnPosition - gripFrom, handTurned = 70f / pitch;
+                Expect(Mathf.Abs(dragged - handTurned) < 0.2f, $"a pinched edge follows the hand closely (turned {dragged:0.00} cassettes for the hand's {handTurned:0.00})");
+                for (int i = 0; i < 22; i++)
+                {
+                    Hand(deck.EdgePoint(-45f), Closed);
+                    menu.Step(rig, manager, bus, camera, Frame);
+                }
+                var noise = new System.Random(5);
+                float lastNoise = 0f, rawStep = 0f, heldStep = 0f, heldAt = deck.TurnPosition;
+                for (int i = 0; i < 36; i++)
+                {
+                    float jitter = ((float)noise.NextDouble() * 2f - 1f) * 0.8f;
+                    if (i > 0) rawStep = Mathf.Max(rawStep, Mathf.Abs(jitter - lastNoise) / pitch);
+                    lastNoise = jitter;
+                    Hand(deck.EdgePoint(-45f + jitter), Closed);
+                    menu.Step(rig, manager, bus, camera, Frame);
+                    heldStep = Mathf.Max(heldStep, Mathf.Abs(deck.TurnPosition - heldAt));
+                    heldAt = deck.TurnPosition;
+                }
+                Expect(heldStep < rawStep * 0.35f, $"held still, tracking jitter barely moves it (at most {heldStep:0.0000} cassettes a frame for the hand's {rawStep:0.0000})");
                 Pinch(false);
-                Move(pinchAt + Vector3.up * 0.1f, 8, Open);
-                Run(2.2f);
+                bool dragSettled = Settles(3f);
                 var front1 = deck.FrontSong;
-                Expect(front1 != front0 && !deck.Turning, $"dragging the edge turns another cassette to the front ({Title(front0)} -> {Title(front1)}, settled {!deck.Turning})");
+                Expect(front1 != front0 && dragSettled, $"a pinch-drag turns another cassette to the front and it settles there ({Title(front0)} -> {Title(front1)}, settled {dragSettled})");
+
+                // A quick turn of the edge, let go mid-turn: it spins on at the hand's speed (no faster than the top
+                // speed), and the open hand resting where it let go doesn't stop it.
+                Move(deck.EdgePoint(30f) + Vector3.up * 0.08f, 12, Open);
+                Move(deck.EdgePoint(30f), 10, Open);
+                Pinch(true);
+                for (int i = 1; i <= 12; i++)
+                {
+                    Hand(deck.EdgePoint(30f - 60f * i / 12f), Closed);
+                    menu.Step(rig, manager, bus, camera, Frame);
+                }
+                Hand(pinchAt, Open);
+                menu.Step(rig, manager, bus, camera, Frame);
+                float flung = deck.TurnSpeed, flungAt = deck.TurnPosition;
+                for (int i = 0; i < 36; i++)
+                {
+                    Hand(pinchAt, Open);
+                    menu.Step(rig, manager, bus, camera, Frame);
+                }
+                float gliding = deck.TurnSpeed, glided = deck.TurnPosition - flungAt;
+                Expect(flung > 3f && flung <= deck.TurnFeel.TopSpeed + 0.01f && gliding > 2.5f && glided > 1.5f,
+                    $"let go mid-turn, it spins on (let go at {flung:0.0} cassettes/s, still {gliding:0.0} half a second later, {glided:0.0} cassettes on)");
+
+                // A hand put back into it catches it: lifted out of the turntable and lowered, open and still, over
+                // the front cassettes, it brakes the spin quickly but smoothly, and the turntable settles.
+                for (int i = 0; i < 3; i++)
+                {
+                    OpenHand(Over(0f) + Vector3.up * 0.35f, Vector3.zero);
+                    menu.Step(rig, manager, bus, camera, Frame);
+                }
+                float beforeCatch = deck.TurnSpeed, catchFrom = deck.TurnPosition;
+                OpenHand(Over(0f), Vector3.zero);
+                menu.Step(rig, manager, bus, camera, Frame);
+                float firstCatch = deck.TurnSpeed;
+                for (int i = 0; i < 28; i++)
+                {
+                    OpenHand(Over(0f), Vector3.zero);
+                    menu.Step(rig, manager, bus, camera, Frame);
+                }
+                float caught = Mathf.Abs(deck.TurnSpeed);
+                bool catchSettled = Settles(3f);
+                // Left to glide from that speed it would go on for several cassettes; caught, it stops within one or so.
+                float caughtIn = Mathf.Abs(deck.TurnPosition - catchFrom);
+                Expect(beforeCatch > 2f && firstCatch > beforeCatch * 0.7f && caught < beforeCatch * 0.4f && caughtIn < 1.2f && catchSettled,
+                    $"a hand put back into it catches it with a smooth brake and it settles on a cassette ({beforeCatch:0.0} cassettes/s, then {firstCatch:0.0} a frame later, " +
+                    $"{caught:0.00} after 0.4 s, stopped {caughtIn:0.00} cassettes on, settled {catchSettled})");
+
+                // The soft area: an open hand sliding slowly across the cassettes (15 cm/s) carries the turntable along
+                // gently; when it stops, the turntable settles.
+                var nudgeStart = Over(25f);
+                var nudgeEnd = Over(-25f);
+                OpenHand(nudgeStart + Vector3.up * 0.1f, Vector3.zero);
+                menu.Step(rig, manager, bus, camera, Frame);
+                for (int i = 0; i < 6; i++)
+                {
+                    OpenHand(nudgeStart, Vector3.zero);
+                    menu.Step(rig, manager, bus, camera, Frame);
+                }
+                float nudgeFrom = deck.TurnPosition, nudgeTop = 0f;
+                int slowFrames = Mathf.RoundToInt(Vector3.Distance(nudgeStart, nudgeEnd) / 0.15f / Frame);
+                Slide(nudgeStart, nudgeEnd, slowFrames, () => nudgeTop = Mathf.Max(nudgeTop, Mathf.Abs(deck.TurnSpeed)));
+                float nudged = deck.TurnPosition - nudgeFrom;
+                for (int i = 0; i < 14; i++)
+                {
+                    OpenHand(nudgeEnd, Vector3.zero);
+                    menu.Step(rig, manager, bus, camera, Frame);
+                }
+                bool nudgeSettled = Settles(3f);
+                Expect(nudged > 0.4f && nudgeTop < 1.5f && nudgeSettled,
+                    $"a slow slide of an open hand moves it gently ({nudged:0.00} cassettes at up to {nudgeTop:0.00} cassettes/s) and it settles (settled {nudgeSettled})");
+
+                // A quick slide flicks it into a spin that glides on after the hand stops in the turntable; a pinch on
+                // the edge of the spinning turntable catches it too, slipping at first and then holding.
+                var flickFrom = Over(35f);
+                var flickTo = Over(-35f);
+                OpenHand(flickFrom + Vector3.up * 0.1f, Vector3.zero);
+                menu.Step(rig, manager, bus, camera, Frame);
+                Slide(flickFrom, flickTo, 12, null);
+                float flicked = deck.TurnSpeed, flickedAt = deck.TurnPosition;
+                for (int i = 0; i < 43; i++)
+                {
+                    OpenHand(flickTo, Vector3.zero);
+                    menu.Step(rig, manager, bus, camera, Frame);
+                }
+                float flickGliding = deck.TurnSpeed, flickGlided = deck.TurnPosition - flickedAt;
+                Expect(flicked > 2.5f && flickGliding > 1.5f && flickGlided > 1f,
+                    $"a quick slide flicks it into a glide ({flicked:0.0} cassettes/s as the hand stops, {flickGliding:0.0} 0.6 s later, {flickGlided:0.0} cassettes on)");
+                rig.Right.Velocity = Vector3.zero;
+                Hand(deck.EdgePoint(0f), Open);
+                menu.Step(rig, manager, bus, camera, Frame);
+                float beforeGrip = deck.TurnSpeed;
+                Hand(deck.EdgePoint(0f), Closed);
+                menu.Step(rig, manager, bus, camera, Frame);
+                float firstGrip = deck.TurnSpeed;
+                for (int i = 0; i < 29; i++)
+                {
+                    Hand(deck.EdgePoint(0f), Closed);
+                    menu.Step(rig, manager, bus, camera, Frame);
+                }
+                float held = Mathf.Abs(deck.TurnSpeed);
+                Pinch(false);
+                bool gripSettled = Settles(3f);
+                Expect(beforeGrip > 1f && firstGrip > beforeGrip * 0.6f && held < 0.3f && gripSettled,
+                    $"a pinch on the spinning edge catches it smoothly ({beforeGrip:0.0} cassettes/s, then {firstGrip:0.0} a frame later, {held:0.00} after 0.4 s) and it settles (settled {gripSettled})");
+                string turns = $"Turntable: a pinch-drag followed the hand to {Mathf.Abs(dragged - handTurned):0.00} cassettes, and held still its largest step was " +
+                               $"{heldStep / Mathf.Max(rawStep, 1e-6f) * 100f:0}% of the hand's jitter; let go mid-turn at {flung:0.0} cassettes/s it glided on " +
+                               $"{glided:0.0} cassettes in 0.5 s; a hand put back cut {beforeCatch:0.0} to {caught:0.00} cassettes/s in 0.4 s and it stopped {caughtIn:0.00} cassettes on; " +
+                               $"a pinch on the spinning edge held it {held:0.00} cassettes/s after 0.4 s; a slow slide moved it {nudged:0.00} cassettes " +
+                               $"at up to {nudgeTop:0.00} cassettes/s; a flick glided {flickGlided:0.0} cassettes in 0.6 s; every turn settled on a cassette.";
 
                 // Pinch the front cassette, carry it to the radio's door: the outline shows; let go: it plays.
-                var first = front1 ?? deck.SongBeside(1);
+                var first = deck.FrontSong ?? deck.SongBeside(1);
                 PickUp(first);
                 Expect(deck.InHand(first), $"pinching the front cassette picks up {Title(first)}");
                 CarryToRadio();
@@ -389,34 +560,48 @@ namespace MusicInYourHands.EditorTools
                 Run(1.2f);
                 Expect(deck.IsOpen && !root.gameObject.activeSelf, "the song page's Back returns to the deck");
 
-                // A sweep of an open hand across the front cassettes turns it.
+                // Back at the deck, a slide of an open hand across the front cassettes still sends it round, and it
+                // settles with another cassette at the front.
                 var beforeSweep = deck.FrontSong;
-                var across = deck.EdgePoint(30f) + Vector3.up * 0.045f;
-                for (int i = 0; i <= 16; i++)
-                {
-                    var palm = Vector3.Lerp(deck.EdgePoint(30f), deck.EdgePoint(-30f), i / 16f) + Vector3.up * 0.05f;
-                    var tips = new[]
-                    {
-                        palm + new Vector3(-0.06f, 0.02f, 0.03f), palm + new Vector3(-0.03f, 0.03f, 0.09f), palm + new Vector3(0f, 0.03f, 0.1f),
-                        palm + new Vector3(0.02f, 0.03f, 0.09f), palm + new Vector3(0.04f, 0.02f, 0.07f)
-                    };
-                    rig.Push(false, true, new Pose(palm, Quaternion.identity), Vector3.down, tips);
-                    rig.Right.Velocity = (deck.EdgePoint(-30f) - deck.EdgePoint(30f)) / (16f * Frame);
-                    deck.Step(rig, bus, camera, Frame);
-                }
+                OpenHand(Over(30f) + Vector3.up * 0.1f, Vector3.zero);
+                menu.Step(rig, manager, bus, camera, Frame);
+                Slide(Over(30f), Over(-30f), 30, null);
                 rig.Right.Velocity = Vector3.zero;
-                pinchAt = across + Vector3.up * 0.15f;
-                gap = Open;
-                Run(2.2f);
-                Expect(deck.FrontSong != beforeSweep || beforeSweep == null && deck.FrontSong != null, $"a sweep of an open hand turns it ({Title(beforeSweep)} -> {Title(deck.FrontSong)})");
+                bool sweepSettled = Settles(6f);
+                Expect(deck.FrontSong != beforeSweep && sweepSettled, $"a slide of an open hand turns it ({Title(beforeSweep)} -> {Title(deck.FrontSong)}, settled {sweepSettled})");
 
-                // A frame of the deck, hands near it and a song playing, allocates no memory.
-                Move(deck.CassetteCenter(deck.FrontSong) + Vector3.up * 0.05f, 10, Open);
+                // A frame of the deck, hands near it and a song playing, allocates no memory: resting in the turntable,
+                // brushing it along and holding its edge.
+                Move(deck.FrontPlace + Vector3.up * 0.05f, 10, Open);
                 for (int i = 0; i < 10; i++) deck.Step(rig, bus, camera, Frame);
                 long before = System.GC.GetAllocatedBytesForCurrentThread();
                 for (int i = 0; i < 120; i++) deck.Step(rig, bus, camera, Frame);
                 long allocated = System.GC.GetAllocatedBytesForCurrentThread() - before;
-                Expect(allocated == 0, $"no memory allocated per frame ({allocated} bytes over 120 frames)");
+                // A short, slow slide (too short to bring another cassette to the front, which rewrites its title).
+                var brushFrom = Over(4f);
+                var brushTo = Over(-4f);
+                var brushVelocity = (brushTo - brushFrom) / (16 * Frame);
+                OpenHand(brushFrom, Vector3.zero);
+                deck.Step(rig, bus, camera, Frame);
+                before = System.GC.GetAllocatedBytesForCurrentThread();
+                for (int i = 1; i <= 16; i++)
+                {
+                    OpenHand(Vector3.Lerp(brushFrom, brushTo, i / 16f), brushVelocity);
+                    deck.Step(rig, bus, camera, Frame);
+                }
+                long brushing = System.GC.GetAllocatedBytesForCurrentThread() - before;
+                rig.Right.Velocity = Vector3.zero;
+                Settles(3f);
+                Move(deck.EdgePoint(-20f) + Vector3.up * 0.08f, 10, Open);
+                Move(deck.EdgePoint(-20f), 8, Open);
+                Pinch(true);
+                before = System.GC.GetAllocatedBytesForCurrentThread();
+                for (int i = 0; i < 60; i++) deck.Step(rig, bus, camera, Frame);
+                long holding = System.GC.GetAllocatedBytesForCurrentThread() - before;
+                Pinch(false);
+                Settles(3f);
+                Expect(allocated == 0 && brushing == 0 && holding == 0,
+                    $"no memory allocated per frame ({allocated} bytes over 120 frames with a hand resting, {brushing} over 16 brushing, {holding} over 60 holding the edge)");
 
                 // The blank cassette in the radio opens the file picker on the headset; here it says so, comes
                 // back out, and the song that is still playing goes back in.
@@ -447,12 +632,12 @@ namespace MusicInYourHands.EditorTools
                 menu.OpenDeck(camera);
                 Run(1.2f);
                 float standingTop = deck.TableHeight;
-                float standingReach = Vector3.ProjectOnPlane(deck.CassetteCenter(deck.FrontSong) - camera.transform.position, Vector3.up).magnitude;
+                float standingReach = Vector3.ProjectOnPlane(deck.FrontPlace - camera.transform.position, Vector3.up).magnitude;
                 Expect(standingTop > 0.9f && standingTop < 1f && standingReach > 0.35f && standingReach < 0.45f,
                     $"standing, the table top rises to {standingTop:0.00} m with the front cassette {standingReach:0.00} m ahead");
                 menu.Toggle(camera);
                 Run(0.6f);
-                return Report(failures, $"Seated: front cassette {reach:0.00} m ahead, everything to touch within {widest:0.0}° of the gaze ({widestName}), the words over the turntable within {plateWidest:0.0}° and clear of the front labels, table top {tableTop:0.00} m; standing: table top {standingTop:0.00} m.");
+                return Report(failures, $"Seated: front cassette {reach:0.00} m ahead, everything to touch within {widest:0.0}° of the gaze ({widestName}), the words over the turntable within {plateWidest:0.0}° and clear of the front labels, table top {tableTop:0.00} m; standing: table top {standingTop:0.00} m. " + turns);
             }
             finally
             {
@@ -480,9 +665,11 @@ namespace MusicInYourHands.EditorTools
         {
             if (failures.Count == 0)
             {
-                Debug.Log("[Check] The cassette deck works by hand: the song bubble opens it within reach and view, dragging the edge turns it, " +
+                Debug.Log("[Check] The cassette deck works by hand: the song bubble opens it within reach and view; a pinched edge turns it, following " +
+                          "the hand closely and smoothly, and let go mid-turn it spins on; a hand put back in it, or a pinch on its spinning edge, catches it " +
+                          "smoothly; a slow slide of an open hand nudges it and a quick one flicks it into a glide; it always settles on a cassette; " +
                           "a pinched cassette shows the snap outline at the radio and plays when let go, the next one pops it home, Eject and Play work, " +
-                          "the song list and its Back button come and go, a sweep turns it, the blank cassette asks for the file picker, the close button " +
+                          "the song list and its Back button come and go, the blank cassette asks for the file picker, the close button " +
                           "and the menu gesture close it, standing raises the table, and a frame allocates nothing. " + measures);
                 return true;
             }

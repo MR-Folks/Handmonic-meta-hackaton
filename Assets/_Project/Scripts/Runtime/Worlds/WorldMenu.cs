@@ -38,6 +38,8 @@ namespace MusicInYourHands
         [SerializeField] Vector2 pinchThresholds = new Vector2(0.85f, 0.5f);
         [Tooltip("A fingertip nearer the menu than the first distance (m) touches instead of pointing, until it is farther than the second (Meta's hover zone).")]
         [SerializeField] Vector2 touchZone = new Vector2(0.15f, 0.2f);
+        [Tooltip("How the cassette deck's turntable turns under the hands: how long it glides, how a brushing hand pulls it along, how a hand catches it, and its top speed.")]
+        [SerializeField] DeckRing.Tuning turntable = new DeckRing.Tuning();
 
         /// <summary>Raised by the menu button feed (Meta's menu gesture); the menu opens or closes.</summary>
         public static event Action ToggleRequested;
@@ -651,13 +653,19 @@ namespace MusicInYourHands
             lyricLabel.Transform.SetPositionAndRotation(root.TransformPoint(new Vector3(LyricCenter.x, highest + bubbleSize * 0.62f, 0f)), rotation);
         }
 
+        /// <summary>
+        /// A bubble pressed, by touch or by pinch: a soft pop sounds the moment it is pressed, its chime rings on under
+        /// it, and it does what it is for.
+        /// </summary>
         void Press(Bubble b, WorldManager manager, MusicBus bus)
         {
             cooldown = 0.6f;
             b.Pop = 1f;
             float note = b.World >= 0 ? Synth.Pentatonic[6 + b.World % 5]
                 : Synth.Pentatonic[b.World == ListenToggle ? 4 : IsSongStep(b) ? 3 : b.World == LyricsToggle || b.World == Library ? 2 : 5];
-            voices.Play(Synth.Chime(note), b.Renderer.transform.position, 0.6f);
+            var at = b.Renderer.transform.position;
+            voices.Play(Synth.Pop(), at, 0.45f);
+            voices.Play(Synth.Chime(note), at, 0.5f);
             if (b.World >= 0)
             {
                 manager.Switch(b.World);
@@ -728,7 +736,7 @@ namespace MusicInYourHands
             block = new MaterialPropertyBlock();
             root = new GameObject("Menu").transform;
             root.SetParent(transform, false);
-            voices ??= new AudioPool(transform, 3);
+            voices ??= new AudioPool(transform, 4);
 
             int count = manager.Worlds.Count;
             bubbles = new Bubble[count + ExtraBubbles];
@@ -785,7 +793,7 @@ namespace MusicInYourHands
             library.BackPressed += OnLibraryBack;
             if (deck == null)
             {
-                deck = new CassetteDeck(transform, glowMaterial);
+                deck = new CassetteDeck(transform, glowMaterial, turntable);
                 deck.SongListRequested += () => ShowSongList(lastView);
                 deck.PickerOpened += OnDeckPicker;
             }

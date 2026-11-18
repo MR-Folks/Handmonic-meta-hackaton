@@ -15,6 +15,20 @@ namespace MusicInYourHands
         // Meta's touch specs, as the menu uses them: a fingertip within 15 cm of a key hovers it (until 20 cm away), a
         // press lands when the 5 mm fingertip reaches the key's face, and the next needs the finger 2 cm back out.
         const float HoverEnter = 0.15f, HoverExit = 0.2f, TouchContact = 0.005f, TouchRearm = 0.02f;
+        /// <summary>
+        /// An open hand in the soft area rests in it below the first sideways speed (m/s), braking the turntable, and
+        /// moves it along above the second.
+        /// </summary>
+        const float RestSpeed = 0.04f, BrushSpeed = 0.1f;
+        /// <summary>
+        /// A hand that slides the turntable along faster than this (m/s) has flicked it: it lets it glide on, and only
+        /// catches it again once it has left the turntable and come back.
+        /// </summary>
+        const float FlickSpeed = 0.25f;
+        /// <summary>How long a hand's sideways speed is averaged over (s), so tracking jitter never pushes the turntable.</summary>
+        const float SidewaysSmoothing = 0.05f;
+        /// <summary>The soft area starts this far from the middle of the turntable (m): over the platter and the cassettes.</summary>
+        const float SoftInner = 0.08f;
 
         /// <summary>What one hand is doing at the deck.</summary>
         sealed class HandState
@@ -23,7 +37,14 @@ namespace MusicInYourHands
             public Vector3 PinchPoint, FistPoint, Tip;
             public Cassette Holding, Hovered;
             public bool ByFist, Dragging, NearEdge, Sweeping;
-            public float DragAngle, DragFrom, DragTotal, Lost;
+            public float DragAngle, DragTotal, Lost;
+            /// <summary>The palm is over the turntable's soft area, and how far from its middle (m).</summary>
+            public bool InSoft;
+            public float SoftRadius;
+            /// <summary>How fast the palm moves round the turntable (m/s, positive to the player's right), smoothed.</summary>
+            public float Sideways;
+            /// <summary>This hand set the turntable spinning (a flick or a pinch let go) and hasn't left the soft area since.</summary>
+            public bool Spun;
             /// <summary>The key the fingertip hovers (or -1), how far above its face, and the point under the fingertip.</summary>
             public int Key = -1;
             public float KeyDepth;
@@ -63,9 +84,11 @@ namespace MusicInYourHands
             {
                 h.PinchArmed = h.FistArmed = false;
                 h.Holding = h.Hovered = null;
-                h.Dragging = h.NearEdge = h.Sweeping = false;
+                h.Dragging = h.NearEdge = h.Sweeping = h.InSoft = h.Spun = false;
+                h.Sideways = 0f;
                 h.Key = -1;
             }
+            turning.Release(false);
             foreach (var k in keys)
                 for (int s = 0; s < 2; s++) k.Armed[s] = k.Over[s] = k.Near[s] = false;
         }
@@ -76,15 +99,14 @@ namespace MusicInYourHands
         /// </summary>
         float EdgeTop => rimHeight + 0.015f;
 
-        bool AnyDragging() => hands[0].Dragging || hands[1].Dragging;
-
         bool HoveredBy(Cassette c) => (hands[0].Hovered == c && hands[0].Holding == null) || (hands[1].Hovered == c && hands[1].Holding == null);
 
         /// <summary>
-        /// Each hand: carries what it holds, turns the turntable while it pinches its edge, or else looks for a
-        /// cassette to pick up (a pinch on it, or the whole hand closing round it), an edge to pinch, or a sweep of an
-        /// open hand across the cassettes. A pinch must open before it can grab, so the pinch that opened the deck
-        /// doesn't, and nothing is grabbed while Meta's menu gesture shows.
+        /// Each hand: carries what it holds, turns the turntable while it pinches its edge (the hard area), or else
+        /// looks for a cassette to pick up (a pinch on it, or the whole hand closing round it), an edge to pinch, or an
+        /// open hand over the cassettes or the platter (the soft area), which brushes the turntable along or catches it.
+        /// A pinch must open before it can grab, so the pinch that opened the deck doesn't, and nothing is grabbed while
+        /// Meta's menu gesture shows.
         /// </summary>
         void StepHands(HandRig rig, bool ready, float dt)
         {
@@ -101,8 +123,10 @@ namespace MusicInYourHands
                     if (h.Lost > 0.3f)
                     {
                         LetGo(h, false);
-                        h.Dragging = false;
+                        if (h.Dragging) EndDrag(h, false);
                         h.PinchArmed = h.FistArmed = false;
+                        h.InSoft = h.Spun = false;
+                        h.Sideways = 0f;
                     }
                     continue;
                 }
@@ -112,6 +136,7 @@ namespace MusicInYourHands
                 h.Tip = index;
                 h.PinchPoint = (thumb + index) * 0.5f;
                 h.FistPoint = hand.Palm.position + hand.PalmNormal * 0.035f;
+                TrackSoft(h, hand, dt);
                 if (!ready)
                 {
                     h.PinchArmed = h.FistArmed = false;
@@ -127,7 +152,8 @@ namespace MusicInYourHands
                 }
                 if (h.Dragging)
                 {
-                    if (pinch < PinchThresholds.y || hand.InSystemGesture) h.Dragging = false;
+                    // Let go mid-turn, it spins on at the hand's speed; Meta's menu gesture lets it go without a spin.
+                    if (pinch < PinchThresholds.y || hand.InSystemGesture) EndDrag(h, !hand.InSystemGesture);
                     else Drag(h, dt);
                     continue;
                 }
@@ -153,7 +179,7 @@ namespace MusicInYourHands
                     var c = Nearest(h.FistPoint, FistMargin);
                     if (c != null) Grab(h, c, true);
                 }
-                else if (pinch < 0.45f && fist < 0.5f) Sweep(h, hand, dt);
+                else if (pinch < 0.45f && fist < 0.5f) Brush(h, dt);
             }
         }
 
@@ -222,6 +248,8 @@ namespace MusicInYourHands
             var half = cassetteSize * 0.5f;
             c.GrabLocal = new Vector3(Mathf.Clamp(local.x, -half.x, half.x), Mathf.Clamp(local.y, -half.y, half.y), Mathf.Clamp(local.z, -half.z, half.z));
             voices.Play(DeckSounds.Click, grab, 0.6f, 1.15f);
+            // Taking a cassette off a turntable that is still spinning catches it: it brakes and settles.
+            turning.Catch();
         }
 
         /// <summary>
@@ -269,42 +297,89 @@ namespace MusicInYourHands
             c.InRange = false;
         }
 
+        /// <summary>
+        /// A pinch takes hold of the turntable's edge (the hard area). A spinning turntable slips under the fingers at
+        /// first and is braked to the hand's speed, then held. A pinch from the other hand takes it over.
+        /// </summary>
         void StartDrag(HandState h)
         {
+            foreach (var other in hands)
+                if (other != h) other.Dragging = false;
             h.Dragging = true;
             h.DragAngle = EdgeAngle(h.PinchPoint);
-            h.DragFrom = turning.Scroll;
             h.DragTotal = 0f;
+            turning.StartGrip();
             voices.Play(DeckSounds.Click, h.PinchPoint, 0.35f, 0.8f);
         }
 
-        /// <summary>The pinched edge follows the hand round, carrying the cassettes with it.</summary>
+        /// <summary>The pinched edge follows the hand round, smoothed, carrying the cassettes with it.</summary>
         void Drag(HandState h, float dt)
         {
             float angle = EdgeAngle(h.PinchPoint);
             float step = Mathf.DeltaAngle(h.DragAngle * Mathf.Rad2Deg, angle * Mathf.Rad2Deg) * Mathf.Deg2Rad;
             h.DragAngle = angle;
             h.DragTotal += step;
-            turning.Drag(h.DragFrom - h.DragTotal / Mathf.Max(turning.FrontPitch, 1e-3f), dt);
+            turning.Grip(-h.DragTotal / Mathf.Max(turning.FrontPitch, 1e-3f), dt);
         }
 
-        /// <summary>An open hand brushing across the front of the cassettes sets the turntable going its way.</summary>
-        void Sweep(HandState h, HandRig.Hand hand, float dt)
+        /// <summary>
+        /// The pinch on the edge opens. With <paramref name="spin"/> the turntable keeps the hand's speed and glides on,
+        /// and this hand lets it: resting in the soft area afterwards doesn't stop it until it has left and come back.
+        /// </summary>
+        void EndDrag(HandState h, bool spin)
+        {
+            h.Dragging = false;
+            turning.Release(spin);
+            h.Spun = spin;
+        }
+
+        /// <summary>
+        /// Whether a hand's palm is over the turntable's soft area (the platter and the cassettes, on the near side), and
+        /// how fast it moves sideways round it, smoothed so tracking jitter never pushes the turntable. A hand leaving
+        /// the area may catch the turntable again when it comes back.
+        /// </summary>
+        void TrackSoft(HandState h, HandRig.Hand hand, float dt)
         {
             var onDeck = onTable.InverseTransformPoint(hand.Palm.position);
             var rel = new Vector2(onDeck.x - turntableAt.x, onDeck.z - turntableAt.z);
             float r = rel.magnitude, y = onDeck.y - turntableAt.y;
-            if (r < rimRadius - 0.1f || r > rimRadius + 0.13f) return;
-            if (y < rimHeight - 0.03f || y > rimHeight + cassetteSize.y + 0.09f) return;
             var u = rel / Mathf.Max(r, 1e-4f);
-            if (Vector2.Dot(u, front) < -0.2f) return;
+            // A little more room to stay in than to come in, so a hand at the border doesn't flicker in and out.
+            float m = h.InSoft ? 0.03f : 0f;
+            h.InSoft = r > SoftInner - m && r < rimRadius + 0.13f + m && y > rimHeight - 0.03f - m && y < rimHeight + cassetteSize.y + 0.09f + m
+                       && Vector2.Dot(u, front) > -0.2f - m;
+            if (!h.InSoft) h.Spun = false;
+            h.SoftRadius = r;
             float angle = Mathf.Atan2(Vector2.Dot(u, frontRight), Vector2.Dot(u, front));
             var tangent = -front * Mathf.Sin(angle) + frontRight * Mathf.Cos(angle);
             var velocity = onTable.InverseTransformDirection(hand.Velocity);
             float along = velocity.x * tangent.x + velocity.z * tangent.y;
-            if (Mathf.Abs(along) < 0.15f) return;
-            h.Sweeping = true;
-            turning.Push(-along / (r * Mathf.Max(turning.FrontPitch, 1e-3f)), dt);
+            h.Sideways = Mathf.Lerp(h.Sideways, along, 1f - Mathf.Exp(-dt / SidewaysSmoothing));
+        }
+
+        /// <summary>
+        /// An open hand in the soft area doesn't lock the turntable to it: it pulls the turntable's speed softly towards
+        /// its own, like a finger brushing a spinning record. A quick slide flicks it into a spin and a slow one nudges
+        /// it; a hand put into it and resting there catches it with a quick, smooth brake. The hand that set it spinning
+        /// lets it glide on, resting or trailing behind it, until it has left the turntable and come back.
+        /// </summary>
+        void Brush(HandState h, float dt)
+        {
+            if (!h.InSoft) return;
+            var feel = turning.Feel;
+            float sideways = Mathf.Abs(h.Sideways);
+            float moving = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(RestSpeed, BrushSpeed, sideways));
+            // The hand's speed as the turntable's: the angle it sweeps round the middle, in cassettes at the front.
+            float speed = -h.Sideways / (Mathf.Max(h.SoftRadius, SoftInner) * Mathf.Max(turning.FrontPitch, 1e-3f));
+            float spin = turning.Velocity;
+            if (h.Spun)
+            {
+                if (moving < 0.01f || (speed * spin > 0f && Mathf.Abs(speed) <= Mathf.Abs(spin))) return;
+                turning.Brush(speed, feel.SoftCoupling * moving, moving > 0.5f, dt);
+            }
+            else turning.Brush(speed * moving, Mathf.Lerp(feel.CatchBraking, feel.SoftCoupling, moving), moving > 0.5f, dt);
+            h.Sweeping = moving > 0.5f;
+            if (sideways > FlickSpeed && turning.Velocity * speed > 0f) h.Spun = true;
         }
 
         // ---- Keys ----
