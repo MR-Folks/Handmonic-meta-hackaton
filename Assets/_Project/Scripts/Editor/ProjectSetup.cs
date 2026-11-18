@@ -598,7 +598,6 @@ namespace MusicInYourHands.EditorTools
         public const string PaintMaterialPath = Root + "/Materials/PaintStroke.mat";
         public const string RoomGridMaterialPath = Root + "/Materials/RoomGrid.mat";
         public const string TrailMaterialPath = Root + "/Materials/Trail.mat";
-        public const string PlateMaterialPath = Root + "/Materials/Plate.mat";
         public const string LetteringMaterialPath = Root + "/Materials/Lettering.mat";
         public const string RingMaterialPath = Root + "/Materials/Ring.mat";
         public const string ShellMaterialPath = Root + "/Materials/Shell.mat";

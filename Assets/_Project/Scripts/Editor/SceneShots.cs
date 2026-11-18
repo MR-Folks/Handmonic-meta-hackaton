@@ -69,7 +69,6 @@ namespace MusicInYourHands.EditorTools
             // Flower dance: your hands are the sun, and the garden leans after them (here held out to your left).
             Shot<FlowerDance>("25-flower-dance", HandPose.PalmsToFace, 8f);
             Shot<FlowerDance>("25l-flower-dance-sun-left", HandPose.PalmsToFace, 8f, handOffset: _ => new Vector3(-0.45f, 0.05f, 0.1f));
-            Shot<NeonSign>("16-neon-sign", HandPose.BacksToFace, 2f, lead: 4f, extra: 1.7f);
             Shot<WordDrift>("17-word-drift", HandPose.PalmsToFace, 2f, lead: 6f);
             WordDrift drift = null;
             int heldFrames = 0;
@@ -79,8 +78,6 @@ namespace MusicInYourHands.EditorTools
             // Solar system: the planets round you, and looking up, the sung line as a constellation under the ceiling.
             Shot<SolarSystem>("24-solar-system", HandPose.PalmsToFace, 8f);
             Shot<SolarSystem>("24s-solar-system-stars", HandPose.PalmsToFace, -40f, lead: 4f);
-            Shot<SandTable>("11-sand-table", HandPose.PalmsDown, 40f, closeUp: rig => rig.Right.Palm.position + Vector3.down * 0.08f,
-                handOffset: side => side == "R" ? new Vector3(0.02f, -0.24f, 0.12f) : new Vector3(-0.05f, -0.12f, 0.06f));
             MenuShot();
             CassetteDeckSetup.EnsureMaterials();
             DeckShots();
@@ -88,12 +85,9 @@ namespace MusicInYourHands.EditorTools
             // The same worlds in a scanned, furnished room: on the real table, walls, ceiling and furniture.
             Shot<SoundPool>("8r-sound-pool-room", HandPose.PalmsDown, 42f, closeUp: rig => rig.Right.Palm.position + Vector3.down * 0.04f,
                 handOffset: side => side == "R" ? new Vector3(-0.03f, -0.53f, 0.15f) : new Vector3(0f, -0.35f, 0.1f), scanned: true);
-            Shot<SandTable>("11r-sand-table-room", HandPose.PalmsDown, 45f, handOffset: side => side == "R" ? new Vector3(0.02f, -0.45f, 0.15f) : new Vector3(-0.05f, -0.3f, 0.06f),
-                scanned: true);
             Shot<Graffiti>("13r-graffiti-room", HandPose.BacksToFace, 4f, rig => rig.Right.Pinch = 1f,
                 handOffset: side => side == "R" ? new Vector3(0.02f, 0.08f, 0.12f) : new Vector3(0f, -0.15f, 0f), lead: 6f, scanned: true);
             Shot<BreathingRoom>("14r-breathing-room-room", HandPose.PalmsToFace, 6f, scanned: true);
-            Shot<NeonSign>("16r-neon-sign-room", HandPose.BacksToFace, 2f, lead: 4f, extra: 1.7f, scanned: true);
             Shot<SolarSystem>("24r-solar-system-stars-room", HandPose.PalmsToFace, -40f, lead: 4f, scanned: true);
             Shot<Lightning>("22r-lightning-snow-room", HandPose.PalmsUp, 26f, prepare: world => ((Lightning)world).PreviewWeather(true), lead: 30f, scanned: true);
             Shot<ShadowPlay>("23r-shadow-play-room", HandPose.BacksToFace, 6f, holdPose: rig => PreviewBody(rig, 1f / 30f),
