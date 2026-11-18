@@ -5,8 +5,11 @@ namespace MusicInYourHands
 {
     /// <summary>
     /// The first-launch onboarding, shown rather than told. The app opens straight into a world that answers your hands
-    /// at once (Flower dance: your hand is the sun and the flowers lean after it) while a sung song fades in, and you
-    /// get a few seconds just to enjoy it. Then, one at a time, a see-through ghost hand beside your own loops a gesture
+    /// at once while a sung song fades in, and plays a guided three-minute demo through the worlds, the cassette deck
+    /// and back (see Onboarding.Demo.cs: Living skin, Heartbeat orb, Shadow play, Solar system, Bubble notes, Lightning,
+    /// a new song on the cassette deck, Air strings, Flower dance), each world showing its own ghost demo. Without the
+    /// demo (<see cref="DemoOnFirstLaunch"/> off) it opens in Flower dance (your hand is the sun and the flowers lean
+    /// after it) and you get a few seconds just to enjoy it. Then, one at a time, a see-through ghost hand beside your own loops a gesture
     /// with a one-line caption above it, and stays until you do it:
     /// <list type="number">
     /// <item><b>Open the menu</b> (required): the left ghost hand turns its palm to your face and pinches.</item>
@@ -235,27 +238,37 @@ namespace MusicInYourHands
             if (bus != null)
                 foreach (var s in bus.Songs)
                     if (s != null && string.Equals(s.title, openingSong, StringComparison.OrdinalIgnoreCase)) song = s;
+            // The demo opens in its first world and leads the way; the journey takes over after it.
+            bool withDemo = DemoOnFirstLaunch && DemoOpeningWorld != null && !worldAsked;
+            string first = withDemo ? DemoOpeningWorld : openingWorld;
             if (worlds != null && !worldAsked)
             {
                 for (int i = 0; i < worlds.Worlds.Count; i++)
                 {
                     var world = worlds.Worlds[i];
-                    if (world == null || world.GetType().Name != openingWorld) continue;
+                    if (world == null || world.GetType().Name != first) continue;
                     // With Journey mode on, the opening world plays the opening song's first section and the journey goes
                     // on from it, rather than taking the opening switch for the player choosing a world.
                     var journey = JourneyMode.Instance;
-                    if (journey != null && journey.IsActive) journey.OpenWith(i, song != null ? song : bus != null ? bus.CurrentSong : null);
+                    if (journey != null && journey.IsActive)
+                    {
+                        if (withDemo) journey.Stop();
+                        else journey.OpenWith(i, song != null ? song : bus != null ? bus.CurrentSong : null);
+                    }
+                    demoSwitching = withDemo;
                     worlds.Switch(i);
+                    demoSwitching = false;
                     break;
                 }
                 StartHint(worlds.Current);
+                if (withDemo) StartDemo();
             }
             if (bus != null)
             {
                 if (song != null && song != bus.CurrentSong) bus.Play(song);
                 else if (song == null) Debug.LogWarning($"[Onboarding] No song called \"{openingSong}\"; opening with the current one.");
             }
-            Debug.Log($"[Onboarding] First launch: opening in {openingWorld} with \"{openingSong}\".");
+            Debug.Log($"[Onboarding] First launch: opening in {first} with \"{openingSong}\"{(withDemo ? ", then the demo" : "")}.");
         }
 
         /// <summary>
@@ -265,6 +278,7 @@ namespace MusicInYourHands
         /// </summary>
         public void Replay(bool withOpening = false)
         {
+            if (demo) EndDemo(true, false);
             learned = 0;
             lessonsOn = true;
             SetLesson(Lesson.None);
@@ -285,7 +299,8 @@ namespace MusicInYourHands
         /// <summary>Skips every lesson (the Skip target): they count as learned and don't come back.</summary>
         public void Skip()
         {
-            bool showing = lesson != Lesson.None;
+            bool showing = lesson != Lesson.None || demo;
+            if (demo) EndDemo(true, false);
             Learn(AllLessons);
             SetLesson(Lesson.None);
             opening = false;
@@ -302,7 +317,11 @@ namespace MusicInYourHands
         /// <summary>A world started (WorldManager.WorldChanged): its ghost demo starts, and if it was chosen at the menu, lesson 2 is done.</summary>
         public void NotifyWorldChanged(int index)
         {
+            // A world chosen during the demo (at the menu): you're choosing, so the demo ends.
+            if (demo && !demoSwitching) EndDemo(false, true);
             StartHint(index);
+            // The demo's own changes (and its opening) teach nothing: the lessons are still to come.
+            if (demoSwitching) return;
             if (!lessonsOn || !menuWasOpen || Has(LearnedWorld)) return;
             bool taught = lesson == Lesson.TouchWorld;
             Learn(LearnedMenu | LearnedWorld);
@@ -346,6 +365,7 @@ namespace MusicInYourHands
             bool opened = menuOpen && !menuWasOpen;
             menuClosedClock = menuOpen ? 0f : menuClosedClock + dt;
             if (opened && view != null) RememberMenu(view);
+            if (demo) StepDemo(worlds, menuOpen, view, dt);
             if (lessonsOn) UpdateLessons(rig, menuOpen, opened || menuToggled, dt);
             menuToggled = false;
             menuWasOpen = menuOpen;
@@ -355,6 +375,13 @@ namespace MusicInYourHands
 
         void UpdateLessons(HandRig rig, bool menuOpen, bool menuCame, float dt)
         {
+            if (demo)
+            {
+                // The demo comes first; opening the menu meanwhile still counts as found (the deck the demo raised
+                // itself doesn't).
+                if (menuCame && !Has(LearnedMenu) && !InCassette) Learn(LearnedMenu);
+                return;
+            }
             if (menuCame && !Has(LearnedMenu))
             {
                 bool taught = lesson == Lesson.OpenMenu;
@@ -488,6 +515,7 @@ namespace MusicInYourHands
                     }
                     break;
             }
+            DemoWanted(ref want);
             bool controllers = ControllersInUse != null && ControllersInUse();
             if (controllers && lessonsOn && (want.Lesson != Lesson.None || IsOpening))
             {

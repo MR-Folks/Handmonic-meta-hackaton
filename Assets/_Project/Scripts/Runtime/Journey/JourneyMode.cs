@@ -333,6 +333,20 @@ namespace MusicInYourHands
             planned = false;
         }
 
+        /// <summary>
+        /// A world change made by someone else (the onboarding's first-launch demo) gets the journey's own flourish: the
+        /// wave of light from your feet in the new world's colour and the soft swell, with the journey on or off.
+        /// </summary>
+        public void Flourish(Camera view, Color color)
+        {
+            Build();
+            if (view == null) view = lastView != null ? lastView : Camera.main;
+            if (view == null) return;
+            lastView = view;
+            if (!waveView.Blooming) waveView.Launch(view, color, false);
+            JourneySounds.Play(voices, view.transform.position + Effects.FlatForward(view) * 0.4f + Vector3.down * 0.9f, plan, false, volume);
+        }
+
         void TurnOff(string caption)
         {
             if (state == State.Off) return;

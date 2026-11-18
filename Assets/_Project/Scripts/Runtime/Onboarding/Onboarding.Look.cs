@@ -17,6 +17,8 @@ namespace MusicInYourHands
             public string Caption;
             /// <summary>Which side the caption sits on: -1 left, 1 right, 0 in the middle (away from the ghost hand).</summary>
             public float CaptionSide;
+            /// <summary>The caption floats a little above eye height instead of below it (over the cassette deck).</summary>
+            public bool CaptionHigh;
             /// <summary>Words for the open menu's own caption line, in place of a caption of ours (lesson 2).</summary>
             public string Prompt;
             public bool Skip;
@@ -74,7 +76,7 @@ namespace MusicInYourHands
         bool framed;
         // The caption.
         string shownCaption;
-        bool captionPlaced;
+        bool captionPlaced, shownHigh;
         float captionAlpha, shownSide;
         // The Skip target.
         float skipAlpha, skipAway, skipHover, skipPop;
@@ -425,13 +427,14 @@ namespace MusicInYourHands
         void StepCaption(Camera view, Vector3 head, in Display want, float dt)
         {
             var text = want.Caption;
-            if (text != shownCaption || want.CaptionSide != shownSide)
+            if (text != shownCaption || want.CaptionSide != shownSide || want.CaptionHigh != shownHigh)
             {
                 captionAlpha = Mathf.MoveTowards(captionAlpha, 0f, dt / 0.25f);
                 if (captionAlpha <= 0f)
                 {
                     shownCaption = text;
                     shownSide = want.CaptionSide;
+                    shownHigh = want.CaptionHigh;
                     captionPlaced = false;
                     if (text != null)
                     {
@@ -451,7 +454,9 @@ namespace MusicInYourHands
             if (captionRoot.gameObject.activeSelf != show) captionRoot.gameObject.SetActive(show);
             if (!show) return;
 
-            var target = head + frame * (Quaternion.Euler(captionPlace.y, captionPlace.x * shownSide, 0f) * Vector3.forward * captionDistance);
+            // Over the cassette deck the caption floats a little above eye height, clear of the deck below.
+            float pitch = shownHigh ? -8f : captionPlace.y;
+            var target = head + frame * (Quaternion.Euler(pitch, captionPlace.x * shownSide, 0f) * Vector3.forward * captionDistance);
             var position = captionPlaced ? Vector3.Lerp(captionRoot.position, target, 1f - Mathf.Exp(-3f * dt)) : target;
             captionRoot.SetPositionAndRotation(position, Quaternion.LookRotation(position - head, Vector3.up));
             captionPlaced = true;

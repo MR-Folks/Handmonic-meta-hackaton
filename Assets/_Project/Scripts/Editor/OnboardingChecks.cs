@@ -76,6 +76,9 @@ namespace MusicInYourHands.EditorTools
 
             string savedKey = Onboarding.PrefsKey;
             Onboarding.PrefsKey = "Onboarding.Check";
+            // The lessons on their own; CheckOnboardingDemo plays the first-launch demo.
+            bool savedDemo = Onboarding.DemoOnFirstLaunch;
+            Onboarding.DemoOnFirstLaunch = false;
             PlayerPrefs.DeleteKey(Onboarding.PrefsKey);
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var onboarding = new GameObject("Onboarding").AddComponent<Onboarding>();
@@ -423,6 +426,7 @@ namespace MusicInYourHands.EditorTools
             {
                 PlayerPrefs.DeleteKey(Onboarding.PrefsKey);
                 Onboarding.PrefsKey = savedKey;
+                Onboarding.DemoOnFirstLaunch = savedDemo;
                 if (onboarding != null) Object.DestroyImmediate(onboarding.gameObject);
             }
         }

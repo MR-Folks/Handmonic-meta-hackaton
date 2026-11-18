@@ -31,6 +31,9 @@ namespace MusicInYourHands.EditorTools
             LoadSceneSettings();
             string savedKey = Onboarding.PrefsKey;
             Onboarding.PrefsKey = "Onboarding.Shots";
+            // The lessons' own moments, without the first-launch demo before them.
+            bool savedDemo = Onboarding.DemoOnFirstLaunch;
+            Onboarding.DemoOnFirstLaunch = false;
             try
             {
                 // Lesson 1 over the opening world; lesson 2 at the open menu; lesson 3 in a chosen world.
@@ -55,6 +58,7 @@ namespace MusicInYourHands.EditorTools
             {
                 PlayerPrefs.DeleteKey(Onboarding.PrefsKey);
                 Onboarding.PrefsKey = savedKey;
+                Onboarding.DemoOnFirstLaunch = savedDemo;
                 Room.Clear();
             }
             Debug.Log($"[Shots] Saved onboarding screenshots to {OnboardingShotFolder}.");
