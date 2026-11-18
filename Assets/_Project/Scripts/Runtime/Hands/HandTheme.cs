@@ -13,7 +13,7 @@ namespace MusicInYourHands
         public Effect Pattern;
         public Color PatternColor;
 
-        /// <summary>Living skin's look: violet with pulses of light running through the veins.</summary>
+        /// <summary>The default look, Breathing room's: violet with pulses of light running through the veins.</summary>
         public static HandTheme Veins => new HandTheme
         {
             Fill = new Color(0.19f, 0.11f, 0.36f, 0.62f),

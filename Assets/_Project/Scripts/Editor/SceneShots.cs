@@ -34,7 +34,6 @@ namespace MusicInYourHands.EditorTools
             LoadSceneSettings();
             ShotTypes.Clear();
 
-            Shot<LivingSkin>("1-living-skin", HandPose.PalmsToFace, 8f);
             Shot<HeartbeatOrb>("2-heartbeat-orb", HandPose.PalmsFacing, 18f, closeUp: rig => HandSkin.FocusPosition);
             Shot<WaveformRibbon>("3-waveform-ribbon", HandPose.BacksToFace, 8f, rig => { rig.Left.Pinch = 1f; rig.Right.Pinch = 1f; });
             Shot<AirStrings>("4-air-strings", HandPose.BacksToFace, 12f);

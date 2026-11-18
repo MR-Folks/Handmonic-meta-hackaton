@@ -39,7 +39,7 @@ namespace MusicInYourHands.EditorTools
             ok &= CheckDebugMaterial(out var material);
             ok &= CheckPreview(material);
             ok &= CheckHandPreview();
-            ok &= CheckLivingSkinPreview();
+            ok &= CheckBreathingRoomPreview();
             ok &= CheckOrbPreview();
             ok &= CheckMenuPreview();
             ok &= CheckMenuTouch();
@@ -303,10 +303,10 @@ namespace MusicInYourHands.EditorTools
         }
 
         /// <summary>
-        /// Renders the Living skin world at four moments after a beat (pulse through the hand, palm waves spreading,
-        /// fingertip lights, sparks) into one 2x2 image: Logs/preview-living-skin.png.
+        /// Renders Breathing room's hands at four moments after a beat (pulse through the hand, palm waves spreading,
+        /// fingertip lights, sparks) into one 2x2 image: Logs/preview-breathing-room.png.
         /// </summary>
-        static bool CheckLivingSkinPreview()
+        static bool CheckBreathingRoomPreview()
         {
 #if META_XR_CORE
             var hands = StageHands(out var camera);
@@ -314,11 +314,12 @@ namespace MusicInYourHands.EditorTools
             foreach (var hand in hands) PushHand(rig, hand);
 
             HandSkin.Theme = HandTheme.Veins;
-            var skin = new GameObject("LivingSkin").AddComponent<LivingSkin>();
+            var skin = new GameObject("BreathingRoom").AddComponent<BreathingRoom>();
             var so = new SerializedObject(skin);
             so.FindProperty("glowMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow");
             so.FindProperty("shellMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.ShellMaterialPath, "MusicInYourHands/Shell");
             so.FindProperty("lineMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.LineMaterialPath, "MusicInYourHands/Line");
+            so.FindProperty("gridMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.RoomGridMaterialPath, "MusicInYourHands/RoomGrid");
             so.ApplyModifiedPropertiesWithoutUndo();
             skin.Build();
 
@@ -343,7 +344,7 @@ namespace MusicInYourHands.EditorTools
                 sheet.SetPixels((i % 2) * w, (1 - i / 2) * h, w, h, frame.GetPixels());
             }
             sheet.Apply();
-            return CheckImage(sheet, camera.backgroundColor, "Logs/preview-living-skin.png", "Living skin preview");
+            return CheckImage(sheet, camera.backgroundColor, "Logs/preview-breathing-room.png", "Breathing room preview");
 #else
             return true;
 #endif

@@ -607,7 +607,6 @@ namespace MusicInYourHands.EditorTools
         public const string LetteringMaterialPath = Root + "/Materials/Lettering.mat";
         public const string RingMaterialPath = Root + "/Materials/Ring.mat";
         public const string ShellMaterialPath = Root + "/Materials/Shell.mat";
-        public const string LivingWallsMaterialPath = Root + "/Materials/LivingWalls.mat";
 
         public static Material EnsureHandMaterial() => EnsureMaterial(HandMaterialPath, "MusicInYourHands/Hand");
 

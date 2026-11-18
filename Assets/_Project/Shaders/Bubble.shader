@@ -83,9 +83,8 @@ Shader "MusicInYourHands/Bubble"
                 if (icon < -0.5) return 0;
                 if (icon < 0.5)
                 {
-                    // Living skin: waves leaving a palm.
-                    float d = length(p);
-                    e = pow(abs(sin(d * 9 - t * 3)), 12) * saturate(1 - d * 1.25) + exp(-d * d * 30) * 0.8;
+                    // (free)
+                    e = Line(abs(length(p) - 0.45), 0.04);
                 }
                 else if (icon < 1.5)
                 {

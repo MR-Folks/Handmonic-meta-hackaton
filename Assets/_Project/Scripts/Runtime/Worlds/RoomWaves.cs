@@ -5,8 +5,8 @@ namespace MusicInYourHands
 {
     /// <summary>
     /// Waves across the room: a quad on each wall, the floor and the ceiling, on which waves spread as rings of their
-    /// colour, with a look set by the material: Living skin's palm waves land and light veins (LivingWalls shader), and
-    /// Sound pool's ripples spread out from the pool as water light (RoomRipples shader). The surfaces also wake a little
+    /// colour, with a look set by the material: Sound pool's ripples spread out from the pool as water light (RoomRipples
+    /// shader). The surfaces also wake a little
     /// on the bass. With a room scan they are your real walls; until then the walls stand a couple of metres around
     /// where you started.
     /// </summary>
