@@ -9,6 +9,7 @@ namespace MusicInYourHands.EditorTools
     /// Screenshots of the onboarding as a player would see it, in the staged room with the preview hands at chest height:
     /// each lesson's ghost hand beside the real hands (over the opening world, the open menu, and a world), and a few
     /// worlds' ghost demos over the world itself. Each comes with a close-up strip of four moments of the ghost's loop.
+    /// Also the menu with a fingertip at its "?" bubble.
     /// Writes Logs/onboarding/*.png. Batch mode (needs graphics):
     /// -executeMethod MusicInYourHands.EditorTools.EditorChecks.CaptureOnboardingShotsBatch
     /// ($env:SHOTS picks shots by name, as for the scene shots.)
@@ -48,6 +49,7 @@ namespace MusicInYourHands.EditorTools
                 OnboardingShot("h-flower-dance", typeof(FlowerDance), HandPose.PalmsToFace, Onboarding.Lesson.None, 1.8f, new[] { 0.2f, 1f, 2f, 3f });
                 OnboardingShot("h-waveform-ribbon", typeof(WaveformRibbon), HandPose.BacksToFace, Onboarding.Lesson.None, 2f, new[] { 0.2f, 0.8f, 1.6f, 2.5f });
                 OnboardingShot("h-word-drift", typeof(WordDrift), HandPose.BacksToFace, Onboarding.Lesson.None, 1.3f, new[] { 0.2f, 0.8f, 1.3f, 2f });
+                HelpBubbleShot("m-show-me-how");
             }
             finally
             {
@@ -120,6 +122,7 @@ namespace MusicInYourHands.EditorTools
                 wso.FindProperty("bubbleMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.BubbleMaterialPath, "MusicInYourHands/Bubble");
                 wso.FindProperty("glowMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow");
                 wso.FindProperty("lineMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.LineMaterialPath, "MusicInYourHands/Line");
+                wso.FindProperty("panelMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.PanelMaterialPath, "MusicInYourHands/Panel");
                 wso.ApplyModifiedPropertiesWithoutUndo();
                 menu.Step(rig, manager, null, camera, 0f);
             }
@@ -150,7 +153,7 @@ namespace MusicInYourHands.EditorTools
                     }
                     menu.Step(rig, manager, null, camera, step);
                 }
-                onboarding.Step(rig, manager, opened, music, camera, step);
+                onboarding.Step(rig, manager, menu, menu != null && menu.IsOpen, music, camera, step);
             }
             // Run until the wanted lesson (or the demo) has shown for a while.
             for (float t = 0f; t < 60f; t += dt)
@@ -193,6 +196,51 @@ namespace MusicInYourHands.EditorTools
             sheet.Apply();
             File.WriteAllBytes($"{OnboardingShotFolder}/{name}-loop.png", sheet.EncodeToPNG());
             Object.DestroyImmediate(onboarding.gameObject);
+        }
+
+        /// <summary>
+        /// The open menu with the right index fingertip just in front of its "?" bubble, in the honeycomb's last cell:
+        /// the bubble swells and "Show me how" shows over the menu.
+        /// </summary>
+        static void HelpBubbleShot(string name)
+        {
+            if (!Wanted(name)) return;
+            BodyRig.Clear();
+            var camera = StageRoom(6f);
+            var rig = new GameObject("HandRig").AddComponent<HandRig>();
+            var hands = PlaceHands(camera, HandPose.BacksToFace, rig);
+            hands[0].Root.transform.position += new Vector3(-0.05f, -0.22f, 0f);
+            PushHand(rig, hands[0]);
+            var managerGo = new GameObject("Worlds");
+            var worlds = WorldCatalog.MakePreviews(managerGo.transform);
+            var manager = managerGo.AddComponent<WorldManager>();
+            var mso = new SerializedObject(manager);
+            var list = mso.FindProperty("worlds");
+            list.arraySize = worlds.Length;
+            for (int i = 0; i < worlds.Length; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = worlds[i];
+            mso.ApplyModifiedPropertiesWithoutUndo();
+            manager.Switch(0);
+            HandSkin.Theme = HandTheme.Veins;
+            var menu = new GameObject("WorldMenu").AddComponent<WorldMenu>();
+            var wso = new SerializedObject(menu);
+            wso.FindProperty("bubbleMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.BubbleMaterialPath, "MusicInYourHands/Bubble");
+            wso.FindProperty("glowMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow");
+            wso.FindProperty("lineMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.LineMaterialPath, "MusicInYourHands/Line");
+            wso.FindProperty("panelMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.PanelMaterialPath, "MusicInYourHands/Panel");
+            wso.ApplyModifiedPropertiesWithoutUndo();
+            menu.Step(rig, manager, null, camera, 0f);
+            menu.Open(camera);
+            for (int i = 0; i < 24; i++) menu.Step(rig, manager, null, camera, 0.05f);
+            var root = menu.transform.Find("Menu");
+            var bones = hands[1].Root.GetComponentsInChildren<Transform>();
+            Transform tip = null;
+            foreach (var b in bones) if (b.name == "XRHand_IndexTip") tip = b;
+            var reach = root.Find("Bubble Help").position - root.forward * 0.03f - tip.position;
+            hands[1].Root.transform.position += reach;
+            PushHand(rig, hands[1]);
+            for (int i = 0; i < 12; i++) menu.Step(rig, manager, null, camera, 0.05f);
+            foreach (var hand in hands) hand.Root.GetComponent<HandSkin>().Apply();
+            File.WriteAllBytes($"{OnboardingShotFolder}/{name}.png", Render(camera, 1600, 900).EncodeToPNG());
         }
 
         /// <summary>

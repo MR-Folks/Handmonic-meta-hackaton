@@ -72,6 +72,12 @@ namespace MusicInYourHands
     /// </summary>
     public static class GhostMotions
     {
+        /// <summary>
+        /// A poke's full reach (m) in the keys. Aimed at the menu, a poke of this reach ends with the fingertip just short
+        /// of the bubble it points at, however far the menu is.
+        /// </summary>
+        public const float FullPoke = 0.075f;
+
         // Finger curls: index, middle, ring, little.
         static readonly Vector4 Open = new Vector4(0.03f, 0.04f, 0.07f, 0.1f);
         static readonly Vector4 Relaxed = new Vector4(0.16f, 0.2f, 0.26f, 0.3f);
@@ -128,8 +134,8 @@ namespace MusicInYourHands
             {
                 K(0f, V(-0.2f, 0.3f, 1f), V(-0.4f, -1f, 0f), Point, ThumbShape.Tuck, aimMenu: 1f),
                 K(0.7f, V(-0.2f, 0.3f, 1f), V(-0.4f, -1f, 0f), Point, ThumbShape.Tuck, aimMenu: 1f),
-                K(1.2f, V(-0.2f, 0.3f, 1f), V(-0.4f, -1f, 0f), Point, ThumbShape.Tuck, aimMenu: 1f, reach: 0.075f, glow: 1f),
-                K(1.45f, V(-0.2f, 0.3f, 1f), V(-0.4f, -1f, 0f), Point, ThumbShape.Tuck, aimMenu: 1f, reach: 0.075f, glow: 1f),
+                K(1.2f, V(-0.2f, 0.3f, 1f), V(-0.4f, -1f, 0f), Point, ThumbShape.Tuck, aimMenu: 1f, reach: FullPoke, glow: 1f),
+                K(1.45f, V(-0.2f, 0.3f, 1f), V(-0.4f, -1f, 0f), Point, ThumbShape.Tuck, aimMenu: 1f, reach: FullPoke, glow: 1f),
                 K(2f, V(-0.2f, 0.3f, 1f), V(-0.4f, -1f, 0f), Point, ThumbShape.Tuck, aimMenu: 1f)
             }
         };
@@ -225,8 +231,8 @@ namespace MusicInYourHands
             {
                 K(0f, V(-0.1f, 0.25f, 1f), V(-0.4f, -1f, 0f), Point, ThumbShape.Tuck),
                 K(0.7f, V(-0.1f, 0.25f, 1f), V(-0.4f, -1f, 0f), Point, ThumbShape.Tuck),
-                K(1.2f, V(-0.1f, 0.25f, 1f), V(-0.4f, -1f, 0f), Point, ThumbShape.Tuck, reach: 0.075f, glow: 1f),
-                K(1.45f, V(-0.1f, 0.25f, 1f), V(-0.4f, -1f, 0f), Point, ThumbShape.Tuck, reach: 0.075f, glow: 1f),
+                K(1.2f, V(-0.1f, 0.25f, 1f), V(-0.4f, -1f, 0f), Point, ThumbShape.Tuck, reach: FullPoke, glow: 1f),
+                K(1.45f, V(-0.1f, 0.25f, 1f), V(-0.4f, -1f, 0f), Point, ThumbShape.Tuck, reach: FullPoke, glow: 1f),
                 K(2f, V(-0.1f, 0.25f, 1f), V(-0.4f, -1f, 0f), Point, ThumbShape.Tuck)
             }
         };

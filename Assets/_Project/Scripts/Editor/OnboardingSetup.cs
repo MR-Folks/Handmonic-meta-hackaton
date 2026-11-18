@@ -45,7 +45,8 @@ namespace MusicInYourHands.EditorTools
             ring.SetFloat("_Thickness", 0.07f);
             ring.SetFloat("_InnerGlow", 0.2f);
             var plate = Make("OnboardingPlate", "MusicInYourHands/Panel");
-            plate.SetColor("_Color", new Color(0.04f, 0.045f, 0.075f, 0.78f));
+            // Opaque enough that a world's floating words passing behind it never show through the letters.
+            plate.SetColor("_Color", new Color(0.04f, 0.045f, 0.075f, 0.88f));
             plate.SetColor("_Edge", new Color(1f, 1f, 1f, 0.14f));
             plate.SetFloat("_Radius", 0.016f);
             AssetDatabase.SaveAssets();

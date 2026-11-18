@@ -9,12 +9,14 @@ namespace MusicInYourHands.EditorTools
     public static partial class EditorChecks
     {
         /// <summary>
-        /// The onboarding, driven frame by frame with stand-in hands and a stand-in menu: a first launch opens in Flower
-        /// dance and shows lesson 1 after its payoff; opening the menu completes it and shows lesson 2 at the menu (no
-        /// Skip target over the menu), which shows how to open the menu again if it closes without a choice; choosing a
-        /// world completes lesson 2; the thumb lesson comes later, fades when unused, comes back once, and a thumb gesture
-        /// completes it; what was learned is remembered (a new launch shows nothing), touching Skip skips everything,
-        /// and Replay starts again. Each world's ghost demo appears for its first seconds (never while the menu is open)
+        /// The onboarding, driven frame by frame with stand-in hands and the world menu: a first launch opens in Flower
+        /// dance and shows lesson 1 after its payoff; opening the menu completes it and shows lesson 2, the ghost finger
+        /// poking a real world bubble near the middle that the player hasn't tried, which swells, while the menu's own
+        /// caption says "Touch a world" (no Skip target or caption of ours over the menu); closed without a choice, it
+        /// shows how to open the menu again; choosing a world completes lesson 2; the thumb lesson comes later, fades when
+        /// unused, comes back once, and a thumb gesture completes it; what was learned is remembered (a new launch shows
+        /// nothing), touching Skip skips everything, and Replay starts again. The menu's "?" bubble, in the honeycomb's last
+        /// cell, replays the lessons: the menu closes and lesson 1 follows, and the menu still fits the aim area. Each world's ghost demo appears for its first seconds (never while the menu is open)
         /// and goes; every world in the demo table exists; the ghost thumb really meets the index for a pinch and a tap;
         /// nothing it draws is closer than half a metre to read or can catch a touch; and steady frames allocate nothing.
         /// </summary>
@@ -57,6 +59,15 @@ namespace MusicInYourHands.EditorTools
             manager.Switch(0);
             int IndexOf<T>() where T : World => System.Array.FindIndex(worlds, w => w is T);
 
+            var menu = new GameObject("WorldMenu").AddComponent<WorldMenu>();
+            var wso = new SerializedObject(menu);
+            wso.FindProperty("bubbleMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.BubbleMaterialPath, "MusicInYourHands/Bubble");
+            wso.FindProperty("glowMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.GlowMaterialPath, "MusicInYourHands/Glow");
+            wso.FindProperty("lineMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.LineMaterialPath, "MusicInYourHands/Line");
+            wso.FindProperty("panelMaterial").objectReferenceValue = ProjectSetup.EnsureMaterial(ProjectSetup.PanelMaterialPath, "MusicInYourHands/Panel");
+            wso.ApplyModifiedPropertiesWithoutUndo();
+            float bubbleDiameter = wso.FindProperty("bubbleDiameter").floatValue;
+
             var failures = new List<string>();
             void Expect(bool ok, string what)
             {
@@ -69,23 +80,43 @@ namespace MusicInYourHands.EditorTools
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var onboarding = new GameObject("Onboarding").AddComponent<Onboarding>();
             const float Frame = 1f / 72f;
-            bool menuOpen = false;
+            // The menu and the onboarding, a frame at a time, as on the headset (the menu first).
+            void Tick(float dt)
+            {
+                menu.Step(rig, manager, null, camera, dt);
+                onboarding.Step(rig, manager, menu, menu.IsOpen, default, camera, dt);
+            }
             void Run(float seconds)
             {
-                for (float t = 0f; t < seconds; t += Frame) onboarding.Step(rig, manager, menuOpen, default, camera, Frame);
+                for (float t = 0f; t < seconds; t += Frame) Tick(Frame);
+            }
+            // The onboarding alone (the menu closed), to count its own allocations.
+            void RunOnly(float seconds)
+            {
+                for (float t = 0f; t < seconds; t += Frame) onboarding.Step(rig, manager, menu, false, default, camera, Frame);
             }
             // Runs until something happens (or the limit), and says how long it took.
             float RunUntil(System.Func<bool> done, float limit)
             {
                 float t = 0f;
-                for (; t < limit && !done(); t += Frame) onboarding.Step(rig, manager, menuOpen, default, camera, Frame);
+                for (; t < limit && !done(); t += Frame) Tick(Frame);
                 return t;
+            }
+            void SetMenu(bool open)
+            {
+                if (!open)
+                {
+                    menu.Close();
+                    return;
+                }
+                menu.Step(rig, manager, null, camera, 0f);
+                menu.Open(camera);
             }
             try
             {
                 // First launch: the opening world, a payoff with Flower dance's own demo, then lesson 1.
                 onboarding.Begin(manager);
-                onboarding.Step(rig, manager, menuOpen, default, camera, Frame);
+                Tick(Frame);
                 float buildMs = (float)stopwatch.Elapsed.TotalMilliseconds;
                 Expect(manager.Worlds[manager.Current] is FlowerDance, "the first launch opens in Flower dance");
                 Expect(onboarding.LeftGhost.IsValid && onboarding.RightGhost.IsValid, "both ghost hands are made from Resources/Onboarding");
@@ -106,36 +137,48 @@ namespace MusicInYourHands.EditorTools
 
                 // Allocation-free steady frames, during a lesson with the ghost, caption, Skip target and fingertip lights.
                 int probe = AllocationsIn(() => allocationProbe = new byte[2048]);
-                int lessonFrames = AllocationsIn(() => Run(4f));
+                int lessonFrames = AllocationsIn(() => RunOnly(4f));
                 allocationProbe = null;
 
                 // Opening the menu completes lesson 1 and brings lesson 2, at the menu, without the Skip target.
                 onboarding.NotifyMenuToggle();
-                menuOpen = true;
+                SetMenu(true);
                 Run(1.2f);
                 Expect(onboarding.HasLearned(Onboarding.Lesson.OpenMenu), "opening the menu completes lesson 1");
                 Expect(PlayerPrefs.GetInt(Onboarding.PrefsKey, 0) == 1, "lesson 1 is remembered");
                 Expect(onboarding.CurrentLesson == Onboarding.Lesson.TouchWorld && onboarding.ShowingMotion == GhostMotion.TouchMenu && !onboarding.ShowingLeft,
                     $"lesson 2 shows the right hand poking the menu (showing {onboarding.ShowingMotion})");
-                Expect(onboarding.Caption == Onboarding.TouchWorldCaption, $"lesson 2's caption (\"{onboarding.Caption}\")");
+                Expect(onboarding.Caption == "" && menu.Prompt == Onboarding.TouchWorldCaption,
+                    $"lesson 2's words are the menu's own caption line (ours \"{onboarding.Caption}\", the menu's \"{menu.Prompt}\")");
                 Expect(!onboarding.SkipShowing, "no Skip target over the open menu");
-                Expect(CaptionDistance(onboarding, head) >= 0.49f, "lesson 2's caption is at least half a metre away");
-                // The poke reaches towards the menu (it opens 44 cm ahead, 5 cm down).
-                var aim = head + Vector3.forward * 0.44f + Vector3.down * 0.05f;
+                // The ghost finger aims at a real world bubble near the middle that the player hasn't been in yet, and that
+                // bubble swells to invite the touch.
+                int target = menu.Beckoned;
+                var middle = Vector3.zero;
+                for (int i = 0; i < worlds.Length; i++)
+                    if (menu.BubblePosition(i, out var p)) middle += p / worlds.Length;
+                bool found = menu.BubblePosition(target, out var bubbleAt);
+                Expect(found && target != manager.Current,
+                    $"lesson 2 aims at a world bubble other than the current one (world {target})");
+                Expect(found && Vector3.Distance(bubbleAt, middle) < bubbleDiameter * 1.6f,
+                    $"lesson 2's bubble is near the middle of the honeycomb ({Vector3.Distance(bubbleAt, middle) * 100f:0.0} cm from it)");
                 onboarding.MotionTime = 0.4f;
-                onboarding.Step(rig, manager, menuOpen, default, camera, 0f);
-                float before = Vector3.Distance(onboarding.RightGhost.Tip(1), aim);
+                onboarding.Step(rig, manager, menu, true, default, camera, 0f);
+                float before = Vector3.Distance(onboarding.RightGhost.Tip(1), bubbleAt);
+                float pointing = Vector3.Angle(onboarding.RightGhost.Tip(1) - onboarding.RightGhost.PalmPosition, bubbleAt - onboarding.RightGhost.PalmPosition);
                 onboarding.MotionTime = 1.3f;
-                onboarding.Step(rig, manager, menuOpen, default, camera, 0f);
-                float poked = Vector3.Distance(onboarding.RightGhost.Tip(1), aim);
-                Expect(poked < before - 0.05f && poked < 0.12f, $"lesson 2's finger pokes towards the menu ({before:0.000} m, then {poked:0.000} m)");
+                onboarding.Step(rig, manager, menu, true, default, camera, 0f);
+                float poked = Vector3.Distance(onboarding.RightGhost.Tip(1), bubbleAt);
+                Expect(pointing < 15f && poked < before - 0.05f && poked < 0.035f,
+                    $"lesson 2's finger points at the bubble ({pointing:0}° off) and pokes up to it ({before * 100f:0.0} cm, then {poked * 100f:0.0} cm)");
 
                 // The menu closes without a choice: lesson 2 shows how to open it again; reopened, the poke returns.
-                menuOpen = false;
+                SetMenu(false);
                 Run(2f);
+                Expect(menu.Prompt == null && menu.Beckoned < 0, "with the menu closed, lesson 2 gives the menu back its caption and bubble");
                 Expect(onboarding.CurrentLesson == Onboarding.Lesson.TouchWorld && onboarding.ShowingMotion == GhostMotion.MenuGesture &&
                        onboarding.Caption == Onboarding.OpenMenuCaption, "with the menu closed, lesson 2 shows how to open it again");
-                menuOpen = true;
+                SetMenu(true);
                 Run(1.2f);
                 Expect(onboarding.ShowingMotion == GhostMotion.TouchMenu, "reopened, lesson 2's poke shows again");
 
@@ -147,7 +190,8 @@ namespace MusicInYourHands.EditorTools
                 Expect(onboarding.HasLearned(Onboarding.Lesson.TouchWorld) && onboarding.CurrentLesson == Onboarding.Lesson.None,
                     "choosing a world at the menu completes lesson 2");
                 Expect(onboarding.ShowingMotion == GhostMotion.None, "no ghost demo while the menu is open");
-                menuOpen = false;
+                Expect(menu.Prompt == null && menu.Beckoned < 0, "lesson 2 done, the menu has its own caption back");
+                SetMenu(false);
                 Run(1.2f);
                 Expect(onboarding.ShowingMotion == GhostMotion.Pinch, $"Light trails' pinch demo shows once the menu closes (showing {onboarding.ShowingMotion})");
                 Expect(onboarding.Caption == "", "a world's demo has no caption of its own (the world's hint has the words)");
@@ -199,7 +243,7 @@ namespace MusicInYourHands.EditorTools
                     Expect(onboarding.ShowingMotion == motion, $"{label}'s demo is {motion} (showing {onboarding.ShowingMotion})");
                     if (motion == GhostMotion.PalmsFacing)
                     {
-                        int demoFrames = AllocationsIn(() => Run(3f));
+                        int demoFrames = AllocationsIn(() => RunOnly(3f));
                         Expect(demoFrames == 0, $"two-handed demo frames allocate nothing ({demoFrames})");
                     }
                     else Run(3f);
@@ -221,7 +265,7 @@ namespace MusicInYourHands.EditorTools
                 for (float d = 0.1f; d > -0.01f; d -= 0.01f)
                 {
                     Hands(skip + towardsEyes * d);
-                    onboarding.Step(rig, manager, menuOpen, default, camera, Frame);
+                    Tick(Frame);
                 }
                 Hands();
                 Run(1f);
@@ -233,6 +277,56 @@ namespace MusicInYourHands.EditorTools
                 onboarding.Replay();
                 Run(1.2f);
                 Expect(onboarding.CurrentLesson == Onboarding.Lesson.OpenMenu, "Replay restarts after a Skip too");
+
+                // The menu's "?" bubble: in the honeycomb's last cell, the whole menu still within the aim area; touched,
+                // it replays the lessons, the menu closes and lesson 1 follows it. A later launch still starts as before.
+                onboarding.Skip();
+                Run(1f);
+                SetMenu(true);
+                Run(1.2f);
+                var menuRoot = menu.transform.Find("Menu");
+                var help = menuRoot.Find("Bubble Help");
+                var lastWorld = menuRoot.Find($"Bubble {worlds.Length - 1}");
+                Expect(help != null && help.gameObject.activeSelf, "the menu shows a \"?\" bubble");
+                if (help != null && lastWorld != null)
+                {
+                    var helpLocal = menuRoot.InverseTransformPoint(help.position);
+                    var lastLocal = menuRoot.InverseTransformPoint(lastWorld.position);
+                    Expect(Mathf.Abs(helpLocal.y - lastLocal.y) < 0.008f && helpLocal.x > lastLocal.x,
+                        "the \"?\" sits in the honeycomb's last cell, after the last world");
+                }
+                var reach = new Extent();
+                foreach (Transform child in menuRoot)
+                {
+                    if (!child.name.StartsWith("Bubble ")) continue;
+                    for (int k = 0; k < 32; k++)
+                    {
+                        float a = k * Mathf.PI * 2f / 32f;
+                        reach.Add(camera.transform, child.position + (menuRoot.right * Mathf.Cos(a) + menuRoot.up * Mathf.Sin(a)) * (bubbleDiameter * WorldMenu.NearGaze * 0.5f));
+                    }
+                }
+                Expect(reach.Inside(WorldMenu.AimArea), $"with the \"?\" the bubbles still fit the {WorldMenu.AimArea.x:0}° × {WorldMenu.AimArea.y:0}° aim area ({reach})");
+                if (help != null)
+                {
+                    var helpAt = help.position;
+                    for (float d = 0.08f; d > -0.015f; d -= 0.01f)
+                    {
+                        Hands(helpAt - menuRoot.forward * d);
+                        Tick(Frame);
+                    }
+                }
+                Hands();
+                Expect(onboarding.CurrentLesson == Onboarding.Lesson.OpenMenu && !onboarding.HasLearned(Onboarding.Lesson.OpenMenu),
+                    $"touching the \"?\" replays the lessons (lesson {onboarding.CurrentLesson})");
+                Expect(onboarding.ShowingLesson == Onboarding.Lesson.None, "while the menu is still open, lesson 1 waits");
+                float closed = RunUntil(() => !menu.IsOpen, 2f);
+                Expect(!menu.IsOpen && closed < 0.6f, $"the menu closes after the \"?\" ({closed:0.00} s)");
+                Run(0.15f);
+                Expect(onboarding.ShowingLesson == Onboarding.Lesson.None, "lesson 1 follows the menu away a moment later, not at once");
+                Run(1.2f);
+                Expect(onboarding.ShowingLesson == Onboarding.Lesson.OpenMenu && onboarding.Caption == Onboarding.OpenMenuCaption,
+                    "then lesson 1 shows how to open the menu again");
+                Expect(PlayerPrefs.GetInt(Onboarding.PrefsKey, 0) == (1 | 2 | 4 | 8), "replaying keeps what is remembered, so a later launch starts as before");
 
                 // The ghost thumb really meets the index: pinch and thumb tap, on both hands.
                 foreach (var ghost in new[] { onboarding.LeftGhost, onboarding.RightGhost })
@@ -295,7 +389,8 @@ namespace MusicInYourHands.EditorTools
                     Debug.Log("[Check] Onboarding: a first launch opens in Flower dance, and after its payoff the ghost left hand shows the menu " +
                               "gesture; opening the menu brings the poke at the menu, choosing a world completes it; the thumb lesson comes " +
                               "later, fades, comes back once and a thumb gesture completes it; it is all remembered, Skip skips it and Replay " +
-                              "restarts; world demos show for their first seconds, never over the menu; MusicGestures reports the thumb gestures it carries out; " +
+                              "restarts, and so does the menu's \"?\"; lesson 2 points at a real bubble; world demos show for their first seconds, never over the menu; " +
+                              "MusicGestures reports the thumb gestures it carries out; " +
                               "ghost thumbs meet the index; " +
                               $"nothing nearer than half a metre to read; steady frames allocate nothing. Ghost hands made in {buildMs:0} ms. " +
                               $"{GhostMotions.WorldTable.Length} worlds have a demo{(unmapped.Count > 0 ? "; without one: " + string.Join(", ", unmapped) : "")}.");

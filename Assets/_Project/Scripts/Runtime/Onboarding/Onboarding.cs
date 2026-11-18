@@ -17,7 +17,8 @@ namespace MusicInYourHands
     /// </list>
     /// Your own active fingertips glow while a lesson waits; doing it sets off a burst of sparks and a soft chime in the
     /// song's key. A Skip target low on the right skips the lessons. What you have learned is remembered, so later
-    /// launches start as before; Replay (and "--ez onboarding true" on the adb launch) starts the lessons again.
+    /// launches start as before. The menu's "?" bubble (Replay) shows the lessons again: the menu closes and the ghost
+    /// shows how to open it; "--ez onboarding true" on the adb launch starts the whole first launch again.
     /// Every world also gets a ghost demo of its own gesture for its first ten seconds, beside its text hint (see
     /// <see cref="GhostMotions.WorldTable"/>), never while the menu is open. The onboarding is made at run time
     /// (nothing in the scene) and reads the menu only through WorldMenu.ToggleRequested, WorldMenu.IsOpen and
@@ -36,6 +37,8 @@ namespace MusicInYourHands
         public const string TouchWorldCaption = "Touch a world";
         public const string ThumbCaption = "Thumb: tap to pause, swipe to skip";
         public const string ControllersCaption = "Put your controllers down and use your hands";
+        /// <summary>The same, short enough for the open menu's caption line.</summary>
+        public const string ControllersPrompt = "Put your controllers down";
 
         [Header("Opening (first launch)")]
         [Tooltip("The world the app opens in on first launch, by its class name.")]
@@ -69,7 +72,8 @@ namespace MusicInYourHands
         /// <summary>Set by the Meta feed: true while the player is holding controllers rather than using their hands.</summary>
         public static Func<bool> ControllersInUse;
 
-        int learned;
+        // What this session counts as learned (Replay forgets it), and what is kept between launches.
+        int learned, remembered;
         bool lessonsOn = true, opening, openingPending, worldAsked;
         float clock, openingClock;
         Lesson lesson;
@@ -88,6 +92,8 @@ namespace MusicInYourHands
         SongAsset watchedSong;
         float watchedTime;
         WorldManager subscribed;
+        // The worlds the player has been in this session, so lesson 2 can point at one they haven't tried.
+        bool[] tried = Array.Empty<bool>();
 
         // ---- What the editor checks read ----
 
@@ -97,7 +103,7 @@ namespace MusicInYourHands
         /// <summary>True during the opening's first seconds, before the first lesson.</summary>
         public bool IsOpening => opening && lesson == Lesson.None && !Has(LearnedMenu);
 
-        /// <summary>Whether a lesson has been learned (or skipped), as remembered between launches.</summary>
+        /// <summary>Whether a lesson counts as learned (or skipped) now: remembered between launches, forgotten by Replay.</summary>
         public bool HasLearned(Lesson which) => which switch
         {
             Lesson.OpenMenu => Has(LearnedMenu),
@@ -127,6 +133,7 @@ namespace MusicInYourHands
 
         void OnDestroy()
         {
+            EndInvite();
             if (Instance == this) Instance = null;
         }
 
@@ -140,6 +147,7 @@ namespace MusicInYourHands
 
         void OnDisable()
         {
+            EndInvite();
             WorldMenu.ToggleRequested -= NotifyMenuToggle;
             MusicGestures.Used -= OnGesture;
             if (subscribed != null) subscribed.WorldChanged -= NotifyWorldChanged;
@@ -168,7 +176,7 @@ namespace MusicInYourHands
                 Bands = bus.Bands, Kick = bus.Kick, Bus = bus, SongTime = bus.SongTime, Notes = bus.Notes,
                 BeatAge = bus.TimeSinceBeat, BeatInterval = bus.BeatInterval
             };
-            Step(HandRig.Instance, WorldManager.Instance, menuOpen, frame, Camera.main, dt);
+            Step(HandRig.Instance, WorldManager.Instance, menu, menuOpen, frame, Camera.main, dt);
         }
 
         /// <summary>The first song looping round counts as it ending (songs loop), which brings on the thumb lesson.</summary>
@@ -192,6 +200,7 @@ namespace MusicInYourHands
         /// </summary>
         public void Begin(WorldManager worlds, bool tour = false, bool replay = false, bool now = true)
         {
+            Instance = this;
             manager = worlds;
             Load();
             lessonsOn = !tour;
@@ -236,10 +245,14 @@ namespace MusicInYourHands
             Debug.Log($"[Onboarding] First launch: opening in {openingWorld} with \"{openingSong}\".");
         }
 
-        /// <summary>Starts the lessons again from the first (the menu's "?" will call this). The opening only if asked.</summary>
+        /// <summary>
+        /// Starts the lessons again from the first: the menu's "?" bubble. Pressed at the open menu, the first lesson waits
+        /// until the menu has closed, then the ghost shows how to open it again. Only this session forgets the lessons, so a
+        /// later launch still starts as before; with <paramref name="withOpening"/> the opening world and song come too.
+        /// </summary>
         public void Replay(bool withOpening = false)
         {
-            Forget();
+            learned = 0;
             lessonsOn = true;
             SetLesson(Lesson.None);
             settledClock = 0f;
@@ -306,10 +319,12 @@ namespace MusicInYourHands
         /// One frame: the lessons move on, then the ghost hands, caption, Skip target, fingertip lights and effects are
         /// drawn. Public so the editor checks can drive it; on the headset LateUpdate calls it.
         /// </summary>
-        public void Step(HandRig rig, WorldManager worlds, bool menuOpen, MusicFrame frame, Camera view, float dt)
+        public void Step(HandRig rig, WorldManager worlds, WorldMenu menu, bool menuOpen, MusicFrame frame, Camera view, float dt)
         {
             manager = worlds;
+            menuNow = menu;
             lastRig = rig;
+            if (worlds != null && worlds.Current >= 0) MarkTried(worlds.Current);
             music = frame;
             Build();
             clock += dt;
@@ -392,9 +407,18 @@ namespace MusicInYourHands
             if (next != Lesson.None) Debug.Log($"[Onboarding] Lesson: {next}");
         }
 
+        void MarkTried(int index)
+        {
+            if (index >= tried.Length) Array.Resize(ref tried, Mathf.Max(index + 1, manager != null ? manager.Worlds.Count : 0));
+            tried[index] = true;
+        }
+
+        bool Tried(int index) => index >= 0 && index < tried.Length && tried[index];
+
         /// <summary>Starts a world's ghost demo.</summary>
         void StartHint(int index)
         {
+            if (index >= 0) MarkTried(index);
             worldClock = 0f;
             hintMotion = GhostMotion.None;
             if (manager == null || index < 0 || index >= manager.Worlds.Count) return;
@@ -413,15 +437,16 @@ namespace MusicInYourHands
             switch (lesson)
             {
                 case Lesson.OpenMenu:
-                    if (!menuOpen) MenuLesson(ref want, Lesson.OpenMenu);
+                    // Just after the menu closes (the "?" bubble), a moment passes first, so the lesson follows the menu away.
+                    if (!menuOpen && menuClosedClock > 0.3f) MenuLesson(ref want, Lesson.OpenMenu);
                     break;
                 case Lesson.TouchWorld:
                     if (menuOpen)
                     {
+                        // The menu's own caption line says it, so nothing of ours covers its bubbles.
                         want.Motion = GhostMotion.TouchMenu;
                         want.Lesson = Lesson.TouchWorld;
-                        want.Caption = TouchWorldCaption;
-                        want.AtMenu = true;
+                        want.Prompt = TouchWorldCaption;
                         want.Lights = 1 << 1;
                     }
                     // The menu closed without a choice: show again how to open it.
@@ -434,16 +459,17 @@ namespace MusicInYourHands
                         want.Left = thumbLeft;
                         want.Lesson = Lesson.Thumb;
                         want.Caption = ThumbCaption;
+                        want.CaptionSide = thumbLeft ? 1f : -1f;
                         want.Skip = true;
                         want.Lights = 1 | 1 << 1;
                     }
                     break;
             }
             bool controllers = ControllersInUse != null && ControllersInUse();
-            if (controllers && lessonsOn && (want.Lesson != Lesson.None || IsOpening) && !menuOpen)
+            if (controllers && lessonsOn && (want.Lesson != Lesson.None || IsOpening))
             {
-                want.Caption = ControllersCaption;
-                want.AtMenu = false;
+                if (menuOpen) want.Prompt = want.Prompt != null ? ControllersPrompt : null;
+                else want.Caption = ControllersCaption;
             }
             if (want.Motion != GhostMotion.None || !HintShowing(menuOpen)) return;
             if (hintSidePending)
@@ -462,6 +488,8 @@ namespace MusicInYourHands
             want.Left = true;
             want.Lesson = lesson;
             want.Caption = OpenMenuCaption;
+            // Beside the left ghost hand, to its right.
+            want.CaptionSide = 1f;
             want.Skip = true;
             want.Lights = 1 | 1 << 1;
         }
@@ -470,19 +498,20 @@ namespace MusicInYourHands
 
         bool Has(int bits) => (learned & bits) == bits;
 
-        void Load() => learned = PlayerPrefs.GetInt(PrefsKey, 0);
+        void Load() => learned = remembered = PlayerPrefs.GetInt(PrefsKey, 0);
 
         void Learn(int bits)
         {
-            if ((learned | bits) == learned) return;
             learned |= bits;
-            PlayerPrefs.SetInt(PrefsKey, learned);
+            if ((remembered | bits) == remembered) return;
+            remembered |= bits;
+            PlayerPrefs.SetInt(PrefsKey, remembered);
             PlayerPrefs.Save();
         }
 
         void Forget()
         {
-            learned = 0;
+            learned = remembered = 0;
             PlayerPrefs.SetInt(PrefsKey, 0);
             PlayerPrefs.Save();
         }

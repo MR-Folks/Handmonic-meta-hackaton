@@ -15,8 +15,10 @@ namespace MusicInYourHands
             public bool Left;
             public Lesson Lesson;
             public string Caption;
-            /// <summary>The caption sits on the open menu rather than below your view.</summary>
-            public bool AtMenu;
+            /// <summary>Which side the caption sits on: -1 left, 1 right, 0 in the middle (away from the ghost hand).</summary>
+            public float CaptionSide;
+            /// <summary>Words for the open menu's own caption line, in place of a caption of ours (lesson 2).</summary>
+            public string Prompt;
             public bool Skip;
             /// <summary>Which of your own fingertips glow, on the ghost's side: bit 0 thumb, 1 index.</summary>
             public int Lights;
@@ -27,15 +29,13 @@ namespace MusicInYourHands
         [SerializeField] Vector3 ghostHome = new Vector3(0.12f, -0.18f, 0.42f);
         [Tooltip("Where the ghost hand sits for 'Touch a world': nearer you than the menu, low on the right.")]
         [SerializeField] Vector3 pokeHome = new Vector3(0.1f, -0.17f, 0.27f);
-        [Tooltip("How far ahead (m) and how far below your eyes the caption floats.")]
+        [Tooltip("How far ahead the caption floats (m).")]
         [SerializeField] float captionDistance = 0.62f;
-        [SerializeField] float captionDrop = 0.075f;
+        [Tooltip("Where the caption floats: degrees to the side, away from the ghost hand, and degrees below straight ahead. " +
+                 "Low enough to keep clear of what a world floats at eye height (Flower dance's sung words), above the ghost.")]
+        [SerializeField] Vector2 captionPlace = new Vector2(7f, 15f);
         [Tooltip("The caption's letter height (m): about 1.8 degrees at its distance.")]
         [SerializeField] float captionHeight = 0.019f;
-        [Tooltip("Lesson 2's aim on the open menu, in the menu's space: its centre until the menu has a bubble to aim at.")]
-        [SerializeField] Vector3 menuAim = Vector3.zero;
-        [Tooltip("Where lesson 2's caption sits, in the menu's space: just above its centre, a little behind it.")]
-        [SerializeField] Vector3 menuCaption = new Vector3(0f, 0.06f, 0.06f);
         [Tooltip("Where the Skip target sits: degrees to the right, degrees down, and distance (m).")]
         [SerializeField] Vector3 skipPlace = new Vector3(20f, 22f, 0.5f);
         [Tooltip("The Skip target's radius (m).")]
@@ -74,18 +74,18 @@ namespace MusicInYourHands
         bool framed;
         // The caption.
         string shownCaption;
-        bool shownAtMenu, captionPlaced;
-        float captionAlpha;
+        bool captionPlaced;
+        float captionAlpha, shownSide;
         // The Skip target.
         float skipAlpha, skipAway, skipHover, skipPop;
         bool skipPlaced, skipFollowing;
         readonly bool[] skipArmed = new bool[2];
         readonly float[] skipDepth = { 1f, 1f };
-        // The menu, as lesson 2 aims at it.
-        WorldMenu menuOwner;
-        Transform menuRoot;
+        // The menu, as lesson 2 aims at it: the world bubble chosen when it opened, and where it opened, for when there is
+        // no menu to ask; and the menu whose caption and bubble lesson 2 has borrowed.
+        WorldMenu menuNow, invited;
+        int menuTarget = -1;
         Vector3 menuPlacedAt;
-        Quaternion menuPlacedRotation = Quaternion.identity;
         // The last burst.
         Vector3 burstAt;
         float burstAge = 99f;
@@ -184,6 +184,7 @@ namespace MusicInYourHands
             frame = framed ? Quaternion.Slerp(frame, level, 1f - Mathf.Exp(-2.5f * dt)) : level;
             framed = true;
 
+            StepInvite(menuOpen, want);
             StepGhosts(rig, view, head, menuOpen, want, dt);
             StepCaption(view, head, want, dt);
             StepSkip(rig, view, head, want, dt);
@@ -244,18 +245,26 @@ namespace MusicInYourHands
                 var at = (two ? anchors[2] : anchors[side]) + frame * pose.Offset;
                 var fingers = frame * pose.Fingers;
                 var palm = frame * pose.Palm;
-                if (pose.AimMenu > 0f)
-                {
-                    MenuAnchors(out var aim, out _, out _);
-                    var to = aim - at;
-                    if (to.sqrMagnitude > 1e-4f) fingers = Vector3.Slerp(fingers, to.normalized, pose.AimMenu);
-                }
                 if (pose.FaceView > 0f)
                 {
                     var to = head - at;
                     if (to.sqrMagnitude > 1e-4f) palm = Vector3.Slerp(palm, to.normalized, pose.FaceView);
                 }
-                at += fingers * pose.Reach;
+                var toAim = pose.AimMenu > 0f ? MenuAim() - at : Vector3.zero;
+                if (toAim.sqrMagnitude > 1e-4f)
+                {
+                    // Pointing at the menu: the hand turns so the index fingertip itself lines up with the bubble, and the
+                    // poke ends with that fingertip just short of it, however far away the menu is.
+                    fingers = Vector3.Slerp(fingers, toAim.normalized, pose.AimMenu);
+                    ghost.Pose(at, fingers, palm, pose.Curl, pose.Spread, pose.ThumbFrom, pose.ThumbTo, pose.ThumbBlend);
+                    var tip = ghost.Tip(1) - at;
+                    var turn = Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(tip, toAim), pose.AimMenu);
+                    fingers = turn * fingers;
+                    palm = turn * palm;
+                    float room = Mathf.Clamp(toAim.magnitude - tip.magnitude - 0.012f, 0.03f, 0.2f);
+                    at += toAim.normalized * (pose.Reach / GhostMotions.FullPoke * room);
+                }
+                else at += fingers * pose.Reach;
                 ghost.Pose(at, fingers, palm, pose.Curl, pose.Spread, pose.ThumbFrom, pose.ThumbTo, pose.ThumbBlend);
 
                 float glow = baseGlow + (1f - baseGlow) * pose.Glow;
@@ -334,54 +343,95 @@ namespace MusicInYourHands
 
         void RememberMenu(Camera view)
         {
-            // Where the menu opens (in front of you, as WorldMenu places it), for when its own objects can't be found.
-            var head = view.transform.position;
-            menuPlacedAt = head + Effects.FlatForward(view) * 0.44f + Vector3.down * 0.05f;
-            menuPlacedRotation = Quaternion.LookRotation(menuPlacedAt - head, Vector3.up);
+            // Where the menu opens (half a metre along your gaze, a little lower, as WorldMenu places it), for when there
+            // is no menu to ask; and a bubble to aim at is chosen afresh.
+            var direction = Quaternion.AngleAxis(1f, view.transform.right) * view.transform.forward;
+            menuPlacedAt = view.transform.position + direction * 0.5f;
+            menuTarget = -1;
         }
 
         /// <summary>
-        /// Where lesson 2's ghost finger aims and pokes, and where its caption sits: on the open menu, its centre for now
-        /// (menuAim, menuCaption, in the menu's space). This is the one place to change once the redesigned menu has a
-        /// bubble to aim at. Reads the menu's "Menu" object when it has one, else where the menu opened.
+        /// Where lesson 2's ghost finger points and pokes: a real world bubble on the open menu (WorldMenu.BubblePosition),
+        /// chosen as the menu opens: of the worlds the player hasn't tried yet (or else any but the current one), the one
+        /// nearest the middle of the honeycomb. Without a menu to ask, where the menu opened.
         /// </summary>
-        void MenuAnchors(out Vector3 aim, out Vector3 caption, out Quaternion facing)
+        Vector3 MenuAim()
         {
-            var menu = WorldMenu.Instance;
-            // Looked up again until the menu has built its objects.
-            if (menu != menuOwner || (menuRoot == null && menu != null))
+            if (menuNow != null)
             {
-                menuOwner = menu;
-                menuRoot = menu != null ? menu.transform.Find("Menu") : null;
+                if (menuTarget < 0) menuTarget = ChooseTarget(menuNow);
+                if (menuTarget >= 0 && menuNow.BubblePosition(menuTarget, out var at)) return at;
             }
-            if (menuRoot != null && menuRoot.gameObject.activeInHierarchy)
+            return menuPlacedAt;
+        }
+
+        int ChooseTarget(WorldMenu menu)
+        {
+            if (manager == null) return -1;
+            int count = manager.Worlds.Count;
+            var middle = Vector3.zero;
+            int shown = 0;
+            for (int i = 0; i < count; i++)
             {
-                aim = menuRoot.TransformPoint(menuAim);
-                caption = menuRoot.TransformPoint(menuCaption);
-                facing = menuRoot.rotation;
-                return;
+                if (!menu.BubblePosition(i, out var at)) continue;
+                middle += at;
+                shown++;
             }
-            aim = menuPlacedAt + menuPlacedRotation * menuAim;
-            caption = menuPlacedAt + menuPlacedRotation * menuCaption;
-            facing = menuPlacedRotation;
+            if (shown == 0) return -1;
+            middle /= shown;
+            int best = -1;
+            float bestScore = float.MaxValue;
+            for (int i = 0; i < count; i++)
+            {
+                if (i == manager.Current || !menu.BubblePosition(i, out var at)) continue;
+                float score = Vector3.Distance(at, middle) + (Tried(i) ? 1f : 0f);
+                if (score >= bestScore) continue;
+                bestScore = score;
+                best = i;
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// While lesson 2 shows, the open menu's own caption line says what to do (instead of a caption of ours over its
+        /// bubbles) and the bubble the ghost points at gently swells, until the player points at a bubble themselves.
+        /// </summary>
+        void StepInvite(bool menuOpen, in Display want)
+        {
+            var menu = menuOpen && want.Prompt != null ? menuNow : null;
+            if (invited != null && invited != menu) EndInvite();
+            if (menu == null) return;
+            if (menuTarget < 0) menuTarget = ChooseTarget(menu);
+            menu.Prompt = want.Prompt;
+            menu.Beckoned = menuTarget;
+            invited = menu;
+        }
+
+        void EndInvite()
+        {
+            if (invited == null) return;
+            invited.Prompt = null;
+            invited.Beckoned = -1;
+            invited = null;
         }
 
         // ---- Caption ----
 
         /// <summary>
-        /// The one-line caption on a dark rounded plate for contrast over any room: below the middle of your view,
-        /// following it loosely, or on the open menu for lesson 2. It always stands at least half a metre away.
+        /// The one-line caption on a dark rounded plate for contrast over any room: a little below and to the side of the
+        /// middle of your view, beside the ghost hand rather than over it, following your view loosely. It stands farther
+        /// than half a metre away. (With the menu open, lesson 2 uses the menu's own caption line instead.)
         /// </summary>
         void StepCaption(Camera view, Vector3 head, in Display want, float dt)
         {
             var text = want.Caption;
-            if (text != shownCaption || want.AtMenu != shownAtMenu)
+            if (text != shownCaption || want.CaptionSide != shownSide)
             {
                 captionAlpha = Mathf.MoveTowards(captionAlpha, 0f, dt / 0.25f);
                 if (captionAlpha <= 0f)
                 {
                     shownCaption = text;
-                    shownAtMenu = want.AtMenu;
+                    shownSide = want.CaptionSide;
                     captionPlaced = false;
                     if (text != null)
                     {
@@ -401,19 +451,8 @@ namespace MusicInYourHands
             if (captionRoot.gameObject.activeSelf != show) captionRoot.gameObject.SetActive(show);
             if (!show) return;
 
-            Vector3 position;
-            if (shownAtMenu)
-            {
-                MenuAnchors(out _, out position, out _);
-                // As large to the eye as below your view, though nearer.
-                captionRoot.localScale = Vector3.one * Mathf.Clamp(Vector3.Distance(head, position) / captionDistance, 0.6f, 1.2f);
-            }
-            else
-            {
-                var target = head + frame * new Vector3(0f, -captionDrop, captionDistance);
-                position = captionPlaced ? Vector3.Lerp(captionRoot.position, target, 1f - Mathf.Exp(-3f * dt)) : target;
-                captionRoot.localScale = Vector3.one;
-            }
+            var target = head + frame * (Quaternion.Euler(captionPlace.y, captionPlace.x * shownSide, 0f) * Vector3.forward * captionDistance);
+            var position = captionPlaced ? Vector3.Lerp(captionRoot.position, target, 1f - Mathf.Exp(-3f * dt)) : target;
             captionRoot.SetPositionAndRotation(position, Quaternion.LookRotation(position - head, Vector3.up));
             captionPlaced = true;
 
@@ -605,9 +644,7 @@ namespace MusicInYourHands
                     if (tracked) return (Tip(0) + Tip(1)) * 0.5f;
                     return ghostL != null && ghostL.IsValid ? ghostL.Tip(1) : transform.position;
                 case Lesson.TouchWorld:
-                    if (tracked) return Tip(1);
-                    MenuAnchors(out var aim, out _, out _);
-                    return aim;
+                    return tracked ? Tip(1) : MenuAim();
                 default:
                     if (tracked) return Tip(0);
                     var ghost = left ? ghostL : ghostR;
